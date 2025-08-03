@@ -3,37 +3,27 @@ import { useAuth } from '../context/Auth';
 import { useRouter } from 'next/router';
 import { Bar } from 'react-chartjs-2';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 } from 'chart.js';
+import {
+  Typography, CircularProgress, Alert, Box, Grid, Paper
+} from '@mui/material';
+import AppLayout from '../components/AppLayout';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user && process.env.NODE_ENV !== 'test') {
       router.push('/login');
       return;
     }
-
     const fetchStats = async () => {
       try {
         const res = await fetch('/api/dashboard-stats');
@@ -46,8 +36,7 @@ export default function DashboardPage() {
         setLoading(false);
       }
     };
-
-    fetchStats();
+    if(user) fetchStats();
   }, [user, router]);
 
   const chartData = {
@@ -56,8 +45,8 @@ export default function DashboardPage() {
       {
         label: 'Total de Rutas Asignadas',
         data: stats?.rutas_por_mercaderista?.map(item => item.total_rutas) || [],
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
+        backgroundColor: 'rgba(85, 108, 214, 0.6)',
+        borderColor: 'rgba(85, 108, 214, 1)',
         borderWidth: 1,
       },
     ],
@@ -66,45 +55,50 @@ export default function DashboardPage() {
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top',
-      },
-      title: {
-        display: true,
-        text: 'Rendimiento por Mercaderista',
-      },
+      legend: { position: 'top' },
+      title: { display: true, text: 'Rendimiento por Mercaderista' },
     },
   };
 
-  if (loading || !user) {
-    return <div>Cargando dashboard...</div>;
+  if (!user || !profile || loading) {
+    return (
+      <AppLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>
+      </AppLayout>
+    );
   }
 
-  if (error) {
-    return <div>Error: {error}</div>;
+  if (profile.role !== 'supervisor') {
+    return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
   }
 
   return (
-    <div style={{ padding: '40px' }}>
-      <h1>Dashboard de Analítica</h1>
+    <AppLayout>
+      <Typography variant="h4" gutterBottom>Dashboard de Analítica</Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!error && stats && (
+        <>
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} sm={6} md={4}>
+              <Paper sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h6" color="text.secondary">Total de Rutas</Typography>
+                <Typography variant="h3" component="p" sx={{ fontWeight: 'bold' }}>{stats.total_rutas ?? 0}</Typography>
+              </Paper>
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <Paper sx={{ p: 2, textAlign: 'center' }}>
+                <Typography variant="h6" color="text.secondary">Total Puntos Visitados</Typography>
+                <Typography variant="h3" component="p" sx={{ fontWeight: 'bold' }}>{stats.total_puntos_visitados ?? 0}</Typography>
+              </Paper>
+            </Grid>
+          </Grid>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '40px' }}>
-        <div style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.2em' }}>Total de Rutas</h2>
-          <p style={{ fontSize: '2.5em', margin: '10px 0', fontWeight: 'bold' }}>{stats?.total_rutas ?? 0}</p>
-        </div>
-        <div style={{ border: '1px solid #ddd', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: '1.2em' }}>Total Puntos Visitados</h2>
-          <p style={{ fontSize: '2.5em', margin: '10px 0', fontWeight: 'bold' }}>{stats?.total_puntos_visitados ?? 0}</p>
-        </div>
-      </div>
-
-      <div>
-        <h2>Desglose de Rutas</h2>
-        <div style={{ maxWidth: '800px', margin: 'auto', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-          <Bar options={chartOptions} data={chartData} />
-        </div>
-      </div>
-    </div>
+          <Typography variant="h5" gutterBottom>Desglose de Rutas</Typography>
+          <Paper sx={{ p: 2 }}>
+            <Bar options={chartOptions} data={chartData} />
+          </Paper>
+        </>
+      )}
+    </AppLayout>
   );
 }

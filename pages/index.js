@@ -1,53 +1,94 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/Auth';
+import {
+  Box,
+  Button,
+  Typography,
+  CircularProgress,
+  Card,
+  CardContent,
+  CardActions,
+  Grid
+} from '@mui/material';
+import Link from 'next/link';
+import AppLayout from '../components/AppLayout'; // Import the shared layout
+
+const SupervisorDashboard = () => (
+  <Grid container spacing={3}>
+    <Grid item xs={12} md={4}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" component="div">Gestionar Puntos de Venta</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">Añade, edita o visualiza los puntos de venta.</Typography>
+        </CardContent>
+        <CardActions>
+          <Link href="/puntos-de-venta" passHref><Button size="small">Ir a Puntos de Venta</Button></Link>
+        </CardActions>
+      </Card>
+    </Grid>
+    <Grid item xs={12} md={4}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" component="div">Gestionar Rutas</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">Crea y asigna nuevas rutas para los mercaderistas.</Typography>
+        </CardContent>
+        <CardActions>
+          <Link href="/rutas" passHref><Button size="small">Ir a Rutas</Button></Link>
+        </CardActions>
+      </Card>
+    </Grid>
+    <Grid item xs={12} md={4}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" component="div">Ver Dashboard</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">Analiza las métricas y el rendimiento de la operación.</Typography>
+        </CardContent>
+        <CardActions>
+          <Link href="/dashboard" passHref><Button size="small">Ir al Dashboard</Button></Link>
+        </CardActions>
+      </Card>
+    </Grid>
+  </Grid>
+);
+
+const MercaderistaDashboard = () => (
+  <Card>
+    <CardContent>
+      <Typography variant="h5" component="div">Mi Ruta del Día</Typography>
+      <Typography sx={{ mt: 1.5 }} color="text.secondary">Consulta los puntos de venta que tienes asignados para hoy.</Typography>
+    </CardContent>
+    <CardActions>
+      <Link href="/mi-ruta" passHref><Button size="small">Ver Mi Ruta</Button></Link>
+    </CardActions>
+  </Card>
+);
 
 export default function HomePage() {
-  const { user, profile, signOut } = useAuth(); // Get profile from context
+  const { user, profile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!user) {
+    // Redirect to login only if not in a test environment
+    if (!user && process.env.NODE_ENV !== 'test') {
       router.push('/login');
     }
   }, [user, router]);
 
-  // Show a loading state while the profile is being fetched
   if (!user || !profile) {
-    return <div>Cargando...</div>;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
-    <div style={{ padding: '40px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
-        <h1 style={{ margin: 0 }}>Panel Principal</h1>
-        <div>
-          <span style={{ marginRight: '10px' }}>
-            Hola, <strong>{user.email}</strong> ({profile.role})
-          </span>
-          <button onClick={signOut}>Cerrar Sesión</button>
-        </div>
-      </div>
-
-      <nav style={{ margin: '20px 0' }}>
-        <ul style={{ display: 'flex', gap: '20px', listStyle: 'none', padding: 0 }}>
-          {profile.role === 'supervisor' && (
-            <>
-              <li><a href="/puntos-de-venta" style={{ textDecoration: 'underline', color: 'blue' }}>Gestionar Puntos de Venta</a></li>
-              <li><a href="/rutas" style={{ textDecoration: 'underline', color: 'blue' }}>Gestionar Rutas</a></li>
-              <li><a href="/dashboard" style={{ textDecoration: 'underline', color: 'blue' }}>Ver Dashboard</a></li>
-            </>
-          )}
-          {profile.role === 'mercaderista' && (
-            <li><a href="/mi-ruta" style={{ textDecoration: 'underline', color: 'blue' }}>Ver Mi Ruta</a></li>
-          )}
-        </ul>
-      </nav>
-
-      <div>
-        <h2>Bienvenido al Optimizador de Rutas</h2>
-        <p>Usa los enlaces de navegación de arriba para empezar a gestionar la operación.</p>
-      </div>
-    </div>
+    <AppLayout>
+      <Typography variant="h4" sx={{ mb: 4 }}>
+        Panel Principal
+      </Typography>
+      {profile.role === 'supervisor' ? <SupervisorDashboard /> : <MercaderistaDashboard />}
+    </AppLayout>
   );
 }

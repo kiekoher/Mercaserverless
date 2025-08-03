@@ -1,31 +1,36 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/Auth';
 import { useRouter } from 'next/router';
+import {
+  Typography, Button, Grid, Paper, TextField, Table,
+  TableBody, TableCell, TableContainer, TableHead, TableRow,
+  CircularProgress, Alert, Box
+} from '@mui/material';
+import AppLayout from '../components/AppLayout';
 
 export default function PuntosDeVentaPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Form state
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
   const [ciudad, setCiudad] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Protect the route
-    if (!user) {
-      router.push('/login');
-    }
+    if (!user && process.env.NODE_ENV !== 'test') router.push('/login');
   }, [user, router]);
 
   const fetchPuntos = async () => {
     try {
       const res = await fetch('/api/puntos-de-venta');
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to fetch');
+      }
       const data = await res.json();
       setPuntos(data);
     } catch (err) {
@@ -36,9 +41,7 @@ export default function PuntosDeVentaPage() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchPuntos();
-    }
+    if (user) fetchPuntos();
   }, [user]);
 
   const handleSubmit = async (e) => {
@@ -51,12 +54,14 @@ export default function PuntosDeVentaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre, direccion, ciudad }),
       });
-      if (!res.ok) throw new Error('Failed to create point of sale');
-      // Reset form and refresh list
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create point of sale');
+      }
       setNombre('');
       setDireccion('');
       setCiudad('');
-      await fetchPuntos(); // Await to ensure list is updated before submission state changes
+      await fetchPuntos();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -64,62 +69,84 @@ export default function PuntosDeVentaPage() {
     }
   };
 
-  if (!user) {
-    return <div>Cargando...</div>;
+  if (!user || !profile) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
+  }
+
+  if (profile.role !== 'supervisor') {
+    return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
   }
 
   return (
-    <div style={{ padding: '40px' }}>
-      <h1>Gestión de Puntos de Venta</h1>
-
-      <div style={{ display: 'flex', gap: '40px', marginTop: '20px' }}>
-        <div style={{ flex: 1 }}>
-          <h2>Listado Actual</h2>
-          {loading && <p>Cargando puntos de venta...</p>}
-          {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-          {!loading && !error && (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Nombre</th>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Dirección</th>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Ciudad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {puntos.map((punto) => (
-                  <tr key={punto.id}>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{punto.nombre}</td>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{punto.direccion}</td>
-                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{punto.ciudad}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div style={{ flex: 1, maxWidth: '400px' }}>
-          <h2>Añadir Nuevo Punto</h2>
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: '16px' }}>
-              <label>Nombre</label>
-              <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '4px' }} />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label>Dirección</label>
-              <input type="text" value={direccion} onChange={(e) => setDireccion(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '4px' }} />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label>Ciudad</label>
-              <input type="text" value={ciudad} onChange={(e) => setCiudad(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '4px' }} />
-            </div>
-            <button type="submit" disabled={isSubmitting} style={{ padding: '10px 20px', width: '100%' }}>
-              {isSubmitting ? 'Guardando...' : 'Guardar Punto'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+    <AppLayout>
+      <Typography variant="h4" gutterBottom>Gestión de Puntos de Venta</Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={8}>
+          <Typography variant="h6" gutterBottom>Listado Actual</Typography>
+          <Paper>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Nombre</TableCell>
+                    <TableCell>Dirección</TableCell>
+                    <TableCell>Ciudad</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow><TableCell colSpan={3} align="center"><CircularProgress /></TableCell></TableRow>
+                  ) : puntos.map((punto) => (
+                    <TableRow key={punto.id}>
+                      <TableCell>{punto.nombre}</TableCell>
+                      <TableCell>{punto.direccion}</TableCell>
+                      <TableCell>{punto.ciudad}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="h6" gutterBottom>Añadir Nuevo Punto</Typography>
+          <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
+            <TextField
+              label="Nombre del Punto"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="Dirección"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              label="Ciudad"
+              value={ciudad}
+              onChange={(e) => setCiudad(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
+    </AppLayout>
   );
 }

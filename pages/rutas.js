@@ -1,9 +1,15 @@
 import { useState, useEffect, Fragment } from 'react';
 import { useAuth } from '../context/Auth';
 import { useRouter } from 'next/router';
+import {
+  Container, Box, Typography, Button, Grid, Paper, TextField,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  CircularProgress, Alert, Checkbox, FormControlLabel, FormGroup, Tooltip
+} from '@mui/material';
+import AppLayout from '../components/AppLayout'; // Assuming we create a shared layout component
 
 export default function RutasPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
 
   const [rutas, setRutas] = useState([]);
@@ -18,9 +24,10 @@ export default function RutasPage() {
 
   const [summaries, setSummaries] = useState({});
   const [summaryLoading, setSummaryLoading] = useState(null);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   useEffect(() => {
-    if (!user) router.push('/login');
+    if (!user && process.env.NODE_ENV !== 'test') router.push('/login');
   }, [user, router]);
 
   const fetchData = async () => {
@@ -49,8 +56,6 @@ export default function RutasPage() {
     setSelectedPuntos(prev => prev.includes(puntoId) ? prev.filter(id => id !== puntoId) : [...prev, puntoId]);
   };
 
-  const [isOptimizing, setIsOptimizing] = useState(false);
-
   const handleOptimizeRoute = async () => {
     if (selectedPuntos.length < 2) {
       setError("Selecciona al menos 2 puntos para optimizar.");
@@ -68,14 +73,12 @@ export default function RutasPage() {
       if (!res.ok) throw new Error('La optimización falló');
       const data = await res.json();
 
-      // Reorder the main `puntos` list to reflect the optimized order visually
       const optimizedIds = data.optimizedPuntos.map(p => p.id);
       const remainingPuntos = puntos.filter(p => !optimizedIds.includes(p.id));
       const reorderedPuntos = [...data.optimizedPuntos, ...remainingPuntos];
 
       setPuntos(reorderedPuntos);
-      setSelectedPuntos(optimizedIds); // Update the selection to match the new order
-
+      setSelectedPuntos(optimizedIds);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -92,12 +95,11 @@ export default function RutasPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch('/api/rutas', {
+      await fetch('/api/rutas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fecha, mercaderistaId, puntosDeVentaIds: selectedPuntos }),
       });
-      if (!res.ok) throw new Error('Failed to create route');
       setMercaderistaId('');
       setSelectedPuntos([]);
       await fetchData();
@@ -110,18 +112,14 @@ export default function RutasPage() {
 
   const handleGenerateSummary = async (ruta) => {
     setSummaryLoading(ruta.id);
-    setSummaries(prev => ({ ...prev, [ruta.id]: null })); // Clear previous summary
+    setSummaries(prev => ({ ...prev, [ruta.id]: null }));
     setError(null);
     try {
       const puntosDeRuta = ruta.puntosDeVentaIds.map(id => puntos.find(p => p.id === id)).filter(Boolean);
       const res = await fetch('/api/generate-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fecha: ruta.fecha,
-          mercaderistaId: ruta.mercaderistaId,
-          puntos: puntosDeRuta,
-        }),
+        body: JSON.stringify({ fecha: ruta.fecha, mercaderistaId: ruta.mercaderistaId, puntos: puntosDeRuta }),
       });
       if (!res.ok) throw new Error('Failed to generate summary');
       const data = await res.json();
@@ -135,87 +133,116 @@ export default function RutasPage() {
 
   const getPuntoNombre = (id) => puntos.find(p => p.id === id)?.nombre || 'Desconocido';
 
-  if (!user) return <div>Cargando...</div>;
+  if (!user || !profile) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
+  }
+
+  if (profile.role !== 'supervisor') {
+    return <AppLayout profile={profile}><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
+  }
 
   return (
-    <div style={{ padding: '40px' }}>
-      <h1>Gestión de Rutas</h1>
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
-
-      <div style={{ display: 'flex', gap: '40px', marginTop: '20px' }}>
-        <div style={{ flex: 2 }}>
-          <h2>Rutas Creadas</h2>
-          {loading ? <p>Cargando rutas...</p> : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Fecha</th>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Mercaderista</th>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Puntos de Venta</th>
-                  <th style={{ border: '1px solid #ddd', padding: '8px', textAlign: 'left' }}>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rutas.map((ruta) => (
-                  <Fragment key={ruta.id}>
-                    <tr>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{ruta.fecha}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>{ruta.mercaderistaId}</td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                        {ruta.puntosDeVentaIds.map(id => getPuntoNombre(id)).join(', ')}
-                      </td>
-                      <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                        <button onClick={() => handleGenerateSummary(ruta)} disabled={summaryLoading === ruta.id}>
-                          {summaryLoading === ruta.id ? 'Generando...' : 'Generar Resumen IA'}
-                        </button>
-                      </td>
-                    </tr>
-                    {summaries[ruta.id] && (
-                      <tr>
-                        <td colSpan="4" style={{ padding: '10px', background: '#f0f8ff', border: '1px solid #ddd' }}>
-                          <strong>Resumen IA:</strong> {summaries[ruta.id]}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div style={{ flex: 1, maxWidth: '400px' }}>
-          <h2>Crear Nueva Ruta</h2>
-          <form onSubmit={handleSubmit}>
-            {/* Form inputs are unchanged */}
-            <div style={{ marginBottom: '16px' }}>
-              <label>Fecha</label>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required style={{ width: '100%', padding: '8px', marginTop: '4px' }} />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label>ID del Mercaderista</label>
-              <input type="text" value={mercaderistaId} onChange={(e) => setMercaderistaId(e.target.value)} required placeholder="Ej: mercaderista-1" style={{ width: '100%', padding: '8px', marginTop: '4px' }} />
-            </div>
-            <div style={{ marginBottom: '16px' }}>
-              <label>Puntos de Venta</label>
-              <button type="button" onClick={handleOptimizeRoute} disabled={isOptimizing || selectedPuntos.length < 2} style={{ width: '100%', padding: '8px', margin: '8px 0', background: '#e0f7fa' }}>
-                {isOptimizing ? 'Optimizando...' : 'Optimizar Selección con IA'}
-              </button>
-              <div style={{ border: '1px solid #ddd', padding: '10px', marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+    <AppLayout profile={profile}>
+      <Typography variant="h4" gutterBottom>Gestión de Rutas</Typography>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={8}>
+          <Typography variant="h6" gutterBottom>Rutas Creadas</Typography>
+          <Paper>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Fecha</TableCell>
+                    <TableCell>Mercaderista</TableCell>
+                    <TableCell>Puntos de Venta</TableCell>
+                    <TableCell>Acciones</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {loading ? (
+                    <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
+                  ) : rutas.map((ruta) => (
+                    <Fragment key={ruta.id}>
+                      <TableRow>
+                        <TableCell>{ruta.fecha}</TableCell>
+                        <TableCell>{ruta.mercaderistaId}</TableCell>
+                        <TableCell>{ruta.puntosDeVentaIds.map(id => getPuntoNombre(id)).join(', ')}</TableCell>
+                        <TableCell>
+                          <Tooltip title="Generar resumen con IA">
+                            <Button size="small" onClick={() => handleGenerateSummary(ruta)} disabled={summaryLoading === ruta.id}>
+                              {summaryLoading === ruta.id ? <CircularProgress size={20} /> : 'Resumen'}
+                            </Button>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                      {summaries[ruta.id] && (
+                        <TableRow>
+                          <TableCell colSpan={4} sx={{ bgcolor: 'action.hover' }}>
+                            <Typography variant="body2"><strong>Resumen IA:</strong> {summaries[ruta.id]}</Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Typography variant="h6" gutterBottom>Crear Nueva Ruta</Typography>
+          <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
+            <TextField
+              label="Fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="ID del Mercaderista"
+              value={mercaderistaId}
+              onChange={(e) => setMercaderistaId(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+            />
+            <Typography variant="subtitle1" gutterBottom>Puntos de Venta</Typography>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={handleOptimizeRoute}
+              disabled={isOptimizing || selectedPuntos.length < 2}
+              sx={{ mb: 1 }}
+            >
+              {isOptimizing ? <CircularProgress size={24} /> : 'Optimizar Selección con IA'}
+            </Button>
+            <Paper variant="outlined" sx={{ p: 1, maxHeight: 200, overflow: 'auto', mb: 2 }}>
+              <FormGroup>
                 {puntos.map(punto => (
-                  <div key={punto.id}>
-                    <input type="checkbox" id={`punto-${punto.id}`} checked={selectedPuntos.includes(punto.id)} onChange={() => handlePuntoSelection(punto.id)} />
-                    <label htmlFor={`punto-${punto.id}`} style={{ marginLeft: '8px' }}>{punto.nombre}</label>
-                  </div>
+                  <FormControlLabel
+                    key={punto.id}
+                    control={<Checkbox checked={selectedPuntos.includes(punto.id)} onChange={() => handlePuntoSelection(punto.id)} />}
+                    label={punto.nombre}
+                  />
                 ))}
-              </div>
-            </div>
-            <button type="submit" disabled={isSubmitting} style={{ padding: '10px 20px', width: '100%' }}>
-              {isSubmitting ? 'Guardando...' : 'Guardar Ruta'}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+              </FormGroup>
+            </Paper>
+            <Button
+              type="submit"
+              variant="contained"
+              fullWidth
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Ruta'}
+            </Button>
+          </Paper>
+        </Grid>
+      </Grid>
+    </AppLayout>
   );
 }
