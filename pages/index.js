@@ -52,6 +52,22 @@ const SupervisorDashboard = () => (
   </Grid>
 );
 
+const AdminDashboard = () => (
+  <Grid container spacing={3}>
+     <Grid item xs={12} md={4}>
+      <Card>
+        <CardContent>
+          <Typography variant="h5" component="div">Gestionar Usuarios</Typography>
+          <Typography sx={{ mt: 1.5 }} color="text.secondary">Asigna roles y gestiona los usuarios del sistema.</Typography>
+        </CardContent>
+        <CardActions>
+          <Link href="/admin/users" passHref><Button size="small">Ir a Usuarios</Button></Link>
+        </CardActions>
+      </Card>
+    </Grid>
+  </Grid>
+);
+
 const MercaderistaDashboard = () => (
   <Card>
     <CardContent>
@@ -63,6 +79,19 @@ const MercaderistaDashboard = () => (
     </CardActions>
   </Card>
 );
+
+const renderDashboardByRole = (role) => {
+  switch (role) {
+    case 'admin':
+      return <><AdminDashboard /><Box sx={{mt: 4}}><SupervisorDashboard /></Box></>;
+    case 'supervisor':
+      return <SupervisorDashboard />;
+    case 'mercaderista':
+      return <MercaderistaDashboard />;
+    default:
+      return <Typography>Rol no reconocido.</Typography>;
+  }
+}
 
 export default function HomePage() {
   const { user, profile } = useAuth();
@@ -88,7 +117,7 @@ export default function HomePage() {
       <Typography variant="h4" sx={{ mb: 4 }}>
         Panel Principal
       </Typography>
-      {profile.role === 'supervisor' ? <SupervisorDashboard /> : <MercaderistaDashboard />}
+      {renderDashboardByRole(profile.role)}
     </AppLayout>
   );
 }

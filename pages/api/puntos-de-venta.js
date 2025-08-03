@@ -9,15 +9,29 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    const { page = 1, search = '' } = req.query;
+    const pageSize = 10;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
       .from('puntos_de_venta')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      query = query.ilike('nombre', `%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching points of sale:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    res.setHeader('X-Total-Count', count);
     return res.status(200).json(data);
 
   } else if (req.method === 'POST') {

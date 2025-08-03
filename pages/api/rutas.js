@@ -7,15 +7,29 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    const { page = 1, search = '' } = req.query;
+    const pageSize = 10;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    let query = supabase
       .from('rutas')
-      .select('*')
-      .order('fecha', { ascending: false });
+      .select('*', { count: 'exact' });
+
+    if (search) {
+      query = query.ilike('mercaderista_id', `%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .order('fecha', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching routes:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    res.setHeader('X-Total-Count', count);
     // The frontend expects camelCase keys, so we transform the data.
     const transformedData = data.map(r => ({
         ...r,

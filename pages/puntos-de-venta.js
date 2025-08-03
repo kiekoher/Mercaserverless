@@ -1,53 +1,61 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/Auth';
 import { useRouter } from 'next/router';
 import {
   Typography, Button, Grid, Paper, TextField, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
-  CircularProgress, Alert, Box
+  CircularProgress, Box, Pagination
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
+import { useDebounce } from '../hooks/useDebounce';
+import { useSnackbar } from 'notistack';
 
 export default function PuntosDeVentaPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
+  const { enqueueSnackbar } = useSnackbar();
   const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
+  // Form state
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
   const [ciudad, setCiudad] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (!user && process.env.NODE_ENV !== 'test') router.push('/login');
-  }, [user, router]);
+  // Pagination and Search state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  const fetchPuntos = async () => {
+  const fetchPuntos = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/puntos-de-venta');
+      const params = new URLSearchParams({ page, search: debouncedSearchTerm });
+      const res = await fetch(`/api/puntos-de-venta?${params.toString()}`);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to fetch');
       }
       const data = await res.json();
+      const totalCount = res.headers.get('X-Total-Count');
+      setTotalPages(Math.ceil(totalCount / 10));
       setPuntos(data);
     } catch (err) {
-      setError(err.message);
+      enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearchTerm, enqueueSnackbar]);
 
   useEffect(() => {
     if (user) fetchPuntos();
-  }, [user]);
+  }, [user, fetchPuntos]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setError(null);
     try {
       const res = await fetch('/api/puntos-de-venta', {
         method: 'POST',
@@ -61,9 +69,10 @@ export default function PuntosDeVentaPage() {
       setNombre('');
       setDireccion('');
       setCiudad('');
+      enqueueSnackbar('Punto de venta creado con éxito!', { variant: 'success' });
       await fetchPuntos();
     } catch (err) {
-      setError(err.message);
+      enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -74,17 +83,24 @@ export default function PuntosDeVentaPage() {
   }
 
   if (profile.role !== 'supervisor') {
-    return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
+    return <AppLayout><Typography sx={{p: 2}}>No tienes permiso para ver esta página.</Typography></AppLayout>
   }
 
   return (
     <AppLayout>
       <Typography variant="h4" gutterBottom>Gestión de Puntos de Venta</Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Grid container spacing={4}>
         <Grid item xs={12} md={8}>
-          <Typography variant="h6" gutterBottom>Listado Actual</Typography>
           <Paper>
+            <Box sx={{ p: 2 }}>
+              <TextField
+                fullWidth
+                label="Buscar por nombre"
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </Box>
             <TableContainer>
               <Table>
                 <TableHead>
@@ -107,41 +123,23 @@ export default function PuntosDeVentaPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(e, value) => setPage(value)}
+                color="primary"
+              />
+            </Box>
           </Paper>
         </Grid>
         <Grid item xs={12} md={4}>
           <Typography variant="h6" gutterBottom>Añadir Nuevo Punto</Typography>
           <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-            <TextField
-              label="Nombre del Punto"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              fullWidth
-              required
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              label="Dirección"
-              value={direccion}
-              onChange={(e) => setDireccion(e.target.value)}
-              fullWidth
-              required
-              sx={{ mb: 2 }}
-            />
-            <TextField
-              label="Ciudad"
-              value={ciudad}
-              onChange={(e) => setCiudad(e.target.value)}
-              fullWidth
-              required
-              sx={{ mb: 2 }}
-            />
-            <Button
-              type="submit"
-              variant="contained"
-              fullWidth
-              disabled={isSubmitting}
-            >
+            <TextField label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+            <TextField label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+            <TextField label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+            <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>
               {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
             </Button>
           </Paper>
