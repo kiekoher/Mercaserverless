@@ -49,6 +49,40 @@ export default function RutasPage() {
     setSelectedPuntos(prev => prev.includes(puntoId) ? prev.filter(id => id !== puntoId) : [...prev, puntoId]);
   };
 
+  const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const handleOptimizeRoute = async () => {
+    if (selectedPuntos.length < 2) {
+      setError("Selecciona al menos 2 puntos para optimizar.");
+      return;
+    }
+    setIsOptimizing(true);
+    setError(null);
+    try {
+      const puntosAOptimizar = puntos.filter(p => selectedPuntos.includes(p.id));
+      const res = await fetch('/api/optimize-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntos: puntosAOptimizar }),
+      });
+      if (!res.ok) throw new Error('La optimización falló');
+      const data = await res.json();
+
+      // Reorder the main `puntos` list to reflect the optimized order visually
+      const optimizedIds = data.optimizedPuntos.map(p => p.id);
+      const remainingPuntos = puntos.filter(p => !optimizedIds.includes(p.id));
+      const reorderedPuntos = [...data.optimizedPuntos, ...remainingPuntos];
+
+      setPuntos(reorderedPuntos);
+      setSelectedPuntos(optimizedIds); // Update the selection to match the new order
+
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selectedPuntos.length === 0) {
@@ -164,6 +198,9 @@ export default function RutasPage() {
             </div>
             <div style={{ marginBottom: '16px' }}>
               <label>Puntos de Venta</label>
+              <button type="button" onClick={handleOptimizeRoute} disabled={isOptimizing || selectedPuntos.length < 2} style={{ width: '100%', padding: '8px', margin: '8px 0', background: '#e0f7fa' }}>
+                {isOptimizing ? 'Optimizando...' : 'Optimizar Selección con IA'}
+              </button>
               <div style={{ border: '1px solid #ddd', padding: '10px', marginTop: '4px', maxHeight: '200px', overflowY: 'auto' }}>
                 {puntos.map(punto => (
                   <div key={punto.id}>

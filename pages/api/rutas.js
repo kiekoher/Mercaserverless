@@ -1,31 +1,28 @@
 import { supabase } from '../../lib/supabaseClient';
 
-// Mock data to simulate Supabase response
-const mockRutas = [
-  {
-    id: 1,
-    created_at: new Date().toISOString(),
-    fecha: '2025-08-03',
-    mercaderista_id: 'mercaderista-1', // Using snake_case to match Supabase conventions
-    puntos_de_venta_ids: [1, 2]
-  },
-];
-
 export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    /*
-     * REAL SUPABASE QUERY
-     * const { data, error } = await supabase.from('rutas').select('*');
-    */
+  const { user } = await supabase.auth.api.getUserByCookie(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-    // MOCK RESPONSE
-    const data = mockRutas.map(r => ({ ...r, puntosDeVentaIds: r.puntos_de_venta_ids, mercaderistaId: r.mercaderista_id })); // maintain compatibility with frontend
-    const error = null;
+  if (req.method === 'GET') {
+    const { data, error } = await supabase
+      .from('rutas')
+      .select('*')
+      .order('fecha', { ascending: false });
 
     if (error) {
+      console.error('Error fetching routes:', error);
       return res.status(500).json({ error: error.message });
     }
-    res.status(200).json(data);
+    // The frontend expects camelCase keys, so we transform the data.
+    const transformedData = data.map(r => ({
+        ...r,
+        mercaderistaId: r.mercaderista_id,
+        puntosDeVentaIds: r.puntos_de_venta_ids,
+    }));
+    return res.status(200).json(transformedData);
 
   } else if (req.method === 'POST') {
     const { fecha, mercaderistaId, puntosDeVentaIds } = req.body;
@@ -33,34 +30,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Todos los campos son requeridos.' });
     }
 
-    /*
-     * REAL SUPABASE QUERY
-     * const { data, error } = await supabase
-     *   .from('rutas')
-     *   .insert([{
-     *      fecha,
-     *      mercaderista_id: mercaderistaId,
-     *      puntos_de_venta_ids: puntosDeVentaIds
-     *   }])
-     *   .single();
-    */
-
-    // MOCK RESPONSE
-    const newRuta = {
-      id: mockRutas.length + 1,
-      created_at: new Date().toISOString(),
-      fecha,
-      mercaderista_id: mercaderistaId,
-      puntos_de_venta_ids: puntosDeVentaIds
-    };
-    mockRutas.push(newRuta);
-    const data = { ...newRuta, puntosDeVentaIds: newRuta.puntos_de_venta_ids, mercaderistaId: newRuta.mercaderista_id };
-    const error = null;
+    const { data, error } = await supabase
+      .from('rutas')
+      .insert([{
+         fecha,
+         mercaderista_id: mercaderistaId,
+         puntos_de_venta_ids: puntosDeVentaIds
+      }])
+      .single();
 
     if (error) {
+      console.error('Error inserting route:', error);
       return res.status(500).json({ error: error.message });
     }
-    res.status(201).json(data);
+    return res.status(201).json(data);
 
   } else {
     res.setHeader('Allow', ['GET', 'POST']);
