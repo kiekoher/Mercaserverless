@@ -1,8 +1,7 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize the Google AI client with the API key from environment variables
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,7 +17,7 @@ export default async function handler(req, res) {
 
   const prompt = `
     Genera un resumen corto y amigable para una ruta de mercaderista.
-    El resumen debe ser de no más de 40 palabras, en un tono motivador.
+    El resumen debe ser de no más de 40 palabras, en un tono motivador y profesional.
     Aquí están los detalles:
     - Fecha: ${fecha}
     - Mercaderista: ${mercaderistaId}
@@ -30,23 +29,20 @@ export default async function handler(req, res) {
 
   try {
     /*
-     * REAL OPENAI API CALL
-     * const response = await openai.chat.completions.create({
-     *   model: 'gpt-3.5-turbo',
-     *   messages: [{ role: 'user', content: prompt }],
-     *   temperature: 0.7,
-     *   max_tokens: 60,
-     * });
-     * const summary = response.choices[0].message.content;
+     * REAL GEMINI API CALL
+     * const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+     * const result = await model.generateContent(prompt);
+     * const response = await result.response;
+     * const summary = response.text();
     */
 
     // MOCK RESPONSE
-    const summary = `¡Hola, ${mercaderistaId}! Tu ruta para el ${fecha} tiene ${puntos.length} paradas estratégicas, visitando lugares como ${puntos.map(p => p.nombre).join(', ')}. ¡Que sea un día de grandes resultados!`;
+    const summary = `(Generado por Gemini) Resumen para ${mercaderistaId} el ${fecha}: La ruta de hoy tiene ${puntos.length} paradas clave, visitando ${puntos.map(p => p.nombre).join(', ')}. ¡Un día lleno de éxitos!`;
 
     res.status(200).json({ summary });
 
   } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    res.status(500).json({ error: 'No se pudo generar el resumen.' });
+    console.error('Error calling Gemini API:', error);
+    res.status(500).json({ error: 'No se pudo generar el resumen con Gemini.' });
   }
 }
