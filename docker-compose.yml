@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rutero-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mounts the source code for hot-reloading
+      - .:/app
+      # Anonymous volumes for folders that should not be overwritten from the host
+      - /app/node_modules
+      - /app/.next
+    # Pass environment variables from a .env file
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=development
+    # The command to run in development is different from production CMD in Dockerfile
+    command: npm run dev

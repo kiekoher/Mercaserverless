@@ -56,6 +56,8 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
 
 ### Ejecución
 
+#### Modo Local (Sin Docker)
+
 1.  **Iniciar el servidor de desarrollo:**
     ```bash
     npm run dev
@@ -66,4 +68,21 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     Para correr las pruebas unitarias y de componentes, ejecuta:
     ```bash
     npm test
+    ```
+
+#### Modo Dockerizado (Recomendado)
+
+Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compose instalados.
+
+1.  **Construir y levantar el contenedor:**
+    Desde la raíz del proyecto, ejecuta:
+    ```bash
+    docker-compose up --build
+    ```
+    La primera vez tomará un tiempo mientras se construye la imagen. Las siguientes veces será mucho más rápido. La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
+
+2.  **Detener el contenedor:**
+    Presiona `Ctrl + C` en la terminal. Para eliminar el contenedor y la red, puedes ejecutar:
+    ```bash
+    docker-compose down
     ```

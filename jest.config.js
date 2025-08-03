@@ -10,14 +10,14 @@ module.exports = {
     '^@/context/(.*)$': '<rootDir>/context/$1',
     '^@/lib/(.*)$': '<rootDir>/lib/$1',
   },
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
+  testPathIgnorePatterns: ['<rootDir>/.next/'],
   transform: {
     // Use babel-jest to transpile tests with the next/babel preset
     // https://jestjs.io/docs/configuration#transform-objectstring-pathtotransformer--pathtotransformer-object
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
   transformIgnorePatterns: [
-    '/node_modules/',
+    '/node_modules/(?!(@supabase|isows|@supabase/realtime-js)/)',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
 };
