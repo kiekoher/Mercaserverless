@@ -25,6 +25,20 @@ export default async function handler(req, res) {
     return res.status(200).json(transformedData);
 
   } else if (req.method === 'POST') {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+    }
+
+    if (profile.role !== 'supervisor') {
+      return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
+    }
+
     const { fecha, mercaderistaId, puntosDeVentaIds } = req.body;
     if (!fecha || !mercaderistaId || !puntosDeVentaIds || !Array.isArray(puntosDeVentaIds)) {
       return res.status(400).json({ message: 'Todos los campos son requeridos.' });

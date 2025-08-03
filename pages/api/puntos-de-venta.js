@@ -21,6 +21,21 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } else if (req.method === 'POST') {
+    // Check user's role before allowing insertion
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+    }
+
+    if (profile.role !== 'supervisor') {
+      return res.status(403).json({ error: 'No tienes permiso para realizar esta acción.' });
+    }
+
     const { nombre, direccion, ciudad } = req.body;
     if (!nombre || !direccion || !ciudad) {
       return res.status(400).json({ message: 'Nombre, dirección y ciudad son requeridos.' });
