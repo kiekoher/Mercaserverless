@@ -1,6 +1,5 @@
 import { useState, useEffect, Fragment, useCallback } from 'react';
 import { useAuth } from '../context/Auth';
-import { useRouter } from 'next/router';
 import {
   Box, Typography, Button, Grid, Paper, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -13,7 +12,6 @@ import { useSnackbar } from 'notistack';
 
 export default function RutasPage() {
   const { user, profile } = useAuth();
-  const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
   const [rutas, setRutas] = useState([]);
