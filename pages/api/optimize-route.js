@@ -1,12 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
   const { puntos } = req.body; // Expects an array of point-of-sale objects
 
@@ -28,23 +32,23 @@ export default async function handler(req, res) {
   `;
 
   try {
-    /*
-     * REAL GEMINI API CALL
-     * const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-     * const result = await model.generateContent(prompt);
-     * const response = await result.response;
-     * const text = response.text().replace(/```json|```/g, '').trim(); // Clean up potential markdown
-     * const optimizedPuntos = JSON.parse(text);
-    */
-
-    // MOCK RESPONSE
-    // To simulate a reordering, we'll just reverse the list.
-    const optimizedPuntos = [...puntos].reverse();
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = (await response.text()).replace(/```json|```/g, '').trim();
+    const optimizedPuntos = JSON.parse(text);
 
     res.status(200).json({ optimizedPuntos });
 
   } catch (error) {
     console.error('Error calling Gemini for optimization:', error);
+    const status = error?.response?.status;
+    if (status === 401) {
+      return res.status(401).json({ error: 'Token inválido para Gemini API.' });
+    }
+    if (status === 403) {
+      return res.status(403).json({ error: 'Límite de cuota de Gemini API excedido.' });
+    }
     res.status(500).json({ error: 'No se pudo optimizar la ruta.' });
   }
 }
