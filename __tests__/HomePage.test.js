@@ -77,6 +77,6 @@ describe('HomePage', () => {
 
     render(<HomePage />);
 
-    expect(screen.getByText(/cargando/i)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
   });
 });

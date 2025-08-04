@@ -13,7 +13,10 @@ jest.mock('next/router', () => ({
 }));
 
 jest.mock('../context/Auth', () => ({
-  useAuth: () => ({ user: { email: 'test@example.com' } }),
+  useAuth: () => ({
+    user: { email: 'test@example.com' },
+    profile: { role: 'supervisor' },
+  }),
 }));
 
 // Mock Chart.js components
@@ -54,7 +57,7 @@ describe('DashboardPage', () => {
     render(<DashboardPage />);
 
     // Check for loading state first
-    expect(screen.getByText(/cargando dashboard/i)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
 
     // Wait for the data to be loaded and rendered
     await waitFor(() => {
@@ -74,12 +77,12 @@ describe('DashboardPage', () => {
   });
 
   it('renders an error message if the fetch fails', async () => {
-    fetch.mockRejectedValueOnce(new Error('Failed to fetch stats'));
+    fetch.mockImplementationOnce(() => Promise.reject(new Error('Failed to fetch stats')));
 
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error: failed to fetch stats/i)).toBeInTheDocument();
+      expect(screen.getByText(/failed to fetch stats/i)).toBeInTheDocument();
     });
   });
 });
