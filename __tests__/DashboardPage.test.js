@@ -1,6 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import DashboardPage from '../pages/dashboard.js';
-import { AuthProvider } from '../context/Auth.js';
 
 // Mock the API endpoint
 global.fetch = jest.fn();
@@ -56,7 +55,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    // Check for loading state first
+    // Should display a loading spinner initially
     expect(screen.getByRole('progressbar')).toBeInTheDocument();
 
     // Wait for the data to be loaded and rendered
