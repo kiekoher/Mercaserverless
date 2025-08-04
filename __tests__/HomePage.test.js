@@ -68,7 +68,7 @@ describe('HomePage', () => {
     expect(screen.queryByText(/ver dashboard/i)).not.toBeInTheDocument();
   });
 
-  it('shows loading state when profile is not yet available', () => {
+  it('shows a loading spinner when profile is not yet available', () => {
     useAuth.mockReturnValue({
       user: { email: 'test@test.com' },
       profile: null, // Profile is null while loading
