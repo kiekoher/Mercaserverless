@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/Auth';
-import { useRouter } from 'next/router';
 import {
   Typography, Button, Grid, Paper, TextField, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -12,7 +11,6 @@ import { useSnackbar } from 'notistack';
 
 export default function PuntosDeVentaPage() {
   const { user, profile } = useAuth();
-  const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
