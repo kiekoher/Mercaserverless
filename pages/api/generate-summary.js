@@ -1,13 +1,16 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Google AI client with the API key from environment variables
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end('Method Not Allowed');
   }
+
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
   const { fecha, mercaderistaId, puntos } = req.body;
 
@@ -28,21 +31,22 @@ export default async function handler(req, res) {
   `;
 
   try {
-    /*
-     * REAL GEMINI API CALL
-     * const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-     * const result = await model.generateContent(prompt);
-     * const response = await result.response;
-     * const summary = response.text();
-    */
-
-    // MOCK RESPONSE
-    const summary = `(Generado por Gemini) Resumen para ${mercaderistaId} el ${fecha}: La ruta de hoy tiene ${puntos.length} paradas clave, visitando ${puntos.map(p => p.nombre).join(', ')}. ¡Un día lleno de éxitos!`;
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const summary = await response.text();
 
     res.status(200).json({ summary });
 
   } catch (error) {
     console.error('Error calling Gemini API:', error);
+    const status = error?.response?.status;
+    if (status === 401) {
+      return res.status(401).json({ error: 'Token inválido para Gemini API.' });
+    }
+    if (status === 403) {
+      return res.status(403).json({ error: 'Límite de cuota de Gemini API excedido.' });
+    }
     res.status(500).json({ error: 'No se pudo generar el resumen con Gemini.' });
   }
 }
