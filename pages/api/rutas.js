@@ -1,13 +1,14 @@
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export default async function handler(req, res) {
-  const supabase = createServerSupabaseClient({ req, res });
+  // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
+  const supabase = createPagesServerClient({ req, res });
+  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // **MEJORA: Obtener el perfil del usuario una sola vez para todos los métodos**
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
@@ -50,7 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json(transformedData);
 
   } else if (req.method === 'POST') {
-    // **MEJORA: Permitir acceso a 'supervisor' y 'admin'**
     if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
     }
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
          mercaderista_id: mercaderistaId,
          puntos_de_venta_ids: puntosDeVentaIds
       }])
-      .select() // Use .select() para obtener la fila insertada
+      .select()
       .single();
 
     if (error) {

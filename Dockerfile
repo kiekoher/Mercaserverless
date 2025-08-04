@@ -1,5 +1,6 @@
 # Stage 1: Install dependencies
-FROM node:18-alpine AS deps
+# MEJORA: Actualizado a Node.js 20 para evitar la advertencia de obsolescencia.
+FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
@@ -10,7 +11,8 @@ RUN \
   fi
 
 # Stage 2: Build the application
-FROM node:18-alpine AS builder
+# MEJORA: Actualizado a Node.js 20.
+FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package-lock.json ./package-lock.json
@@ -28,7 +30,8 @@ RUN NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     npm run build
 
 # Stage 3: Production image
-FROM node:18-alpine AS runner
+# MEJORA: Actualizado a Node.js 20.
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
