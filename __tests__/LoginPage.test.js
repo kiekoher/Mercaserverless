@@ -26,7 +26,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument();
 
     // Check for form fields by their labels
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/correo electr/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument();
 
     // Check for the submit button
