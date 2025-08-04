@@ -1,24 +1,18 @@
-version: '3.8'
-
+# Versión de compose es declarada por el comando, no es necesaria en el archivo.
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      # Pasa las variables del .env como argumentos al build
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        - GEMINI_API_KEY=${GEMINI_API_KEY}
     container_name: rutero-app
     restart: unless-stopped
     ports:
       - "3000:3000"
-    volumes:
-      # Mounts the source code for hot-reloading
-      - .:/app
-      # Anonymous volumes for folders that should not be overwritten from the host
-      - /app/node_modules
-      - /app/.next
-    # Pass environment variables from a .env file
+    # Carga las variables del .env para que estén disponibles en el contenedor en ejecución
     env_file:
-      - .env.local
-    environment:
-      - NODE_ENV=development
-    # The command to run in development is different from production CMD in Dockerfile
-    command: npm run dev
+      - .env

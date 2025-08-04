@@ -55,22 +55,38 @@ export default function RutasPage() {
     }
   }, [page, debouncedSearchTerm, enqueueSnackbar]);
 
+  // **MEJORA: Función para obtener TODOS los puntos de venta, manejando paginación**
+  const fetchAllPuntosDeVenta = useCallback(async () => {
+    let allPuntos = [];
+    let currentPage = 1;
+    let hasMore = true;
+
+    while(hasMore) {
+        try {
+            const res = await fetch(`/api/puntos-de-venta?page=${currentPage}`);
+            if (!res.ok) throw new Error('Failed to fetch points of sale');
+            const data = await res.json();
+            if (data.length > 0) {
+                allPuntos = [...allPuntos, ...data];
+                currentPage++;
+            } else {
+                hasMore = false;
+            }
+        } catch(err) {
+            enqueueSnackbar(err.message, { variant: 'error' });
+            hasMore = false; // Detener en caso de error
+        }
+    }
+    setPuntos(allPuntos);
+  }, [enqueueSnackbar]);
+
+
   useEffect(() => {
-    const fetchPuntosDeVenta = async () => {
-      try {
-        const res = await fetch('/api/puntos-de-venta');
-        if(!res.ok) throw new Error('Failed to fetch points of sale');
-        const data = await res.json();
-        setPuntos(data);
-      } catch(err) {
-        enqueueSnackbar(err.message, { variant: 'error' });
-      }
-    };
     if(user) {
       fetchRutas();
-      fetchPuntosDeVenta();
+      fetchAllPuntosDeVenta();
     }
-  }, [user, fetchRutas, enqueueSnackbar]);
+  }, [user, fetchRutas, fetchAllPuntosDeVenta]);
 
   const handleOptimizeRoute = async () => {
     if (selectedPuntos.length < 2) {
@@ -88,9 +104,14 @@ export default function RutasPage() {
       if (!res.ok) throw new Error('La optimización falló');
       const data = await res.json();
       const optimizedIds = data.optimizedPuntos.map(p => p.id);
-      const remainingPuntos = puntos.filter(p => !optimizedIds.includes(p.id));
-      setPuntos([...data.optimizedPuntos, ...remainingPuntos]);
-      setSelectedPuntos(optimizedIds);
+      
+      // Reordenar la lista de puntos de venta para reflejar la optimización
+      const optimizedPuntosOrdenados = data.optimizedPuntos;
+      const puntosNoOptimizados = puntos.filter(p => !selectedPuntos.includes(p.id));
+      
+      setPuntos([...optimizedPuntosOrdenados, ...puntosNoOptimizados]);
+      setSelectedPuntos(optimizedIds); // Mantener la selección
+      
       enqueueSnackbar('Ruta optimizada con IA!', { variant: 'info' });
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
@@ -101,17 +122,21 @@ export default function RutasPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (selectedPuntos.length === 0) {
-      enqueueSnackbar('Debes seleccionar al menos un punto de venta.', { variant: 'warning' });
+    if (selectedPuntos.length === 0 || !mercaderistaId.trim()) {
+      enqueueSnackbar('Debes seleccionar un mercaderista y al menos un punto de venta.', { variant: 'warning' });
       return;
     }
     setIsSubmitting(true);
     try {
-      await fetch('/api/rutas', {
+      const res = await fetch('/api/rutas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fecha, mercaderistaId, puntosDeVentaIds: selectedPuntos }),
       });
+       if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to create route');
+      }
       setMercaderistaId('');
       setSelectedPuntos([]);
       enqueueSnackbar('Ruta creada con éxito!', { variant: 'success' });
@@ -142,22 +167,15 @@ export default function RutasPage() {
     }
   };
 
-  if (!user || !profile || loading) {
-    return (
-      <AppLayout>
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-          <CircularProgress />
-        </Box>
-      </AppLayout>
-    );
+  if (!user || !profile) {
+    return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
   }
 
-  if (profile.role !== 'supervisor') {
-    return (
-      <AppLayout>
-        <Alert severity="error">No tienes permiso para ver esta página.</Alert>
-      </AppLayout>
-    );
+  // **CORRECCIÓN: Permitir acceso a 'supervisor' y 'admin'**
+  const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
+
+  if (!hasPermission) {
+    return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
   }
 
   return (
@@ -167,7 +185,7 @@ export default function RutasPage() {
         <Grid item xs={12} md={7}>
           <Paper sx={{ p: 2 }}>
             <TextField
-              label="Buscar"
+              label="Buscar por ID de Mercaderista"
               value={searchTerm}
               onChange={handleSearchChange}
               fullWidth
@@ -175,11 +193,7 @@ export default function RutasPage() {
               margin="normal"
             />
             {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                <CircularProgress />
-              </Box>
-            ) : rutas.length === 0 ? (
-              <Typography>No hay rutas registradas.</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress /></Box>
             ) : (
               <Fragment>
                 <TableContainer>
@@ -189,11 +203,13 @@ export default function RutasPage() {
                         <TableCell>Fecha</TableCell>
                         <TableCell>Mercaderista</TableCell>
                         <TableCell>Puntos de Venta</TableCell>
-                        <TableCell>Resumen</TableCell>
+                        <TableCell>Resumen IA</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {rutas.map((ruta) => (
+                      {rutas.length === 0 ? (
+                        <TableRow><TableCell colSpan={4} align="center">No hay rutas registradas.</TableCell></TableRow>
+                      ) : rutas.map((ruta) => (
                         <TableRow key={ruta.id}>
                           <TableCell>{ruta.fecha}</TableCell>
                           <TableCell>{ruta.mercaderistaId}</TableCell>
@@ -213,11 +229,7 @@ export default function RutasPage() {
                                 onClick={() => handleGenerateSummary(ruta)}
                                 disabled={summaryLoading === ruta.id}
                               >
-                                {summaryLoading === ruta.id ? (
-                                  <CircularProgress size={20} />
-                                ) : (
-                                  'Generar resumen'
-                                )}
+                                {summaryLoading === ruta.id ? <CircularProgress size={20} /> : 'Generar'}
                               </Button>
                             )}
                           </TableCell>
@@ -238,7 +250,7 @@ export default function RutasPage() {
 
         <Grid item xs={12} md={5}>
           <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>Crear nueva ruta</Typography>
+            <Typography variant="h6" gutterBottom>Crear Nueva Ruta</Typography>
             <TextField
               label="Fecha"
               type="date"
@@ -253,10 +265,11 @@ export default function RutasPage() {
               value={mercaderistaId}
               onChange={(e) => setMercaderistaId(e.target.value)}
               fullWidth
+              required
               margin="normal"
             />
-            <Typography variant="subtitle1" sx={{ mt: 2 }}>Puntos de venta</Typography>
-            <FormGroup>
+            <Typography variant="subtitle1" sx={{ mt: 2 }}>Puntos de Venta Disponibles</Typography>
+            <FormGroup sx={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #ddd', p: 1, borderRadius: 1 }}>
               {puntos.map((punto) => (
                 <FormControlLabel
                   key={punto.id}
@@ -276,15 +289,15 @@ export default function RutasPage() {
                 />
               ))}
             </FormGroup>
-            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'flex-end' }}>
               <Tooltip title="Optimiza el orden de visita usando IA">
                 <span>
                   <Button
                     variant="outlined"
                     onClick={handleOptimizeRoute}
-                    disabled={isOptimizing}
+                    disabled={isOptimizing || selectedPuntos.length < 2}
                   >
-                    {isOptimizing ? <CircularProgress size={24} /> : 'Optimizar' }
+                    {isOptimizing ? <CircularProgress size={24} /> : 'Optimizar'}
                   </Button>
                 </span>
               </Tooltip>

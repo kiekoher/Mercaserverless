@@ -6,9 +6,11 @@ import {
   Box, Select, MenuItem, FormControl
 } from '@mui/material';
 import AppLayout from '../../components/AppLayout';
+import { useSnackbar } from 'notistack'; // Importar useSnackbar
 
 export default function UserManagementPage() {
   const { user, profile } = useAuth();
+  const { enqueueSnackbar } = useSnackbar(); // Usar el hook
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,7 +38,8 @@ export default function UserManagementPage() {
       if (profile.role === 'admin') {
         fetchUsers();
       } else {
-        setError('Permission Denied');
+        setLoading(false); // Detener el loading si no tiene permisos
+        setError('No tienes permiso para acceder a esta página.');
       }
     }
   }, [profile, fetchUsers]);
@@ -59,8 +62,11 @@ export default function UserManagementPage() {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to update role');
       }
-      // Optionally show a success message
+      // **MEJORA: Añadir mensaje de éxito**
+      enqueueSnackbar('Rol de usuario actualizado con éxito', { variant: 'success' });
     } catch (err) {
+      // **MEJORA: Mostrar error en Snackbar también**
+      enqueueSnackbar(err.message, { variant: 'error' });
       setError(err.message);
       fetchUsers(); // Re-fetch to revert optimistic update on error
     } finally {
@@ -79,6 +85,7 @@ export default function UserManagementPage() {
   return (
     <AppLayout>
       <Typography variant="h4" gutterBottom>Administración de Usuarios</Typography>
+      {/* El error ahora se manejará principalmente por el Snackbar, pero mantenemos esto como respaldo */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper>
         <TableContainer>

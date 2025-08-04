@@ -68,7 +68,10 @@ export default function DashboardPage() {
     );
   }
 
-  if (profile.role !== 'supervisor') {
+  // **MEJORA: Permitir acceso a 'supervisor' y 'admin'**
+  const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
+
+  if (!hasPermission) {
     return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
   }
 
@@ -76,6 +79,9 @@ export default function DashboardPage() {
     <AppLayout>
       <Typography variant="h4" gutterBottom>Dashboard de Analítica</Typography>
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!error && !stats && !loading && (
+        <Alert severity="info" sx={{ mb: 2 }}>No hay datos disponibles para mostrar en el dashboard todavía.</Alert>
+      )}
       {!error && stats && (
         <>
           <Grid container spacing={3} sx={{ mb: 4 }}>

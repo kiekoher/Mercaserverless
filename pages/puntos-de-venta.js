@@ -3,7 +3,7 @@ import { useAuth } from '../context/Auth';
 import {
   Typography, Button, Grid, Paper, TextField, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
-  CircularProgress, Box, Pagination
+  CircularProgress, Box, Pagination, Alert
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -68,6 +68,8 @@ export default function PuntosDeVentaPage() {
       setDireccion('');
       setCiudad('');
       enqueueSnackbar('Punto de venta creado con éxito!', { variant: 'success' });
+      // Reset to page 1 to see the new entry if not searching
+      if (page !== 1) setPage(1); 
       await fetchPuntos();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
@@ -80,8 +82,11 @@ export default function PuntosDeVentaPage() {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   }
 
-  if (profile.role !== 'supervisor') {
-    return <AppLayout><Typography sx={{p: 2}}>No tienes permiso para ver esta página.</Typography></AppLayout>
+  // **MEJORA: Permitir acceso a 'supervisor' y 'admin'**
+  const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
+
+  if (!hasPermission) {
+    return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
   }
 
   return (
@@ -111,6 +116,8 @@ export default function PuntosDeVentaPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow><TableCell colSpan={3} align="center"><CircularProgress /></TableCell></TableRow>
+                  ) : puntos.length === 0 ? (
+                    <TableRow><TableCell colSpan={3} align="center">No se encontraron puntos de venta.</TableCell></TableRow>
                   ) : puntos.map((punto) => (
                     <TableRow key={punto.id}>
                       <TableCell>{punto.nombre}</TableCell>
@@ -127,6 +134,7 @@ export default function PuntosDeVentaPage() {
                 page={page}
                 onChange={(e, value) => setPage(value)}
                 color="primary"
+                disabled={loading}
               />
             </Box>
           </Paper>
