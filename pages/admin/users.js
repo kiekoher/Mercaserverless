@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/Auth';
-import { useRouter } from 'next/router';
 import {
   Typography, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Alert,
@@ -10,7 +9,6 @@ import AppLayout from '../../components/AppLayout';
 
 export default function UserManagementPage() {
   const { user, profile } = useAuth();
-  const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
