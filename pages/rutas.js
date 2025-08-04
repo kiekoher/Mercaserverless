@@ -4,7 +4,8 @@ import { useRouter } from 'next/router';
 import {
   Box, Typography, Button, Grid, Paper, TextField,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  CircularProgress, Checkbox, FormControlLabel, FormGroup, Tooltip, Pagination
+  CircularProgress, Checkbox, FormControlLabel, FormGroup, Tooltip, Pagination,
+  Alert
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -32,6 +33,12 @@ export default function RutasPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  const handlePageChange = (_e, value) => setPage(value);
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setPage(1);
+  };
 
   const fetchRutas = useCallback(async () => {
     setLoading(true);
@@ -137,10 +144,163 @@ export default function RutasPage() {
     }
   };
 
-  // ... render logic remains largely the same, but without the top-level Alert component
+  if (!user || !profile || loading) {
+    return (
+      <AppLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      </AppLayout>
+    );
+  }
+
+  if (profile.role !== 'supervisor') {
+    return (
+      <AppLayout>
+        <Alert severity="error">No tienes permiso para ver esta página.</Alert>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
-      {/* ... */}
+      <Typography variant="h4" gutterBottom>Gestión de Rutas</Typography>
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 2 }}>
+            <TextField
+              label="Buscar"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              fullWidth
+              size="small"
+              margin="normal"
+            />
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress />
+              </Box>
+            ) : rutas.length === 0 ? (
+              <Typography>No hay rutas registradas.</Typography>
+            ) : (
+              <Fragment>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Fecha</TableCell>
+                        <TableCell>Mercaderista</TableCell>
+                        <TableCell>Puntos de Venta</TableCell>
+                        <TableCell>Resumen</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rutas.map((ruta) => (
+                        <TableRow key={ruta.id}>
+                          <TableCell>{ruta.fecha}</TableCell>
+                          <TableCell>{ruta.mercaderistaId}</TableCell>
+                          <TableCell>
+                            {ruta.puntosDeVentaIds
+                              .map((id) => puntos.find((p) => p.id === id)?.nombre)
+                              .filter(Boolean)
+                              .join(', ')}
+                          </TableCell>
+                          <TableCell>
+                            {summaries[ruta.id] ? (
+                              <Typography variant="body2">{summaries[ruta.id]}</Typography>
+                            ) : (
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => handleGenerateSummary(ruta)}
+                                disabled={summaryLoading === ruta.id}
+                              >
+                                {summaryLoading === ruta.id ? (
+                                  <CircularProgress size={20} />
+                                ) : (
+                                  'Generar resumen'
+                                )}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                {totalPages > 1 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Pagination count={totalPages} page={page} onChange={handlePageChange} />
+                  </Box>
+                )}
+              </Fragment>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={5}>
+          <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Crear nueva ruta</Typography>
+            <TextField
+              label="Fecha"
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              fullWidth
+              margin="normal"
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="ID de Mercaderista"
+              value={mercaderistaId}
+              onChange={(e) => setMercaderistaId(e.target.value)}
+              fullWidth
+              margin="normal"
+            />
+            <Typography variant="subtitle1" sx={{ mt: 2 }}>Puntos de venta</Typography>
+            <FormGroup>
+              {puntos.map((punto) => (
+                <FormControlLabel
+                  key={punto.id}
+                  control={
+                    <Checkbox
+                      checked={selectedPuntos.includes(punto.id)}
+                      onChange={() =>
+                        setSelectedPuntos((prev) =>
+                          prev.includes(punto.id)
+                            ? prev.filter((id) => id !== punto.id)
+                            : [...prev, punto.id]
+                        )
+                      }
+                    />
+                  }
+                  label={punto.nombre}
+                />
+              ))}
+            </FormGroup>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+              <Tooltip title="Optimiza el orden de visita usando IA">
+                <span>
+                  <Button
+                    variant="outlined"
+                    onClick={handleOptimizeRoute}
+                    disabled={isOptimizing}
+                  >
+                    {isOptimizing ? <CircularProgress size={24} /> : 'Optimizar' }
+                  </Button>
+                </span>
+              </Tooltip>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? <CircularProgress size={24} /> : 'Crear Ruta'}
+              </Button>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
     </AppLayout>
   );
 }
