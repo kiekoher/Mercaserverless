@@ -1,9 +1,9 @@
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 
 export default async function handler(req, res) {
-  const supabase = createServerSupabaseClient({ req, res });
-  // A simple way to protect the API route.
-  // We're checking for a session on the server-side.
+  // **CORRECCIÓN: Actualizado al nuevo método recomendado por Supabase**
+  const supabase = createPagesServerClient({ req, res });
+  
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -36,18 +36,17 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } else if (req.method === 'POST') {
-    // Check user's role before allowing insertion
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile } = await supabase
       .from('profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profileError || !profile) {
+    if (!profile) {
       return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
     }
 
-    if (profile.role !== 'supervisor') {
+    if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'No tienes permiso para realizar esta acción.' });
     }
 
@@ -59,7 +58,8 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('puntos_de_venta')
       .insert([{ nombre, direccion, ciudad }])
-      .single(); // .single() returns the inserted row as an object
+      .select()
+      .single();
 
     if (error) {
       console.error('Error inserting point of sale:', error);

@@ -7,6 +7,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // **MEJORA: Obtener el perfil del usuario una sola vez para todos los métodos**
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+  }
+
   if (req.method === 'GET') {
     const { page = 1, search = '' } = req.query;
     const pageSize = 10;
@@ -31,7 +42,6 @@ export default async function handler(req, res) {
     }
 
     res.setHeader('X-Total-Count', count);
-    // The frontend expects camelCase keys, so we transform the data.
     const transformedData = data.map(r => ({
         ...r,
         mercaderistaId: r.mercaderista_id,
@@ -40,17 +50,8 @@ export default async function handler(req, res) {
     return res.status(200).json(transformedData);
 
   } else if (req.method === 'POST') {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
-    }
-
-    if (profile.role !== 'supervisor') {
+    // **MEJORA: Permitir acceso a 'supervisor' y 'admin'**
+    if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
     }
 
@@ -66,6 +67,7 @@ export default async function handler(req, res) {
          mercaderista_id: mercaderistaId,
          puntos_de_venta_ids: puntosDeVentaIds
       }])
+      .select() // Use .select() para obtener la fila insertada
       .single();
 
     if (error) {

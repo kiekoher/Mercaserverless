@@ -9,10 +9,11 @@ import {
   Card,
   CardContent,
   CardActions,
-  Grid
+  Grid,
+  Divider
 } from '@mui/material';
 import Link from 'next/link';
-import AppLayout from '../components/AppLayout'; // Import the shared layout
+import AppLayout from '../components/AppLayout';
 
 const SupervisorDashboard = () => (
   <Grid container spacing={3}>
@@ -80,16 +81,25 @@ const MercaderistaDashboard = () => (
   </Card>
 );
 
+// **MEJORA: Se añaden títulos para mayor claridad en el rol de admin**
 const renderDashboardByRole = (role) => {
   switch (role) {
     case 'admin':
-      return <><AdminDashboard /><Box sx={{mt: 4}}><SupervisorDashboard /></Box></>;
+      return (
+        <>
+          <Typography variant="h5" sx={{ mb: 2 }}>Panel de Administrador</Typography>
+          <AdminDashboard />
+          <Divider sx={{ my: 4 }} />
+          <Typography variant="h5" sx={{ mb: 2 }}>Panel de Supervisor</Typography>
+          <SupervisorDashboard />
+        </>
+      );
     case 'supervisor':
       return <SupervisorDashboard />;
     case 'mercaderista':
       return <MercaderistaDashboard />;
     default:
-      return <Typography>Rol no reconocido.</Typography>;
+      return <Typography>Rol no reconocido. Contacta al administrador.</Typography>;
   }
 }
 
@@ -98,17 +108,19 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login only if not in a test environment
     if (!user && process.env.NODE_ENV !== 'test') {
       router.push('/login');
     }
   }, [user, router]);
 
   if (!user || !profile) {
+    // **MEJORA: Usar el layout compartido para mantener la barra de navegación visible durante la carga**
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
+      <AppLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+          <CircularProgress />
+        </Box>
+      </AppLayout>
     );
   }
 
