@@ -1,7 +1,8 @@
-import { supabase } from '../../lib/supabaseClient';
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default async function handler(req, res) {
-  const { user } = await supabase.auth.api.getUserByCookie(req);
+  const supabase = createServerSupabaseClient({ req, res });
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
