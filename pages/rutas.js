@@ -95,7 +95,83 @@ export default function RutasPage() {
     return (completadas / ruta.puntosDeVentaIds.length) * 100;
   };
 
-  // ... (resto de funciones handleOptimizeRoute, handleSubmit, handleGenerateSummary sin cambios)
+  const handleOptimizeRoute = async () => {
+    if (selectedPuntos.length < 2) {
+      enqueueSnackbar('Selecciona al menos 2 puntos de venta para optimizar.', { variant: 'warning' });
+      return;
+    }
+    setIsOptimizing(true);
+    try {
+      const res = await fetch('/api/optimize-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntosDeVentaIds: selectedPuntos }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al optimizar la ruta');
+      }
+      const data = await res.json();
+      setSelectedPuntos(data.optimizedRoute);
+      enqueueSnackbar('¡Ruta optimizada con éxito!', { variant: 'success' });
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleGenerateSummary = async (rutaId) => {
+    setSummaryLoading(rutaId);
+    try {
+      const res = await fetch('/api/generate-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rutaId }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al generar el resumen');
+      }
+      const data = await res.json();
+      setSummaries(prev => ({ ...prev, [rutaId]: data.summary }));
+      enqueueSnackbar('Resumen generado.', { variant: 'info' });
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setSummaryLoading(null);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!fecha || !mercaderistaId || selectedPuntos.length === 0) {
+      enqueueSnackbar('Todos los campos son obligatorios.', { variant: 'warning' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/rutas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha,
+          mercaderistaId,
+          puntosDeVentaIds: selectedPuntos,
+        }),
+      });
+      if (!res.ok) throw new Error('Error al crear la ruta');
+      await fetchRutas(); // Recargar la lista de rutas
+      enqueueSnackbar('Ruta creada con éxito.', { variant: 'success' });
+      // Reset form
+      setMercaderistaId('');
+      setSelectedPuntos([]);
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!user || !profile) return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
   const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
@@ -151,7 +227,73 @@ export default function RutasPage() {
         </Grid>
 
         <Grid item xs={12} md={5}>
-            {/* ... (Formulario de creación de ruta sin cambios) ... */}
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>Crear Nueva Ruta</Typography>
+            <form onSubmit={handleSubmit}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Fecha"
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    label="ID del Mercaderista"
+                    value={mercaderistaId}
+                    onChange={(e) => setMercaderistaId(e.target.value)}
+                    fullWidth
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1">Puntos de Venta</Typography>
+                  <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto', p: 1 }}>
+                    <FormGroup>
+                      {puntos.map((punto) => (
+                        <FormControlLabel
+                          key={punto.id}
+                          control={
+                            <Checkbox
+                              checked={selectedPuntos.includes(punto.id)}
+                              onChange={(e) => {
+                                const puntoId = punto.id;
+                                setSelectedPuntos(
+                                  e.target.checked
+                                    ? [...selectedPuntos, puntoId]
+                                    : selectedPuntos.filter((id) => id !== puntoId)
+                                );
+                              }}
+                            />
+                          }
+                          label={punto.nombre}
+                        />
+                      ))}
+                    </FormGroup>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} container spacing={1} justifyContent="flex-end">
+                    <Grid item>
+                        <Button
+                            onClick={handleOptimizeRoute}
+                            variant="outlined"
+                            disabled={isOptimizing || selectedPuntos.length < 2}
+                        >
+                            {isOptimizing ? <CircularProgress size={24} /> : 'Optimizar Ruta'}
+                        </Button>
+                    </Grid>
+                    <Grid item>
+                        <Button type="submit" variant="contained" disabled={isSubmitting}>
+                            {isSubmitting ? <CircularProgress size={24} /> : 'Crear Ruta'}
+                        </Button>
+                    </Grid>
+                </Grid>
+              </Grid>
+            </form>
+          </Paper>
         </Grid>
       </Grid>
 
@@ -159,22 +301,41 @@ export default function RutasPage() {
         <Box sx={modalStyle}>
           <Typography variant="h6">Detalle de la Ruta</Typography>
           {selectedRuta && (
-            <List>
-              {selectedRuta.puntosDeVentaIds.map(puntoId => {
-                const punto = puntos.find(p => p.id === puntoId);
-                const visita = visitas[selectedRuta.id]?.find(v => v.punto_de_venta_id === puntoId);
-                const estado = visita?.estado || 'Pendiente';
+            <Fragment>
+              <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                {selectedRuta.puntosDeVentaIds.map(puntoId => {
+                  const punto = puntos.find(p => p.id === puntoId);
+                  const visita = visitas[selectedRuta.id]?.find(v => v.punto_de_venta_id === puntoId);
+                  const estado = visita?.estado || 'Pendiente';
 
-                return (
-                  <ListItem key={puntoId} divider>
-                    <ListItemText
-                      primary={<>{punto?.nombre} <Chip label={estado} size="small" color={estado === 'Completada' ? 'success' : 'default'} /></>}
-                      secondary={visita?.observaciones || 'Sin feedback.'}
-                    />
-                  </ListItem>
-                );
-              })}
-            </List>
+                  return (
+                    <ListItem key={puntoId} divider>
+                      <ListItemText
+                        primary={<>{punto?.nombre} <Chip label={estado} size="small" color={estado === 'Completada' ? 'success' : 'default'} /></>}
+                        secondary={visita?.observaciones || 'Sin feedback.'}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+              <Box sx={{ mt: 2 }}>
+                  <Button
+                    onClick={() => handleGenerateSummary(selectedRuta.id)}
+                    disabled={summaryLoading === selectedRuta.id}
+                    variant="contained"
+                  >
+                    {summaryLoading === selectedRuta.id ? <CircularProgress size={24} /> : "Generar Resumen IA"}
+                  </Button>
+                  {summaries[selectedRuta.id] && (
+                    <Paper sx={{ p: 2, mt: 2, backgroundColor: '#f5f5f5' }}>
+                      <Typography variant="subtitle1" gutterBottom>Resumen Generado por IA</Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {summaries[selectedRuta.id]}
+                      </Typography>
+                    </Paper>
+                  )}
+              </Box>
+            </Fragment>
           )}
         </Box>
       </Modal>
