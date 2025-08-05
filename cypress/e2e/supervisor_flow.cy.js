@@ -4,12 +4,12 @@ describe('Supervisor Main Workflow', () => {
   const newPointName = `Test Point ${Date.now()}`;
   const newMercaderistaId = `test-mercaderista-${Date.now()}`;
 
-  it('should allow a supervisor to create a point of sale and then a route', () => {
-    // This test assumes the user is already logged in as a supervisor.
-    // A real E2E suite would have a custom command for programmatic login.
-    // Since our app redirects to /login if not authenticated, this test will fail
-    // if run against a live app without a login session. For now, we test the components.
+  beforeEach(() => {
+    // Log in as a supervisor before each test
+    cy.login('supervisor');
+  });
 
+  it('should allow a supervisor to create a point of sale and then a route', () => {
     // To test the flow, we'll visit pages directly.
 
     // 1. Visit Points of Sale page and add a new one
