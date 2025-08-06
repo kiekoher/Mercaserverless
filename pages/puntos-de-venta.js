@@ -8,6 +8,43 @@ import {
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSnackbar } from 'notistack';
+import Papa from 'papaparse';
+
+const CSVImport = ({ onImport, isImporting }) => {
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          onImport(results.data);
+        },
+        error: (error) => {
+          console.error('Error parsing CSV:', error);
+        }
+      });
+    }
+  };
+
+  return (
+    <Paper sx={{ p: 2, mb: 2 }}>
+      <Typography variant="h6" gutterBottom>Importar desde CSV</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+        El archivo debe tener las columnas: `nombre`, `direccion`, `ciudad`.
+      </Typography>
+      <Button
+        variant="contained"
+        component="label"
+        disabled={isImporting}
+      >
+        {isImporting ? <CircularProgress size={24} /> : 'Seleccionar Archivo'}
+        <input type="file" accept=".csv" hidden onChange={handleFileChange} />
+      </Button>
+    </Paper>
+  );
+};
+
 
 export default function PuntosDeVentaPage() {
   const { user, profile } = useAuth();
@@ -20,6 +57,7 @@ export default function PuntosDeVentaPage() {
   const [direccion, setDireccion] = useState('');
   const [ciudad, setCiudad] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Pagination and Search state
   const [page, setPage] = useState(1);
@@ -75,6 +113,27 @@ export default function PuntosDeVentaPage() {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleImport = async (puntos) => {
+    setIsImporting(true);
+    try {
+      const res = await fetch('/api/import-pdv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntos }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error en la importación masiva.');
+      }
+      enqueueSnackbar(data.message, { variant: 'success' });
+      fetchPuntos(); // Refresh the list
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -140,15 +199,18 @@ export default function PuntosDeVentaPage() {
           </Paper>
         </Grid>
         <Grid item xs={12} md={4}>
-          <Typography variant="h6" gutterBottom>Añadir Nuevo Punto</Typography>
-          <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-            <TextField label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
-            <TextField label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
-            <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>
-              {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
-            </Button>
-          </Paper>
+          <Box>
+            <Typography variant="h6" gutterBottom>Añadir Nuevo Punto</Typography>
+            <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2, mb: 2 }}>
+              <TextField label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>
+                {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
+              </Button>
+            </Paper>
+            <CSVImport onImport={handleImport} isImporting={isImporting} />
+          </Box>
         </Grid>
       </Grid>
     </AppLayout>
