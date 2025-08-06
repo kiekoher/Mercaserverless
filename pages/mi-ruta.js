@@ -10,7 +10,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AppLayout from '../components/AppLayout';
 import { useSnackbar } from 'notistack';
 
-// Estilo para el Modal
+// Estilo para el Modal de feedback
 const modalStyle = {
   position: 'absolute',
   top: '50%',
@@ -18,7 +18,8 @@ const modalStyle = {
   transform: 'translate(-50%, -50%)',
   width: 400,
   bgcolor: 'background.paper',
-  border: '2px solid #000',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
   boxShadow: 24,
   p: 4,
 };
@@ -39,18 +40,22 @@ export default function MiRutaPage() {
   const [feedback, setFeedback] = useState({ estado: 'Completada', observaciones: '' });
 
   const fetchRutaYVisitas = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
       // Obtener la ruta
       const resRuta = await fetch('/api/mi-ruta');
-      if (resRuta.status === 404) throw new Error('No tienes una ruta asignada para hoy.');
+      if (resRuta.status === 404) {
+        setRuta(null);
+        throw new Error('No tienes una ruta asignada para hoy.');
+      }
       if (!resRuta.ok) throw new Error('Error al cargar la ruta.');
       const dataRuta = await resRuta.json();
       setRuta(dataRuta);
 
       // Si hay ruta, obtener las visitas asociadas
-      if (dataRuta) {
+      if (dataRuta && dataRuta.id) {
         const resVisitas = await fetch(`/api/visitas?ruta_id=${dataRuta.id}`);
         if (!resVisitas.ok) throw new Error('Error al cargar el estado de las visitas.');
         const dataVisitas = await resVisitas.json();
@@ -64,10 +69,8 @@ export default function MiRutaPage() {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      fetchRutaYVisitas();
-    }
-  }, [user, fetchRutaYVisitas]);
+    fetchRutaYVisitas();
+  }, [fetchRutaYVisitas]);
 
   const handleCheckIn = async (puntoId) => {
     try {
@@ -76,9 +79,12 @@ export default function MiRutaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ruta_id: ruta.id, punto_de_venta_id: puntoId }),
       });
-      if (!res.ok) throw new Error('No se pudo hacer el check-in.');
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'No se pudo hacer el check-in.');
+      }
       enqueueSnackbar('Check-in realizado con éxito', { variant: 'success' });
-      fetchRutaYVisitas(); // Recargar datos
+      fetchRutaYVisitas(); // Recargar datos para reflejar el nuevo estado
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     }
@@ -96,13 +102,17 @@ export default function MiRutaPage() {
   };
   
   const handleCheckOut = async () => {
+    if (!currentVisita) return;
     try {
       const res = await fetch('/api/visitas', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ visita_id: currentVisita.id, ...feedback }),
       });
-      if (!res.ok) throw new Error('No se pudo enviar el feedback.');
+      if (!res.ok) {
+         const errData = await res.json();
+        throw new Error(errData.error || 'No se pudo enviar el feedback.');
+      }
       enqueueSnackbar('Check-out y feedback enviados con éxito', { variant: 'success' });
       handleCloseModal();
       fetchRutaYVisitas(); // Recargar datos
@@ -115,59 +125,85 @@ export default function MiRutaPage() {
     return visitas.find(v => v.punto_de_venta_id === puntoId);
   };
 
-  if (!user || !profile || loading) {
+  const getGoogleMapsLink = (address) => {
+    if (!address) return '#';
+    const encodedAddress = encodeURIComponent(address);
+    return `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+  };
+
+  if (loading) {
     return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
   }
 
-  if (profile.role !== 'mercaderista') {
+  if (profile?.role !== 'mercaderista') {
     return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
   }
 
   return (
     <AppLayout>
       <Typography variant="h4" gutterBottom>Tu Ruta para Hoy</Typography>
+      <Typography variant="subtitle1" gutterBottom>
+        Fecha: {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      </Typography>
+
       {error && <Alert severity="warning" sx={{ mt: 2 }}>{error}</Alert>}
 
       {!error && ruta && (
         <List sx={{ width: '100%', bgcolor: 'background.paper', mt: 2 }}>
-          {ruta.puntos?.map((punto, index) => {
-            const visita = getPuntoStatus(punto.id);
-            const status = visita?.estado || 'Pendiente';
+          {ruta.puntos && ruta.puntos.length > 0 ? (
+            ruta.puntos.map((punto, index) => {
+              const visita = getPuntoStatus(punto.id);
+              const status = visita?.estado || 'Pendiente';
 
-            return (
-              <ListItem key={punto.id} divider>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: status === 'Completada' ? 'success.main' : 'primary.main' }}>
-                    {status === 'Completada' ? <CheckCircleOutlineIcon /> : index + 1}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={<Typography variant="h6">{punto.nombre}</Typography>}
-                  secondary={punto.direccion}
-                />
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  {status === 'Pendiente' && <Button variant="contained" onClick={() => handleCheckIn(punto.id)}>Check-in</Button>}
-                  {status === 'En Progreso' && <Button variant="outlined" onClick={() => handleOpenModal(visita)}>Check-out</Button>}
-                  <Tooltip title="Abrir en Google Maps">
-                    <IconButton href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(punto.direccion)}`} target="_blank" rel="noopener noreferrer">
-                      <DirectionsIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </ListItem>
-            );
-          })}
+              return (
+                <ListItem
+                  key={punto.id}
+                  divider
+                  secondaryAction={
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      {status === 'Pendiente' && <Button size="small" variant="contained" onClick={() => handleCheckIn(punto.id)}>Check-in</Button>}
+                      {status === 'En Progreso' && <Button size="small" variant="outlined" onClick={() => handleOpenModal(visita)}>Check-out</Button>}
+                      <Tooltip title="Abrir en Google Maps">
+                        <IconButton
+                          edge="end"
+                          aria-label="directions"
+                          href={getGoogleMapsLink(punto.direccion)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <DirectionsIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  }
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: status === 'Completada' || status === 'Incidencia' ? 'success.main' : 'primary.main' }}>
+                      {status === 'Completada' || status === 'Incidencia' ? <CheckCircleOutlineIcon /> : index + 1}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={<Typography variant="h6">{punto.nombre}</Typography>}
+                    secondary={punto.direccion || 'Dirección no disponible'}
+                  />
+                </ListItem>
+              );
+            })
+          ) : (
+             <Alert severity="info">Tu ruta de hoy no tiene puntos de venta asignados.</Alert>
+          )}
         </List>
       )}
 
       <Modal open={modalOpen} onClose={handleCloseModal}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2">Reportar Visita</Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>Finaliza tu visita y añade tus observaciones.</Typography>
           <FormControl fullWidth margin="normal">
-            <InputLabel>Estado</InputLabel>
+            <InputLabel>Estado Final</InputLabel>
             <Select
               value={feedback.estado}
-              label="Estado"
+              label="Estado Final"
               onChange={(e) => setFeedback(prev => ({ ...prev, estado: e.target.value }))}
             >
               <MenuItem value="Completada">Completada</MenuItem>
@@ -183,10 +219,9 @@ export default function MiRutaPage() {
             value={feedback.observaciones}
             onChange={(e) => setFeedback(prev => ({ ...prev, observaciones: e.target.value }))}
           />
-          <Button variant="contained" onClick={handleCheckOut} sx={{ mt: 2 }}>Enviar y Finalizar</Button>
+          <Button variant="contained" onClick={handleCheckOut} sx={{ mt: 2, width: '100%' }}>Enviar y Finalizar</Button>
         </Box>
       </Modal>
-
     </AppLayout>
   );
 }

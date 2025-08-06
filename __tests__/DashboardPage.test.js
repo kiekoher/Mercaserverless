@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { useSnackbar } from 'notistack';
 import DashboardPage from '../pages/dashboard.js';
 
-// Mock the API endpoint
+// Mock the API endpoints
 global.fetch = jest.fn();
 
 // Mock dependencies
@@ -18,34 +19,23 @@ jest.mock('../context/Auth', () => ({
   }),
 }));
 
-// Mock Chart.js components
-jest.mock('react-chartjs-2', () => ({
-  Bar: ({ options }) => {
-    // A more intelligent mock that renders the chart title if provided, so we can test for it
-    const titleText = options?.plugins?.title?.text;
-    return (
-      <div>
-        {titleText && <h3>{titleText}</h3>}
-        <canvas />
-      </div>
-    );
-  },
+jest.mock('notistack', () => ({
+  useSnackbar: jest.fn(),
 }));
 
-
 describe('DashboardPage', () => {
+  let enqueueSnackbar;
+
   beforeEach(() => {
     fetch.mockClear();
+    enqueueSnackbar = jest.fn();
+    useSnackbar.mockImplementation(() => ({ enqueueSnackbar }));
   });
 
-  it('renders stats and chart after fetching data', async () => {
+  it('renders stats and AI section after fetching data', async () => {
     const mockStats = {
       total_rutas: 15,
       total_puntos_visitados: 120,
-      rutas_por_mercaderista: [
-        { mercaderista: 'mercaderista-1', total_rutas: 10 },
-        { mercaderista: 'mercaderista-2', total_rutas: 5 },
-      ],
     };
 
     fetch.mockResolvedValueOnce({
@@ -55,33 +45,32 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    // Should display a loading spinner initially
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
-
-    // Wait for the data to be loaded and rendered
-    await waitFor(() => {
-      // Check for the main heading
-      expect(screen.getByRole('heading', { name: /dashboard de analítica/i })).toBeInTheDocument();
-    });
+    // Use findBy queries which automatically wait for elements to appear
+    expect(await screen.findByRole('heading', { name: /dashboard de operaciones/i })).toBeInTheDocument();
 
     // Check for the rendered stat cards
-    expect(screen.getByText('Total de Rutas')).toBeInTheDocument();
-    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(await screen.findByText('Rutas Totales')).toBeInTheDocument();
+    expect(await screen.findByText('15')).toBeInTheDocument();
 
-    expect(screen.getByText('Total Puntos Visitados')).toBeInTheDocument();
-    expect(screen.getByText('120')).toBeInTheDocument();
+    expect(await screen.findByText('Puntos de Venta Visitados (Total)')).toBeInTheDocument();
+    expect(await screen.findByText('120')).toBeInTheDocument();
 
-    // Check that the chart title is there
-    expect(screen.getByText(/rendimiento por mercaderista/i)).toBeInTheDocument();
+    // Check for the AI insights section
+    expect(screen.getByRole('heading', { name: /insights de la operación por ia/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /analizar última ruta/i })).toBeInTheDocument();
   });
 
-  it('renders an error message if the fetch fails', async () => {
-    fetch.mockImplementationOnce(() => Promise.reject(new Error('Failed to fetch stats')));
+  it('renders an error message if the stats fetch fails', async () => {
+    // Make the mock more specific to how the component handles it
+    fetch.mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: 'Database connection error' }),
+    });
 
     render(<DashboardPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/failed to fetch stats/i)).toBeInTheDocument();
+      expect(enqueueSnackbar).toHaveBeenCalledWith('No se pudieron cargar las estadísticas.', { variant: 'error' });
     });
   });
 });
