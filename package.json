@@ -27,7 +27,8 @@
     "react-dom": "^18",
     "@googlemaps/google-maps-services-js": "^3.4.0",
     "react-leaflet": "^4.2.1",
-    "leaflet": "^1.9.4"
+    "leaflet": "^1.9.4",
+    "papaparse": "^5.4.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.5",
