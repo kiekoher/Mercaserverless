@@ -17,7 +17,7 @@ module.exports = {
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(@supabase|isows|@supabase/realtime-js)/)',
+    '/node_modules/(?!(@supabase|isows|@supabase/realtime-js|p-limit)/)',
     '^.+\\.module\\.(css|sass|scss)$',
   ],
 };

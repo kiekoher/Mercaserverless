@@ -2,6 +2,11 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
+import { z } from 'zod';
+
+const insightsSchema = z.object({
+  rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }),
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,6 +15,7 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.GEMINI_API_KEY) {
+    logger.error('GEMINI_API_KEY is not configured');
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
   }
 
@@ -18,6 +24,7 @@ export default async function handler(req, res) {
   const supabase = createPagesServerClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
+    logger.warn('Unauthorized access attempt to generate-insights');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -28,13 +35,17 @@ export default async function handler(req, res) {
     .single();
 
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to generate-insights');
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const { rutaId } = req.body;
-  if (!rutaId) {
-    return res.status(400).json({ error: 'Se requiere el ID de la ruta.' });
+  const parsed = insightsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const errorMessages = parsed.error.errors.map(e => e.message).join(', ');
+    logger.warn({ errors: parsed.error.format() }, `Invalid request to generate-insights: ${errorMessages}`);
+    return res.status(400).json({ error: `Datos de entrada inválidos: ${errorMessages}` });
   }
+  const { rutaId } = parsed.data;
 
   try {
     // 1. Fetch all visits for the given route

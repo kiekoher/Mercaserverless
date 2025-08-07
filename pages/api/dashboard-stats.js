@@ -12,6 +12,7 @@ export default async function handler(req, res) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
+    logger.warn('Unauthorized access attempt to dashboard-stats');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -27,6 +28,7 @@ export default async function handler(req, res) {
   }
 
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to dashboard-stats');
     return res.status(403).json({ error: 'Forbidden' });
   }
 
