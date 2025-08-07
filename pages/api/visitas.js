@@ -7,11 +7,16 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single();
+
+  if (profileError) {
+    console.error('Error fetching profile:', profileError);
+    return res.status(500).json({ error: 'Error fetching user profile' });
+  }
 
   if (!profile) {
     return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
