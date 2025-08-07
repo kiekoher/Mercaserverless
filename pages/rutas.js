@@ -10,6 +10,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useSnackbar } from 'notistack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MapIcon from '@mui/icons-material/Map';
+import SummarizeIcon from '@mui/icons-material/Summarize';
 import dynamic from 'next/dynamic';
 
 const RutaMap = dynamic(() => import('../components/RutaMap'), { ssr: false });
@@ -40,8 +41,11 @@ export default function RutasPage() {
   // Estado del modal
   const [modalOpen, setModalOpen] = useState(false);
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
   const [selectedRuta, setSelectedRuta] = useState(null);
   const [loadingVisitas, setLoadingVisitas] = useState(false);
+  const [summaryContent, setSummaryContent] = useState('');
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
   // Estado del formulario
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -131,6 +135,38 @@ export default function RutasPage() {
     setSelectedRuta(null);
   };
 
+  const handleGenerateSummary = async (ruta) => {
+    setLoadingSummary(true);
+    setSummaryContent('');
+    try {
+      const routePuntos = ruta.puntos_de_venta_ids
+        .map(id => puntos.find(p => p.id === id))
+        .filter(Boolean);
+
+      const res = await fetch('/api/generate-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fecha: ruta.fecha,
+          mercaderistaId: ruta.mercaderista_id,
+          puntos: routePuntos,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo generar el resumen.');
+      }
+
+      setSummaryContent(data.summary);
+      setSummaryModalOpen(true);
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   const calculateProgress = (ruta) => {
     const visitasDeRuta = visitas[ruta.id] || [];
     if (!ruta.puntos_de_venta_ids || ruta.puntos_de_venta_ids.length === 0) return 0;
@@ -217,6 +253,16 @@ export default function RutasPage() {
                             <MapIcon />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Generar Resumen IA">
+                          <span>
+                            <IconButton
+                              onClick={() => handleGenerateSummary(ruta)}
+                              disabled={loadingSummary}
+                            >
+                              {loadingSummary && selectedRuta?.id === ruta.id ? <CircularProgress size={24} /> : <SummarizeIcon />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -301,6 +347,22 @@ export default function RutasPage() {
                 }
               />
             )}
+        </Box>
+      </Modal>
+
+      <Modal open={summaryModalOpen} onClose={() => setSummaryModalOpen(false)}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" gutterBottom>
+            Resumen de la Ruta Generado por IA
+          </Typography>
+          {loadingSummary ? <CircularProgress /> : (
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+              {summaryContent}
+            </Typography>
+          )}
+          <Button onClick={() => setSummaryModalOpen(false)} sx={{ mt: 2 }}>
+            Cerrar
+          </Button>
         </Box>
       </Modal>
 

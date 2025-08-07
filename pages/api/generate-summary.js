@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  if (!(await checkRateLimit(req))) {
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 

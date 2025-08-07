@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   }
   const puntos = parsed.data;
 
-  if (!(await checkRateLimit(req))) {
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 
