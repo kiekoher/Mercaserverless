@@ -29,7 +29,7 @@ describe('import-pdv API', () => {
     process.env.GOOGLE_MAPS_API_KEY = 'key';
   });
 
-  it.skip('returns 401 when unauthenticated', async () => {
+  it('returns 401 when unauthenticated', async () => {
     const { createPagesServerClient } = await import('@supabase/auth-helpers-nextjs');
     createPagesServerClient.mockReturnValue({
       auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },

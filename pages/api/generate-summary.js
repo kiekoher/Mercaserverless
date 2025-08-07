@@ -3,6 +3,17 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
+import { z } from 'zod';
+
+const summarySchema = z.object({
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }),
+  mercaderistaId: z.string().min(1, { message: "El ID del mercaderista es requerido" }),
+  puntos: z.array(
+    z.object({
+      nombre: z.string().min(1, { message: "El nombre del punto de venta es requerido" })
+    })
+  ).min(1, { message: "Debe haber al menos un punto de venta" }),
+});
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,12 +22,14 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.GEMINI_API_KEY) {
+    logger.error('GEMINI_API_KEY is not configured');
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
   }
 
   const supabase = createPagesServerClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
+    logger.warn('Unauthorized access attempt to generate-summary');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -27,6 +40,7 @@ export default async function handler(req, res) {
     .single();
 
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to generate-summary');
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -36,11 +50,16 @@ export default async function handler(req, res) {
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  const { fecha, mercaderistaId, puntos } = req.body;
+  const parsed = summarySchema.safeParse(req.body);
 
-  if (!fecha || !mercaderistaId || !puntos) {
-    return res.status(400).json({ error: 'Faltan datos de la ruta en la solicitud.' });
+  if (!parsed.success) {
+    // Collect all error messages
+    const errorMessages = parsed.error.errors.map(e => e.message).join(', ');
+    logger.warn({ errors: parsed.error.format() }, `Invalid request to generate-summary: ${errorMessages}`);
+    return res.status(400).json({ error: `Datos de entrada inválidos: ${errorMessages}` });
   }
+
+  const { fecha, mercaderistaId, puntos } = parsed.data;
 
   const safeFecha = sanitizeInput(fecha);
   const safeMercaderista = sanitizeInput(mercaderistaId);

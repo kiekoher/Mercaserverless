@@ -13,12 +13,14 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.GOOGLE_MAPS_API_KEY) {
+    logger.error('GOOGLE_MAPS_API_KEY is not configured');
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
   const supabase = createPagesServerClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
+    logger.warn('Unauthorized access attempt to import-pdv');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -34,12 +36,20 @@ export default async function handler(req, res) {
   }
 
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to import-pdv');
     return res.status(403).json({ error: 'Forbidden' });
   }
 
   const { puntos } = req.body;
   if (!puntos || !Array.isArray(puntos) || puntos.length === 0) {
+    logger.warn('Bad request to import-pdv: "puntos" array is missing or empty.');
     return res.status(400).json({ error: 'Se requiere un array de puntos de venta.' });
+  }
+
+  const MAX_IMPORT_SIZE = 500;
+  if (puntos.length > MAX_IMPORT_SIZE) {
+    logger.warn({ importSize: puntos.length }, 'Payload too large for import-pdv');
+    return res.status(413).json({ error: `La importación está limitada a ${MAX_IMPORT_SIZE} puntos de venta por solicitud.` });
   }
 
   try {
