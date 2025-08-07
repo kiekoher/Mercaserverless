@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,17 +19,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Faltan datos de la ruta en la solicitud.' });
   }
 
+  const safeFecha = sanitizeInput(fecha);
+  const safeMercaderista = sanitizeInput(mercaderistaId);
+  const safePuntos = puntos.map(p => sanitizeInput(p.nombre));
+
   const prompt = `
     Genera un resumen corto y amigable para una ruta de mercaderista.
     El resumen debe ser de no más de 40 palabras, en un tono motivador y profesional.
     Aquí están los detalles:
-    - Fecha: ${fecha}
-    - Mercaderista: ${mercaderistaId}
+    - Fecha: ${safeFecha}
+    - Mercaderista: ${safeMercaderista}
     - Número de paradas: ${puntos.length}
-    - Puntos de venta: ${puntos.map(p => p.nombre).join(', ')}
+    - Puntos de venta: ${safePuntos.join(', ')}
 
-    Ejemplo de respuesta: "¡Excelente día, ${mercaderistaId}! Hoy tu ruta del ${fecha} te llevará a ${puntos.length} puntos clave, incluyendo ${puntos[0]?.nombre}. ¡A darlo todo!"
-  `;
+    Ejemplo de respuesta: "¡Excelente día, ${safeMercaderista}! Hoy tu ruta del ${safeFecha} te llevará a ${puntos.length} puntos clave, incluyendo ${safePuntos[0]}. ¡A darlo todo!"
+  `; // Sanitización básica; no garantiza protección total contra prompt injection
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });

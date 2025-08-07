@@ -56,6 +56,18 @@ export default function RutasPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
+  const fetchVisitasForRuta = useCallback(async (rutaId) => {
+    try {
+        const res = await fetch(`/api/visitas?ruta_id=${rutaId}`);
+        if (!res.ok) return; // Fail silently
+        const data = await res.json();
+        setVisitas(prev => ({ ...prev, [rutaId]: data }));
+    } catch (err) {
+        // Do not show snackbar for this background fetch
+        console.error(`Failed to fetch visits for route ${rutaId}`, err);
+    }
+  }, []);
+
   const fetchRutas = useCallback(async () => {
     setLoading(true);
     try {
@@ -89,18 +101,6 @@ export default function RutasPage() {
         enqueueSnackbar(err.message, { variant: 'error' });
     }
   }, [enqueueSnackbar]);
-
-  const fetchVisitasForRuta = useCallback(async (rutaId) => {
-    try {
-        const res = await fetch(`/api/visitas?ruta_id=${rutaId}`);
-        if (!res.ok) return; // Fail silently
-        const data = await res.json();
-        setVisitas(prev => ({ ...prev, [rutaId]: data }));
-    } catch (err) {
-        // Do not show snackbar for this background fetch
-        console.error(`Failed to fetch visits for route ${rutaId}`, err);
-    }
-  }, []);
 
   useEffect(() => {
     if (user) {
@@ -146,7 +146,7 @@ export default function RutasPage() {
         const res = await fetch('/api/rutas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fecha, mercaderista_id: mercaderistaId, puntos_de_venta_ids: selectedPuntos })
+            body: JSON.stringify({ fecha, mercaderistaId, puntosDeVentaIds: selectedPuntos })
         });
         if (!res.ok) throw new Error('Failed to create route');
         enqueueSnackbar('Ruta creada con éxito', { variant: 'success' });

@@ -1,8 +1,10 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { Client } from '@googlemaps/google-maps-services-js';
+import pLimit from 'p-limit';
 
 const googleMapsClient = new Client({});
 
+// Importación masiva con geocodificación paralela y manejo de errores por punto
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -40,12 +42,14 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Procesar geocodificación en paralelo con un límite de concurrencia
+    const limit = pLimit(5);
     const puntosToInsert = [];
-    for (const punto of puntos) {
+
+    const tasks = puntos.map(punto => limit(async () => {
       if (!punto.nombre || !punto.direccion || !punto.ciudad) {
-        // Skip rows with missing essential data
         console.warn('Skipping point of sale due to missing data:', punto);
-        continue;
+        return null; // se ignoran puntos inválidos sin interrumpir la importación
       }
 
       let latitud = null;
@@ -70,14 +74,17 @@ export default async function handler(req, res) {
         // Continue without coordinates if geocoding fails
       }
 
-      puntosToInsert.push({
+      return {
         nombre: punto.nombre,
         direccion: punto.direccion,
         ciudad: punto.ciudad,
         latitud,
         longitud,
-      });
-    }
+      };
+    }));
+
+    const results = await Promise.all(tasks);
+    results.forEach(r => { if (r) puntosToInsert.push(r); });
 
     if (puntosToInsert.length === 0) {
       return res.status(400).json({ error: 'Ningún punto de venta en el archivo era válido para importar.' });
