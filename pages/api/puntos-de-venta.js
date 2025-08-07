@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { Client } from '@googlemaps/google-maps-services-js';
+import { z } from 'zod';
 
 const googleMapsClient = new Client({});
 
@@ -29,10 +30,16 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const { nombre, direccion, ciudad } = req.body;
-    if (!nombre || !direccion || !ciudad) {
-      return res.status(400).json({ error: 'Nombre, dirección y ciudad son requeridos.' });
+    const schema = z.object({
+      nombre: z.string().min(1),
+      direccion: z.string().min(1),
+      ciudad: z.string().min(1),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.format() });
     }
+    const { nombre, direccion, ciudad } = parsed.data;
 
     let latitud = null;
     let longitud = null;

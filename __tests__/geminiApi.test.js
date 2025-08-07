@@ -6,7 +6,7 @@ const mockText = jest.fn();
 const mockGenerateContent = jest.fn().mockResolvedValue({ response: { text: mockText } });
 const mockGetGenerativeModel = jest.fn().mockReturnValue({ generateContent: mockGenerateContent });
 
-const mockDistanceMatrix = jest.fn();
+const mockDirections = jest.fn();
 
 jest.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
@@ -16,7 +16,7 @@ jest.mock('@google/generative-ai', () => ({
 
 jest.mock('@googlemaps/google-maps-services-js', () => ({
   Client: jest.fn().mockImplementation(() => ({
-    distancematrix: mockDistanceMatrix,
+    directions: mockDirections,
   })),
 }));
 
@@ -104,13 +104,8 @@ describe('Gemini API routes', () => {
   describe('optimize-route', () => {
     it('returns optimized points on success', async () => {
       process.env.GOOGLE_MAPS_API_KEY = 'test';
-      mockDistanceMatrix.mockResolvedValueOnce({
-        data: {
-          rows: [
-            { elements: [{ distance: { value: 0 } }, { distance: { value: 10 } }] },
-            { elements: [{ distance: { value: 10 } }, { distance: { value: 0 } }] },
-          ],
-        },
+      mockDirections.mockResolvedValueOnce({
+        data: { routes: [{ waypoint_order: [0] }] },
       });
 
       const { default: handler } = await import('../pages/api/optimize-route.js');
@@ -139,9 +134,9 @@ describe('Gemini API routes', () => {
       expect(res.data).toEqual({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
     });
 
-    it('propagates distance matrix errors', async () => {
+    it('propagates directions API errors', async () => {
       process.env.GOOGLE_MAPS_API_KEY = 'test';
-      mockDistanceMatrix.mockRejectedValueOnce(new Error('fail'));
+      mockDirections.mockRejectedValueOnce(new Error('fail'));
       const { default: handler } = await import('../pages/api/optimize-route.js');
       const req = { method: 'POST', body: { puntos: [{ id: 1, direccion:'d1', ciudad:'Bogotá' }, { id:2, direccion:'d2', ciudad:'Bogotá' }] } };
       const res = createMockRes();

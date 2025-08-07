@@ -1,4 +1,5 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { z } from 'zod';
 
 export default async function handler(req, res) {
   // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
@@ -55,10 +56,16 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
     }
 
-    const { fecha, mercaderistaId, puntosDeVentaIds } = req.body;
-    if (!fecha || !mercaderistaId || !puntosDeVentaIds || !Array.isArray(puntosDeVentaIds)) {
-      return res.status(400).json({ message: 'Todos los campos son requeridos.' });
+    const schema = z.object({
+      fecha: z.string().min(1),
+      mercaderistaId: z.string().uuid(),
+      puntosDeVentaIds: z.array(z.number().int()).min(1),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
+    const { fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
 
     const { data, error } = await supabase
       .from('rutas')

@@ -60,7 +60,7 @@ describe('rutas API', () => {
       }
     });
     const { default: handler } = await import('../../pages/api/rutas.js');
-    const req = { method: 'POST', body: { fecha: '2024-01-01', mercaderistaId: 'm1', puntosDeVentaIds: [1] } };
+    const req = { method: 'POST', body: { fecha: '2024-01-01', mercaderistaId: '00000000-0000-0000-0000-000000000000', puntosDeVentaIds: [1] } };
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(201);
