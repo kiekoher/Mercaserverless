@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 
 export default async function handler(req, res) {
@@ -18,6 +19,16 @@ export default async function handler(req, res) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const { rutaId } = req.body;
@@ -67,7 +78,7 @@ export default async function handler(req, res) {
     res.status(200).json({ summary: text });
 
   } catch (error) {
-    console.error('Error generating insights:', error);
+    logger.error({ err: error }, 'Error generating insights');
     res.status(500).json({ error: 'Error al comunicarse con la API de IA o al procesar los datos.' });
   }
 }

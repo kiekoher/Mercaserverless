@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { Client } from '@googlemaps/google-maps-services-js';
+import logger from '../../lib/logger';
 import { z } from 'zod';
 
 const googleMapsClient = new Client({});
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
     .single();
 
   if (profileError) {
-    console.error('Error fetching profile:', profileError);
+    logger.error({ err: profileError }, 'Error fetching profile');
     return res.status(500).json({ error: 'Error fetching user profile' });
   }
 
@@ -64,10 +65,10 @@ export default async function handler(req, res) {
         latitud = location.lat;
         longitud = location.lng;
       } else {
-        console.warn(`Geocoding failed for address: ${direccion}, ${ciudad}`);
+        logger.warn({ direccion, ciudad }, 'Geocoding failed for address');
       }
     } catch (e) {
-      console.error('Geocoding API error:', e);
+      logger.error({ err: e }, 'Geocoding API error');
       // Non-blocking error: proceed to save the point of sale even if geocoding fails.
     }
 

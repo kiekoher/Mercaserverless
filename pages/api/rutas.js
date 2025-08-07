@@ -1,4 +1,5 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import logger from '../../lib/logger';
 import { z } from 'zod';
 
 export default async function handler(req, res) {
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
       .range(from, to);
 
     if (error) {
-      console.error('Error fetching routes:', error);
+      logger.error({ err: error }, 'Error fetching routes');
       return res.status(500).json({ error: error.message });
     }
 
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      console.error('Error inserting route:', error);
+      logger.error({ err: error }, 'Error inserting route');
       return res.status(500).json({ error: error.message });
     }
     return res.status(201).json(data);

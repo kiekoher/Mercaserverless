@@ -1,12 +1,10 @@
 Cypress.Commands.add('login', (role) => {
-  cy.request('POST', '/api/e2e-login', { role })
-    .its('body.session')
-    .then((session) => {
-      // The key format is sb-<project-ref>-auth-token
-      const supabaseLocalStorageKey = `sb-qaceecznfveabbnpteox-auth-token`;
-      window.localStorage.setItem(
-        supabaseLocalStorageKey,
-        JSON.stringify(session)
-      );
-    });
+  cy.task('e2eLogin', { role }).then((session) => {
+    if (!session) {
+      throw new Error('Failed to obtain test session');
+    }
+    const supabaseLocalStorageKey = `sb-qaceecznfveabbnpteox-auth-token`;
+    window.localStorage.setItem(supabaseLocalStorageKey, JSON.stringify(session));
+  });
 });
+
