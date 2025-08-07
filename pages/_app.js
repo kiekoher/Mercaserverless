@@ -8,12 +8,18 @@ import theme from '../components/theme';
 import createEmotionCache from '../components/createEmotionCache';
 import { AuthProvider } from '../context/Auth';
 import { SnackbarProvider } from 'notistack';
+import { useEffect } from 'react';
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();
 
 export default function MyApp(props) {
   const { Component, emotionCache = clientSideEmotionCache, pageProps } = props;
+
+  useEffect(() => {
+    // Obtiene un token CSRF y lo almacena en la cookie `csrf-token`
+    fetch('/api/csrf');
+  }, []);
 
   return (
     <CacheProvider value={emotionCache}>

@@ -3,11 +3,14 @@ import { useAuth } from '../context/Auth';
 import {
   Typography, Button, Grid, Paper, TextField, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
-  CircularProgress, Box, Pagination, Alert
+  CircularProgress, Box, Pagination, Alert, Dialog,
+  DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSnackbar } from 'notistack';
+import { useAuthorization } from '../hooks/useAuthorization';
+import fetchWithCsrf from '../lib/fetchWithCsrf';
 import Papa from 'papaparse';
 
 const CSVImport = ({ onImport, isImporting }) => {
@@ -47,7 +50,8 @@ const CSVImport = ({ onImport, isImporting }) => {
 
 
 export default function PuntosDeVentaPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { can, role } = useAuthorization();
   const { enqueueSnackbar } = useSnackbar();
   const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +62,14 @@ export default function PuntosDeVentaPage() {
   const [ciudad, setCiudad] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Dialog state for edit/delete
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [currentPunto, setCurrentPunto] = useState(null);
+  const [editNombre, setEditNombre] = useState('');
+  const [editDireccion, setEditDireccion] = useState('');
+  const [editCiudad, setEditCiudad] = useState('');
 
   // Pagination and Search state
   const [page, setPage] = useState(1);
@@ -93,9 +105,8 @@ export default function PuntosDeVentaPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/puntos-de-venta', {
+      const res = await fetchWithCsrf('/api/puntos-de-venta', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre, direccion, ciudad }),
       });
       if (!res.ok) {
@@ -119,9 +130,8 @@ export default function PuntosDeVentaPage() {
   const handleImport = async (puntos) => {
     setIsImporting(true);
     try {
-      const res = await fetch('/api/import-pdv', {
+      const res = await fetchWithCsrf('/api/import-pdv', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ puntos }),
       });
       const data = await res.json();
@@ -137,34 +147,40 @@ export default function PuntosDeVentaPage() {
     }
   };
 
-  const handleEdit = async (punto) => {
-    const nombreNuevo = prompt('Nuevo nombre', punto.nombre);
-    if (nombreNuevo === null) return;
-    const direccionNueva = prompt('Nueva dirección', punto.direccion);
-    if (direccionNueva === null) return;
-    const ciudadNueva = prompt('Nueva ciudad', punto.ciudad);
-    if (ciudadNueva === null) return;
+  const openEditDialog = (punto) => {
+    setCurrentPunto(punto);
+    setEditNombre(punto.nombre);
+    setEditDireccion(punto.direccion);
+    setEditCiudad(punto.ciudad);
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
     try {
-      const res = await fetch('/api/puntos-de-venta', {
+      const res = await fetchWithCsrf('/api/puntos-de-venta', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: punto.id, nombre: nombreNuevo, direccion: direccionNueva, ciudad: ciudadNueva })
+        body: JSON.stringify({ id: currentPunto.id, nombre: editNombre, direccion: editDireccion, ciudad: editCiudad })
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Error al actualizar');
       }
       enqueueSnackbar('Punto de venta actualizado', { variant: 'success' });
+      setEditOpen(false);
       fetchPuntos();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     }
   };
 
-  const handleDelete = async (punto) => {
-    if (!confirm('¿Eliminar este punto de venta?')) return;
+  const openDeleteDialog = (punto) => {
+    setCurrentPunto(punto);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
     try {
-      const res = await fetch(`/api/puntos-de-venta?id=${punto.id}`, {
+      const res = await fetchWithCsrf(`/api/puntos-de-venta?id=${currentPunto.id}`, {
         method: 'DELETE'
       });
       if (!res.ok) {
@@ -172,18 +188,18 @@ export default function PuntosDeVentaPage() {
         throw new Error(data.error || 'Error al eliminar');
       }
       enqueueSnackbar('Punto de venta eliminado', { variant: 'success' });
+      setDeleteOpen(false);
       fetchPuntos();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     }
   };
 
-  if (!user || !profile) {
+  if (!user || !role) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   }
 
-  // **MEJORA: Permitir acceso a 'supervisor' y 'admin'**
-  const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
+  const hasPermission = can(['supervisor', 'admin']);
 
   if (!hasPermission) {
     return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>
@@ -225,8 +241,8 @@ export default function PuntosDeVentaPage() {
                       <TableCell>{punto.direccion}</TableCell>
                       <TableCell>{punto.ciudad}</TableCell>
                       <TableCell align="right">
-                        <Button size="small" onClick={() => handleEdit(punto)}>Editar</Button>
-                        <Button size="small" color="error" onClick={() => handleDelete(punto)}>Eliminar</Button>
+                        <Button size="small" onClick={() => openEditDialog(punto)}>Editar</Button>
+                        <Button size="small" color="error" onClick={() => openDeleteDialog(punto)}>Eliminar</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -259,6 +275,25 @@ export default function PuntosDeVentaPage() {
           </Box>
         </Grid>
       </Grid>
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)}>
+        <DialogTitle>Editar Punto de Venta</DialogTitle>
+        <DialogContent>
+          <TextField margin="dense" label="Nombre" fullWidth value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+          <TextField margin="dense" label="Dirección" fullWidth value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} />
+          <TextField margin="dense" label="Ciudad" fullWidth value={editCiudad} onChange={(e) => setEditCiudad(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditOpen(false)}>Cancelar</Button>
+          <Button onClick={handleEditSubmit}>Guardar</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={deleteOpen} onClose={() => setDeleteOpen(false)}>
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)}>Cancelar</Button>
+          <Button color="error" onClick={handleDeleteConfirm}>Eliminar</Button>
+        </DialogActions>
+      </Dialog>
     </AppLayout>
   );
 }

@@ -7,10 +7,13 @@ import {
 } from '@mui/material';
 import AppLayout from '../../components/AppLayout';
 import { useSnackbar } from 'notistack'; // Importar useSnackbar
+import { useAuthorization } from '../../hooks/useAuthorization';
+import fetchWithCsrf from '../../lib/fetchWithCsrf';
 
 export default function UserManagementPage() {
-  const { user, profile } = useAuth();
-  const { enqueueSnackbar } = useSnackbar(); // Usar el hook
+  const { user } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
+  const { can, role } = useAuthorization();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,15 +37,15 @@ export default function UserManagementPage() {
   }, []);
 
   useEffect(() => {
-    if (profile) {
-      if (profile.role === 'admin') {
+    if (role) {
+      if (can('admin')) {
         fetchUsers();
       } else {
-        setLoading(false); // Detener el loading si no tiene permisos
+        setLoading(false);
         setError('No tienes permiso para acceder a esta página.');
       }
     }
-  }, [profile, fetchUsers]);
+  }, [role, can, fetchUsers]);
 
   const handleRoleChange = (userId, newRole) => {
     setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
@@ -53,9 +56,8 @@ export default function UserManagementPage() {
     setError(null);
     const userToUpdate = users.find(u => u.id === userId);
     try {
-      const res = await fetch('/api/users', {
+      const res = await fetchWithCsrf('/api/users', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, newRole: userToUpdate.role }),
       });
       if (!res.ok) {
@@ -74,11 +76,10 @@ export default function UserManagementPage() {
     }
   };
 
-  if (!user || !profile) {
+  if (!user || !role) {
     return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
   }
-
-  if (profile.role !== 'admin') {
+  if (!can('admin')) {
     return <AppLayout><Alert severity="error">No tienes permiso para acceder a esta página.</Alert></AppLayout>;
   }
 
