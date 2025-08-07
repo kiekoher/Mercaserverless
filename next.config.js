@@ -4,7 +4,23 @@
 // Nota: Content-Security-Policy (CSP) no se incluye aquí por su complejidad.
 // Una política CSP estricta requiere una auditoría completa de todos los scripts,
 // estilos y fuentes de contenido para evitar romper la aplicación.
+
+const CspHeader = `
+    default-src 'self';
+    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src * blob: data:;
+    media-src 'none';
+    frame-src 'none';
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' *.supabase.co *.googleapis.com;
+`.replace(/\s{2,}/g, ' ').trim();
+
 const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: CspHeader,
+  },
   {
     key: 'X-Content-Type-Options',
     value: 'nosniff',

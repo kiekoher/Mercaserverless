@@ -48,6 +48,15 @@ describe('visitas API', () => {
             })
           };
         }
+        if (table === 'rutas') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] } })
+              })
+            })
+          };
+        }
         if (table === 'visitas') {
           return {
             insert: () => ({

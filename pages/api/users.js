@@ -22,11 +22,29 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, role');
+    const page = parseInt(req.query.page || '1', 10);
+    const search = req.query.search || '';
+    const PAGE_SIZE = 10;
+    const from = (page - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
 
-    if (error) return res.status(500).json({ error: error.message });
+    let query = supabase
+      .from('profiles')
+      .select('id, full_name, role', { count: 'exact' });
+
+    if (search) {
+      query = query.ilike('full_name', `%${search}%`);
+    }
+
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.setHeader('X-Total-Count', count);
     return res.status(200).json(data);
   }
 
