@@ -1,4 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import logger from '../../lib/logger';
+import { z } from 'zod';
 
 export default async function handler(req, res) {
   const supabase = createPagesServerClient({ req, res });
@@ -14,7 +16,7 @@ export default async function handler(req, res) {
     .single();
 
   if (profileError) {
-    console.error('Error fetching profile:', profileError);
+    logger.error({ err: profileError }, 'Error fetching profile');
     return res.status(500).json({ error: 'Error fetching user profile' });
   }
 
@@ -50,10 +52,15 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
     }
     
-    const { ruta_id, punto_de_venta_id } = req.body;
-    if (!ruta_id || !punto_de_venta_id) {
-      return res.status(400).json({ error: 'Se requiere el ID de la ruta y del punto de venta.' });
+    const postSchema = z.object({
+      ruta_id: z.number(),
+      punto_de_venta_id: z.number(),
+    });
+    const parsed = postSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Datos de visita inválidos.' });
     }
+    const { ruta_id, punto_de_venta_id } = parsed.data;
 
     const { data, error } = await supabase
       .from('visitas')
@@ -68,7 +75,7 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      console.error('Error creating visit:', error);
+      logger.error({ err: error }, 'Error creating visit');
       return res.status(500).json({ error: error.message });
     }
     return res.status(201).json(data);
@@ -80,10 +87,17 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
     }
 
-    const { visita_id, estado, observaciones, url_foto } = req.body;
-    if (!visita_id || !estado) {
-        return res.status(400).json({ error: 'Se requiere el ID de la visita y un estado.' });
+    const putSchema = z.object({
+      visita_id: z.number(),
+      estado: z.string().min(1),
+      observaciones: z.string().optional(),
+      url_foto: z.string().url().optional(),
+    });
+    const parsed = putSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Datos de actualización inválidos.' });
     }
+    const { visita_id, estado, observaciones, url_foto } = parsed.data;
 
     const { data, error } = await supabase
       .from('visitas')
@@ -99,7 +113,7 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-        console.error('Error updating visit:', error);
+        logger.error({ err: error }, 'Error updating visit');
         return res.status(500).json({ error: error.message });
     }
     return res.status(200).json(data);

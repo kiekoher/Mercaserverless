@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 
 export default async function handler(req, res) {
@@ -9,6 +12,26 @@ export default async function handler(req, res) {
 
   if (!process.env.GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
+  }
+
+  const supabase = createPagesServerClient({ req, res });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (!(await checkRateLimit(req))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -44,7 +67,7 @@ export default async function handler(req, res) {
     res.status(200).json({ summary });
 
   } catch (error) {
-    console.error('Error calling Gemini API:', error);
+    logger.error({ err: error }, 'Error calling Gemini API');
     const status = error?.response?.status;
     if (status === 401) {
       return res.status(401).json({ error: 'Token inválido para Gemini API.' });

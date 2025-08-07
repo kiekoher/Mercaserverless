@@ -1,4 +1,5 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
     .single();
 
   if (profileError) {
-    console.error('Error fetching profile:', profileError);
+    logger.error({ err: profileError }, 'Error fetching profile');
     return res.status(500).json({ error: 'Error fetching user profile' });
   }
 
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
   const { data, error } = await supabase.rpc('get_dashboard_stats');
 
   if (error) {
-    console.error('Error calling dashboard stats function:', error);
+    logger.error({ err: error }, 'Error calling dashboard stats function');
     return res.status(500).json({ error: 'Error al obtener las estadísticas.' });
   }
 

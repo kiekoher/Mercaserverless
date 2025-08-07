@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { Client } from '@googlemaps/google-maps-services-js';
+import logger from '../../lib/logger';
 import pLimit from 'p-limit';
 
 const googleMapsClient = new Client({});
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
     .single();
 
   if (profileError) {
-    console.error('Error fetching profile:', profileError);
+    logger.error({ err: profileError }, 'Error fetching profile');
     return res.status(500).json({ error: 'Error fetching user profile' });
   }
 
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
 
     const tasks = puntos.map(punto => limit(async () => {
       if (!punto.nombre || !punto.direccion || !punto.ciudad) {
-        console.warn('Skipping point of sale due to missing data:', punto);
+        logger.warn({ punto }, 'Skipping point of sale due to missing data');
         return null; // se ignoran puntos inválidos sin interrumpir la importación
       }
 
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
           longitud = location.lng;
         }
       } catch (e) {
-        console.error(`Geocoding failed for address: ${punto.direccion}`, e);
+        logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
         // Continue without coordinates if geocoding fails
       }
 
@@ -98,7 +99,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ message: `${puntosToInsert.length} puntos de venta importados con éxito.` });
   } catch (error) {
-    console.error('Error during bulk import:', error);
+    logger.error({ err: error }, 'Error during bulk import');
     res.status(500).json({ error: 'Ocurrió un error durante la importación masiva.' });
   }
 }

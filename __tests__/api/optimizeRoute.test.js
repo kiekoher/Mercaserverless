@@ -36,10 +36,23 @@ jest.mock('../../lib/logger', () => ({
   default: { error: jest.fn() },
 }));
 
+jest.mock('@supabase/auth-helpers-nextjs', () => ({
+  createPagesServerClient: jest.fn(),
+}));
+
 describe('optimize-route API', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+    const { createPagesServerClient } = require('@supabase/auth-helpers-nextjs');
+    createPagesServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: () => ({
+        select: () => ({
+          eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
+        })
+      })
+    });
   });
 
   it('returns 400 for invalid body', async () => {

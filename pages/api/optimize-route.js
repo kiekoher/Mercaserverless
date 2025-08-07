@@ -1,4 +1,5 @@
 import { Client } from '@googlemaps/google-maps-services-js';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { z } from 'zod';
@@ -13,6 +14,22 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
+  const supabase = createPagesServerClient({ req, res });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const puntoSchema = z.object({
     id: z.any(),
     direccion: z.string().min(1),
@@ -25,7 +42,7 @@ export default async function handler(req, res) {
   }
   const puntos = parsed.data;
 
-  if (!checkRateLimit(req)) {
+  if (!(await checkRateLimit(req))) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 

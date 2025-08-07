@@ -1,0 +1,48 @@
+/** @jest-environment node */
+import { jest } from '@jest/globals';
+
+function createMockRes() {
+  return {
+    statusCode: 0,
+    data: null,
+    headers: {},
+    setHeader(k, v) { this.headers[k] = v; },
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.data = payload; return this; },
+    end(payload){ this.data = payload; return this; }
+  };
+}
+
+jest.mock('@supabase/auth-helpers-nextjs', () => ({
+  createPagesServerClient: jest.fn(),
+}));
+
+jest.mock('@google/generative-ai', () => ({
+  GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: () => ({
+      generateContent: jest.fn().mockResolvedValue({
+        response: { text: jest.fn().mockResolvedValue('ok') }
+      })
+    })
+  }))
+}));
+
+describe('generate-insights API', () => {
+  beforeEach(() => {
+    jest.resetModules();
+    process.env.GEMINI_API_KEY = 'test';
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    const { createPagesServerClient } = await import('@supabase/auth-helpers-nextjs');
+    createPagesServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
+    });
+    const { default: handler } = await import('../../pages/api/generate-insights.js');
+    const req = { method: 'POST', body: { rutaId: 1 } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
+  });
+});
+

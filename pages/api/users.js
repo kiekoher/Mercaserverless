@@ -1,4 +1,5 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { z } from 'zod';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -30,10 +31,16 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    const { userId, newRole } = req.body;
-    if (!userId || !newRole) {
-      return res.status(400).json({ error: 'User ID and new role are required.' });
+    const schema = z.object({
+      userId: z.string().uuid(),
+      newRole: z.enum(['admin', 'supervisor', 'mercaderista'])
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'User ID and new role are required and must be valid.' });
     }
+
+    const { userId, newRole } = parsed.data;
 
     const { data, error } = await supabase
       .from('profiles')

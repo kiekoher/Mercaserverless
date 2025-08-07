@@ -1,4 +1,5 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
   });
 
   if (error) {
-    console.error('Error calling RPC function:', error);
+    logger.error({ err: error }, 'Error calling RPC function');
     return res.status(500).json({ error: 'Error al obtener la ruta.' });
   }
 
