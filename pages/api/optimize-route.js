@@ -1,4 +1,6 @@
 import { Client } from '@googlemaps/google-maps-services-js';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -15,45 +17,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Se requiere una lista de al menos 2 puntos de venta.' });
   }
 
+  if (!checkRateLimit(req)) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
   const client = new Client({});
   const addresses = puntos.map(p => `${p.direccion}, ${p.ciudad}, Colombia`);
 
   try {
-    const matrix = await client.distancematrix({
+    const origin = addresses[0];
+    const waypoints = addresses.slice(1);
+    const directions = await client.directions({
       params: {
-        origins: addresses,
-        destinations: addresses,
+        origin,
+        destination: origin,
+        waypoints: ['optimize:true', ...waypoints],
         key: process.env.GOOGLE_MAPS_API_KEY,
       },
     });
 
-    const rows = matrix.data.rows;
-    const n = puntos.length;
-    const visited = Array(n).fill(false);
-    let idx = 0;
-    const order = [0];
-    visited[0] = true;
-    for (let step = 1; step < n; step++) {
-      let best = -1;
-      let bestDist = Infinity;
-      for (let j = 0; j < n; j++) {
-        if (!visited[j]) {
-          const dist = rows[idx].elements[j].distance.value;
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = j;
-          }
-        }
-      }
-      visited[best] = true;
-      order.push(best);
-      idx = best;
-    }
-
-    const optimizedPuntos = order.map(i => puntos[i]);
+    const order = directions.data.routes[0].waypoint_order || [];
+    const optimizedPuntos = [puntos[0], ...order.map(i => puntos[i + 1])];
     res.status(200).json({ optimizedPuntos });
   } catch (error) {
-    console.error('Optimization error:', error);
+    logger.error({ err: error }, 'Optimization error');
     res.status(500).json({ error: 'No se pudo optimizar la ruta.' });
   }
 }
