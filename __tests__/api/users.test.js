@@ -17,6 +17,8 @@ jest.mock('@supabase/auth-helpers-nextjs', () => ({
   createPagesServerClient: jest.fn(),
 }));
 
+jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+
 describe('users API', () => {
   beforeEach(() => {
     jest.resetModules();

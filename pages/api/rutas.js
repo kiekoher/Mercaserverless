@@ -1,6 +1,7 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import logger from '../../lib/logger';
 import { z } from 'zod';
+import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
   // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
     return res.status(200).json(transformedData);
 
   } else if (req.method === 'POST') {
+    if (!verifyCsrf(req, res)) return;
     if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
     }
@@ -84,8 +86,65 @@ export default async function handler(req, res) {
     }
     return res.status(201).json(data);
 
+  } else if (req.method === 'PUT') {
+    if (!['supervisor', 'admin'].includes(profile.role)) {
+      return res.status(403).json({ error: 'No tienes permiso para actualizar rutas.' });
+    }
+    if (!verifyCsrf(req, res)) return;
+
+    const schema = z.object({
+      id: z.number().int(),
+      fecha: z.string().min(1),
+      mercaderistaId: z.string().uuid(),
+      puntosDeVentaIds: z.array(z.number().int()).min(1),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
+    }
+    const { id, fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
+
+    const { data, error } = await supabase
+      .from('rutas')
+      .update({
+        fecha,
+        mercaderista_id: mercaderistaId,
+        puntos_de_venta_ids: puntosDeVentaIds,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error({ err: error }, 'Error updating route');
+      return res.status(500).json({ error: error.message });
+    }
+    return res.status(200).json(data);
+
+  } else if (req.method === 'DELETE') {
+    if (!['supervisor', 'admin'].includes(profile.role)) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar rutas.' });
+    }
+    if (!verifyCsrf(req, res)) return;
+
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({ error: 'ID requerido' });
+    }
+
+    const { error } = await supabase
+      .from('rutas')
+      .delete()
+      .eq('id', Number(id));
+
+    if (error) {
+      logger.error({ err: error }, 'Error deleting route');
+      return res.status(500).json({ error: error.message });
+    }
+    return res.status(200).json({ message: 'Ruta eliminada' });
+
   } else {
-    res.setHeader('Allow', ['GET', 'POST']);
+    res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

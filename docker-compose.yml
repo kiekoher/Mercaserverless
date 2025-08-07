@@ -4,11 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Pasa las variables del .env como argumentos al build
-      args:
-        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
-        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-        - GEMINI_API_KEY=${GEMINI_API_KEY}
     container_name: rutero-app
     restart: unless-stopped
     ports:

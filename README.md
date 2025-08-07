@@ -36,9 +36,9 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
 1.  **Clona el repositorio** (o descarga los archivos).
 
 2.  **Crea el archivo de variables de entorno:**
-    Copia el archivo de ejemplo `.env.local.example` y renómbralo a `.env.local`.
+    Copia el archivo de ejemplo `.env.example` y renómbralo a `.env`.
     ```bash
-    cp .env.local.example .env.local
+    cp .env.example .env
     ```
     Luego, rellena las variables con tus propias credenciales de Supabase y Google AI:
     ```
@@ -47,7 +47,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
     GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     ```
-    *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env.local` es necesario.*
+    *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
     Asegúrate de definir `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan.
 
 3.  **Instala las dependencias del proyecto:**

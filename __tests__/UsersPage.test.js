@@ -47,7 +47,7 @@ describe('UsersPage', () => {
 
     // Wait for the users to be fetched and rendered
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/users?page=1&search=');
+      expect(fetch).toHaveBeenCalledWith('/api/users');
     });
 
     // Check if the mock users are displayed in the table

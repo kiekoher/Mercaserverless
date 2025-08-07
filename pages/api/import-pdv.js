@@ -2,6 +2,9 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { Client } from '@googlemaps/google-maps-services-js';
 import logger from '../../lib/logger';
 import pLimit from 'p-limit';
+import { z } from 'zod';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { verifyCsrf } from '../../lib/csrf';
 
 const googleMapsClient = new Client({});
 
@@ -11,6 +14,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
+
+  if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GOOGLE_MAPS_API_KEY) {
     logger.error('GOOGLE_MAPS_API_KEY is not configured');
@@ -40,11 +45,22 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  const { puntos } = req.body;
-  if (!puntos || !Array.isArray(puntos) || puntos.length === 0) {
-    logger.warn('Bad request to import-pdv: "puntos" array is missing or empty.');
-    return res.status(400).json({ error: 'Se requiere un array de puntos de venta.' });
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
+
+  const puntoSchema = z.object({
+    nombre: z.string().min(1),
+    direccion: z.string().min(1),
+    ciudad: z.string().min(1)
+  });
+  const schema = z.array(puntoSchema).min(1);
+  const parsed = schema.safeParse(req.body.puntos);
+  if (!parsed.success) {
+    logger.warn('Bad request to import-pdv: "puntos" array is missing or malformed.');
+    return res.status(400).json({ error: 'Se requiere un array válido de puntos de venta.' });
+  }
+  const puntos = parsed.data;
 
   const MAX_IMPORT_SIZE = 500;
   if (puntos.length > MAX_IMPORT_SIZE) {

@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { z } from 'zod';
+import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
+    if (!verifyCsrf(req, res)) return;
     const schema = z.object({
       userId: z.string().uuid(),
       newRole: z.enum(['admin', 'supervisor', 'mercaderista'])

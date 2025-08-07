@@ -137,6 +137,47 @@ export default function PuntosDeVentaPage() {
     }
   };
 
+  const handleEdit = async (punto) => {
+    const nombreNuevo = prompt('Nuevo nombre', punto.nombre);
+    if (nombreNuevo === null) return;
+    const direccionNueva = prompt('Nueva dirección', punto.direccion);
+    if (direccionNueva === null) return;
+    const ciudadNueva = prompt('Nueva ciudad', punto.ciudad);
+    if (ciudadNueva === null) return;
+    try {
+      const res = await fetch('/api/puntos-de-venta', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: punto.id, nombre: nombreNuevo, direccion: direccionNueva, ciudad: ciudadNueva })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al actualizar');
+      }
+      enqueueSnackbar('Punto de venta actualizado', { variant: 'success' });
+      fetchPuntos();
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  };
+
+  const handleDelete = async (punto) => {
+    if (!confirm('¿Eliminar este punto de venta?')) return;
+    try {
+      const res = await fetch(`/api/puntos-de-venta?id=${punto.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al eliminar');
+      }
+      enqueueSnackbar('Punto de venta eliminado', { variant: 'success' });
+      fetchPuntos();
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  };
+
   if (!user || !profile) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><CircularProgress /></Box>;
   }
@@ -170,6 +211,7 @@ export default function PuntosDeVentaPage() {
                     <TableCell>Nombre</TableCell>
                     <TableCell>Dirección</TableCell>
                     <TableCell>Ciudad</TableCell>
+                    <TableCell align="right">Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -182,6 +224,10 @@ export default function PuntosDeVentaPage() {
                       <TableCell>{punto.nombre}</TableCell>
                       <TableCell>{punto.direccion}</TableCell>
                       <TableCell>{punto.ciudad}</TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={() => handleEdit(punto)}>Editar</Button>
+                        <Button size="small" color="error" onClick={() => handleDelete(punto)}>Eliminar</Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -40,6 +40,8 @@ jest.mock('@supabase/auth-helpers-nextjs', () => ({
   createPagesServerClient: jest.fn(),
 }));
 
+jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+
 describe('optimize-route API', () => {
   beforeEach(() => {
     jest.resetModules();

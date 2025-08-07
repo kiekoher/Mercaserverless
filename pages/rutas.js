@@ -194,6 +194,67 @@ export default function RutasPage() {
     }
   };
 
+  const handleOptimizeRoute = async () => {
+    setIsOptimizing(true);
+    try {
+      const puntosData = selectedPuntos.map(id => {
+        const p = puntos.find(pt => pt.id === id);
+        return { id: p.id, direccion: p.direccion, ciudad: p.ciudad };
+      });
+      const res = await fetch('/api/optimize-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puntos: puntosData })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo optimizar');
+      setSelectedPuntos(data.optimizedPuntos.map(p => p.id));
+      enqueueSnackbar('Ruta optimizada', { variant: 'success' });
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleEditRuta = async (ruta) => {
+    const nuevaFecha = prompt('Nueva fecha', ruta.fecha);
+    if (nuevaFecha === null) return;
+    const nuevosPuntos = prompt('IDs de puntos de venta separados por coma', ruta.puntos_de_venta_ids.join(','));
+    if (nuevosPuntos === null) return;
+    try {
+      const ids = nuevosPuntos.split(',').map(n => parseInt(n.trim(), 10)).filter(Boolean);
+      const res = await fetch('/api/rutas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ruta.id, fecha: nuevaFecha, mercaderistaId: ruta.mercaderista_id, puntosDeVentaIds: ids })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al actualizar');
+      }
+      enqueueSnackbar('Ruta actualizada', { variant: 'success' });
+      fetchRutas();
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  };
+
+  const handleDeleteRuta = async (ruta) => {
+    if (!confirm('¿Eliminar esta ruta?')) return;
+    try {
+      const res = await fetch(`/api/rutas?id=${ruta.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al eliminar');
+      }
+      enqueueSnackbar('Ruta eliminada', { variant: 'success' });
+      fetchRutas();
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  };
+
   if (!user || !profile) return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
   const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
   if (!hasPermission) return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
@@ -263,6 +324,8 @@ export default function RutasPage() {
                             </IconButton>
                           </span>
                         </Tooltip>
+                        <Button size="small" onClick={() => handleEditRuta(ruta)}>Editar</Button>
+                        <Button size="small" color="error" onClick={() => handleDeleteRuta(ruta)}>Eliminar</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -298,6 +361,9 @@ export default function RutasPage() {
                             ))}
                         </FormGroup>
                     </Paper>
+                    <Button onClick={handleOptimizeRoute} variant="outlined" fullWidth disabled={isOptimizing || selectedPuntos.length < 2} sx={{ mb: 2 }}>
+                      {isOptimizing ? 'Optimizando...' : 'Optimizar'}
+                    </Button>
                     <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>Crear Ruta</Button>
                 </form>
             </Paper>
