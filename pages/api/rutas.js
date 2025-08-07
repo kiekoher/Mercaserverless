@@ -2,6 +2,7 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
@@ -55,6 +56,9 @@ export default async function handler(req, res) {
 
   } else if (req.method === 'POST') {
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
     if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
     }
@@ -91,6 +95,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No tienes permiso para actualizar rutas.' });
     }
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
 
     const schema = z.object({
       id: z.number().int(),
@@ -126,6 +133,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No tienes permiso para eliminar rutas.' });
     }
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
 
     const { id } = req.query;
     if (!id) {

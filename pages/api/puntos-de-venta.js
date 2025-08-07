@@ -3,6 +3,7 @@ import { Client } from '@googlemaps/google-maps-services-js';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 const googleMapsClient = new Client({});
 
@@ -34,6 +35,9 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
     if (!['supervisor', 'admin'].includes(profile.role)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
@@ -90,6 +94,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
 
     const schema = z.object({
       id: z.number().int(),
@@ -120,6 +127,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     if (!verifyCsrf(req, res)) return;
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
 
     const { id } = req.query;
     if (!id) {

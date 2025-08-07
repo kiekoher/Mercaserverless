@@ -3,7 +3,8 @@ import { useAuth } from '../context/Auth';
 import {
   Box, Typography, Button, Grid, Paper, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Checkbox, FormControlLabel,
-  FormGroup, Tooltip, Pagination, Alert, Modal, Chip, LinearProgress, List, ListItem, ListItemText, IconButton
+  FormGroup, Tooltip, Pagination, Alert, Modal, Chip, LinearProgress, List, ListItem, ListItemText, IconButton,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -12,6 +13,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import MapIcon from '@mui/icons-material/Map';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import dynamic from 'next/dynamic';
+import { useAuthorization } from '../hooks/useAuthorization';
+import fetchWithCsrf from '../lib/fetchWithCsrf';
 
 const RutaMap = dynamic(() => import('../components/RutaMap'), { ssr: false });
 
@@ -30,8 +33,9 @@ const modalStyle = {
 };
 
 export default function RutasPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+  const { can, role } = useAuthorization();
 
   const [rutas, setRutas] = useState([]);
   const [puntos, setPuntos] = useState([]);
@@ -53,6 +57,13 @@ export default function RutasPage() {
   const [selectedPuntos, setSelectedPuntos] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const [editRutaOpen, setEditRutaOpen] = useState(false);
+  const [deleteRutaOpen, setDeleteRutaOpen] = useState(false);
+  const [rutaToEdit, setRutaToEdit] = useState(null);
+  const [rutaToDelete, setRutaToDelete] = useState(null);
+  const [editFecha, setEditFecha] = useState('');
+  const [editPuntos, setEditPuntos] = useState('');
 
   // Paginación y búsqueda
   const [page, setPage] = useState(1);
@@ -143,9 +154,8 @@ export default function RutasPage() {
         .map(id => puntos.find(p => p.id === id))
         .filter(Boolean);
 
-      const res = await fetch('/api/generate-summary', {
+      const res = await fetchWithCsrf('/api/generate-summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fecha: ruta.fecha,
           mercaderistaId: ruta.mercaderista_id,
@@ -179,9 +189,8 @@ export default function RutasPage() {
     // Simplified for brevity, assuming this logic exists
     setIsSubmitting(true);
     try {
-        const res = await fetch('/api/rutas', {
+        const res = await fetchWithCsrf('/api/rutas', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ fecha, mercaderistaId, puntosDeVentaIds: selectedPuntos })
         });
         if (!res.ok) throw new Error('Failed to create route');
@@ -201,9 +210,8 @@ export default function RutasPage() {
         const p = puntos.find(pt => pt.id === id);
         return { id: p.id, direccion: p.direccion, ciudad: p.ciudad };
       });
-      const res = await fetch('/api/optimize-route', {
+      const res = await fetchWithCsrf('/api/optimize-route', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ puntos: puntosData })
       });
       const data = await res.json();
@@ -217,47 +225,54 @@ export default function RutasPage() {
     }
   };
 
-  const handleEditRuta = async (ruta) => {
-    const nuevaFecha = prompt('Nueva fecha', ruta.fecha);
-    if (nuevaFecha === null) return;
-    const nuevosPuntos = prompt('IDs de puntos de venta separados por coma', ruta.puntos_de_venta_ids.join(','));
-    if (nuevosPuntos === null) return;
+  const openEditRutaDialog = (ruta) => {
+    setRutaToEdit(ruta);
+    setEditFecha(ruta.fecha);
+    setEditPuntos(ruta.puntos_de_venta_ids.join(','));
+    setEditRutaOpen(true);
+  };
+
+  const handleEditRutaSubmit = async () => {
     try {
-      const ids = nuevosPuntos.split(',').map(n => parseInt(n.trim(), 10)).filter(Boolean);
-      const res = await fetch('/api/rutas', {
+      const ids = editPuntos.split(',').map(n => parseInt(n.trim(), 10)).filter(Boolean);
+      const res = await fetchWithCsrf('/api/rutas', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ruta.id, fecha: nuevaFecha, mercaderistaId: ruta.mercaderista_id, puntosDeVentaIds: ids })
+        body: JSON.stringify({ id: rutaToEdit.id, fecha: editFecha, mercaderistaId: rutaToEdit.mercaderista_id, puntosDeVentaIds: ids })
       });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Error al actualizar');
       }
       enqueueSnackbar('Ruta actualizada', { variant: 'success' });
+      setEditRutaOpen(false);
       fetchRutas();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     }
   };
 
-  const handleDeleteRuta = async (ruta) => {
-    if (!confirm('¿Eliminar esta ruta?')) return;
+  const openDeleteRutaDialog = (ruta) => {
+    setRutaToDelete(ruta);
+    setDeleteRutaOpen(true);
+  };
+
+  const handleDeleteRutaConfirm = async () => {
     try {
-      const res = await fetch(`/api/rutas?id=${ruta.id}`, { method: 'DELETE' });
+      const res = await fetchWithCsrf(`/api/rutas?id=${rutaToDelete.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || 'Error al eliminar');
       }
       enqueueSnackbar('Ruta eliminada', { variant: 'success' });
+      setDeleteRutaOpen(false);
       fetchRutas();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     }
   };
 
-  if (!user || !profile) return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
-  const hasPermission = profile && ['supervisor', 'admin'].includes(profile.role);
-  if (!hasPermission) return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
+  if (!user || !role) return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
+  if (!can(['supervisor', 'admin'])) return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
 
   return (
     <AppLayout>
@@ -324,8 +339,8 @@ export default function RutasPage() {
                             </IconButton>
                           </span>
                         </Tooltip>
-                        <Button size="small" onClick={() => handleEditRuta(ruta)}>Editar</Button>
-                        <Button size="small" color="error" onClick={() => handleDeleteRuta(ruta)}>Eliminar</Button>
+                        <Button size="small" onClick={() => openEditRutaDialog(ruta)}>Editar</Button>
+                        <Button size="small" color="error" onClick={() => openDeleteRutaDialog(ruta)}>Eliminar</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -431,6 +446,26 @@ export default function RutasPage() {
           </Button>
         </Box>
       </Modal>
+
+      <Dialog open={editRutaOpen} onClose={() => setEditRutaOpen(false)}>
+        <DialogTitle>Editar Ruta</DialogTitle>
+        <DialogContent>
+          <TextField margin="dense" label="Fecha" type="date" fullWidth value={editFecha} onChange={e => setEditFecha(e.target.value)} InputLabelProps={{ shrink: true }} />
+          <TextField margin="dense" label="IDs de Puntos de Venta" fullWidth value={editPuntos} onChange={e => setEditPuntos(e.target.value)} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditRutaOpen(false)}>Cancelar</Button>
+          <Button onClick={handleEditRutaSubmit}>Guardar</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteRutaOpen} onClose={() => setDeleteRutaOpen(false)}>
+        <DialogTitle>Eliminar Ruta</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setDeleteRutaOpen(false)}>Cancelar</Button>
+          <Button color="error" onClick={handleDeleteRutaConfirm}>Eliminar</Button>
+        </DialogActions>
+      </Dialog>
 
     </AppLayout>
   );
