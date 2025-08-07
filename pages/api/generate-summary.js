@@ -4,6 +4,7 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 import { z } from 'zod';
+import { verifyCsrf } from '../../lib/csrf';
 
 const summarySchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }),
@@ -20,6 +21,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end('Method Not Allowed');
   }
+
+  if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GEMINI_API_KEY) {
     logger.error('GEMINI_API_KEY is not configured');

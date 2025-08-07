@@ -3,12 +3,15 @@ import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { z } from 'zod';
+import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GOOGLE_MAPS_API_KEY) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });

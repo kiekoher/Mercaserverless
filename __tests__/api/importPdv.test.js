@@ -17,6 +17,8 @@ jest.mock('@supabase/auth-helpers-nextjs', () => ({
   createPagesServerClient: jest.fn(),
 }));
 
+jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+
 jest.mock('@googlemaps/google-maps-services-js', () => ({
   Client: jest.fn().mockImplementation(() => ({ geocode: jest.fn() })),
 }));

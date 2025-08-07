@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 import { z } from 'zod';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { verifyCsrf } from '../../lib/csrf';
 
 const insightsSchema = z.object({
   rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }),
@@ -13,6 +15,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
+
+  if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GEMINI_API_KEY) {
     logger.error('GEMINI_API_KEY is not configured');
@@ -37,6 +41,10 @@ export default async function handler(req, res) {
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
     logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to generate-insights');
     return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   const parsed = insightsSchema.safeParse(req.body);

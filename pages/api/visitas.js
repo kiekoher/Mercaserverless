@@ -1,6 +1,7 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import logger from '../../lib/logger';
 import { z } from 'zod';
+import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
   const supabase = createPagesServerClient({ req, res });
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
 
   // MÉTODO POST: Para crear un registro de visita (Check-in)
   if (req.method === 'POST') {
+    if (!verifyCsrf(req, res)) return;
     if (profile.role !== 'mercaderista') {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
     }
@@ -105,6 +107,7 @@ export default async function handler(req, res) {
 
   // MÉTODO PUT: Para actualizar una visita (Check-out y feedback)
   if (req.method === 'PUT') {
+    if (!verifyCsrf(req, res)) return;
     if (profile.role !== 'mercaderista') {
         return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
     }

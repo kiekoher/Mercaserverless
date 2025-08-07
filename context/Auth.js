@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import logger from '../lib/logger';
 
 const AuthContext = createContext(null);
 
@@ -11,35 +12,59 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const setupSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const { data: userProfile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        setProfile(userProfile);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const { data: userProfile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          if (error) {
+            logger.error({ err: error }, 'Error fetching profile');
+            await supabase.auth.signOut();
+            setProfile(null);
+          } else {
+            setProfile(userProfile);
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, 'Unexpected error loading session');
+        await supabase.auth.signOut();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     setupSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          setProfile(userProfile);
-        } else {
-          setProfile(null); // Clear profile on sign out
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            const { data: userProfile, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            if (error) {
+              logger.error({ err: error }, 'Error fetching profile');
+              await supabase.auth.signOut();
+              setProfile(null);
+            } else {
+              setProfile(userProfile);
+            }
+          } else {
+            setProfile(null); // Clear profile on sign out
+          }
+        } catch (err) {
+          logger.error({ err }, 'Unexpected auth state error');
+          await supabase.auth.signOut();
+          setProfile(null);
         }
       }
     );

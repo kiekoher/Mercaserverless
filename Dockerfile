@@ -14,16 +14,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package-lock.json ./package-lock.json
 COPY . .
 
-# Declare build arguments
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ARG GEMINI_API_KEY
-
-# Set build arguments as environment variables for the build command
-RUN NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY \
-    GEMINI_API_KEY=$GEMINI_API_KEY \
-    npm run build
+# Build without inlining secretos; las variables se proveerán en runtime
+RUN npm run build
 
 # Stage 3: Production image
 # MEJORA: Actualizado a Node.js 20.
