@@ -9,10 +9,24 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
+  }
+
   const supabase = createPagesServerClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   const { puntos } = req.body;
@@ -36,7 +50,7 @@ export default async function handler(req, res) {
         const geocodeRequest = {
           params: {
             address: `${punto.direccion}, ${punto.ciudad}, Colombia`,
-            key: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_TEST_API_KEY',
+            key: process.env.GOOGLE_MAPS_API_KEY,
           },
           timeout: 1000,
         };

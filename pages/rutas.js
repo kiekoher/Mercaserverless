@@ -3,7 +3,7 @@ import { useAuth } from '../context/Auth';
 import {
   Box, Typography, Button, Grid, Paper, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Checkbox, FormControlLabel,
-  FormGroup, Tooltip, Pagination, Alert, Modal, Chip, LinearProgress, List, ListItem, ListItemText
+  FormGroup, Tooltip, Pagination, Alert, Modal, Chip, LinearProgress, List, ListItem, ListItemText, IconButton
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -77,7 +77,7 @@ export default function RutasPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearchTerm, enqueueSnackbar]);
+  }, [page, debouncedSearchTerm, enqueueSnackbar, fetchVisitasForRuta]);
 
   const fetchAllPuntosDeVenta = useCallback(async () => {
     try {

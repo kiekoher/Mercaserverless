@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Client } from '@googlemaps/google-maps-services-js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -6,49 +6,54 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-  const { puntos } = req.body; // Expects an array of point-of-sale objects
-
+  const { puntos } = req.body;
   if (!puntos || !Array.isArray(puntos) || puntos.length < 2) {
     return res.status(400).json({ error: 'Se requiere una lista de al menos 2 puntos de venta.' });
   }
 
-  const prompt = `
-    Eres un experto en logística para la ciudad de Bogotá, Colombia.
-    Tu tarea es optimizar una ruta de visitas para un mercaderista.
-    Dada la siguiente lista de puntos de venta (con su nombre y dirección), reordénala para crear la ruta más lógica y eficiente posible, minimizando los desplazamientos.
-    No agregues ni elimines ningún punto de venta. Devuelve la lista reordenada en formato JSON.
-    El JSON de salida debe ser un array de objetos, donde cada objeto tiene exactamente las mismas propiedades que los objetos de entrada ('id', 'nombre', 'direccion', 'ciudad').
-
-    Puntos de venta a optimizar:
-    ${JSON.stringify(puntos, null, 2)}
-
-    Responde únicamente con el array JSON reordenado, sin texto adicional ni markdown.
-  `;
+  const client = new Client({});
+  const addresses = puntos.map(p => `${p.direccion}, ${p.ciudad}, Colombia`);
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = (await response.text()).replace(/```json|```/g, '').trim();
-    const optimizedPuntos = JSON.parse(text);
+    const matrix = await client.distancematrix({
+      params: {
+        origins: addresses,
+        destinations: addresses,
+        key: process.env.GOOGLE_MAPS_API_KEY,
+      },
+    });
 
+    const rows = matrix.data.rows;
+    const n = puntos.length;
+    const visited = Array(n).fill(false);
+    let idx = 0;
+    const order = [0];
+    visited[0] = true;
+    for (let step = 1; step < n; step++) {
+      let best = -1;
+      let bestDist = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (!visited[j]) {
+          const dist = rows[idx].elements[j].distance.value;
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = j;
+          }
+        }
+      }
+      visited[best] = true;
+      order.push(best);
+      idx = best;
+    }
+
+    const optimizedPuntos = order.map(i => puntos[i]);
     res.status(200).json({ optimizedPuntos });
-
   } catch (error) {
-    console.error('Error calling Gemini for optimization:', error);
-    const status = error?.response?.status;
-    if (status === 401) {
-      return res.status(401).json({ error: 'Token inválido para Gemini API.' });
-    }
-    if (status === 403) {
-      return res.status(403).json({ error: 'Límite de cuota de Gemini API excedido.' });
-    }
+    console.error('Optimization error:', error);
     res.status(500).json({ error: 'No se pudo optimizar la ruta.' });
   }
 }

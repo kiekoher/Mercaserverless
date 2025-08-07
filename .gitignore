@@ -16,8 +16,31 @@
 
 # Test results
 /coverage
+cypress/screenshots/
 
 # Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Binary assets managed outside of git
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+*.webp
+*.avif
+*.mp4
+*.mp3
+*.mov
+*.zip
+*.tar
+*.gz
+*.bz2
+*.woff
+*.woff2
+*.ttf
+*.eot

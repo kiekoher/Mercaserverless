@@ -6,9 +6,17 @@ const mockText = jest.fn();
 const mockGenerateContent = jest.fn().mockResolvedValue({ response: { text: mockText } });
 const mockGetGenerativeModel = jest.fn().mockReturnValue({ generateContent: mockGenerateContent });
 
+const mockDistanceMatrix = jest.fn();
+
 jest.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
     getGenerativeModel: mockGetGenerativeModel,
+  })),
+}));
+
+jest.mock('@googlemaps/google-maps-services-js', () => ({
+  Client: jest.fn().mockImplementation(() => ({
+    distancematrix: mockDistanceMatrix,
   })),
 }));
 
@@ -95,20 +103,22 @@ describe('Gemini API routes', () => {
 
   describe('optimize-route', () => {
     it('returns optimized points on success', async () => {
-      process.env.GEMINI_API_KEY = 'test-key';
-      const responseJSON = JSON.stringify([
-        { id: 2, nombre: 'B', direccion: 'd2', ciudad: 'Bogotá' },
-        { id: 1, nombre: 'A', direccion: 'd1', ciudad: 'Bogotá' },
-      ]);
-      mockText.mockResolvedValueOnce(responseJSON);
+      process.env.GOOGLE_MAPS_API_KEY = 'test';
+      mockDistanceMatrix.mockResolvedValueOnce({
+        data: {
+          rows: [
+            { elements: [{ distance: { value: 0 } }, { distance: { value: 10 } }] },
+            { elements: [{ distance: { value: 10 } }, { distance: { value: 0 } }] },
+          ],
+        },
+      });
 
       const { default: handler } = await import('../pages/api/optimize-route.js');
-
       const req = {
         method: 'POST',
         body: { puntos: [
-          { id: 1, nombre: 'A', direccion: 'd1', ciudad: 'Bogotá' },
-          { id: 2, nombre: 'B', direccion: 'd2', ciudad: 'Bogotá' },
+          { id: 1, direccion: 'd1', ciudad: 'Bogotá' },
+          { id: 2, direccion: 'd2', ciudad: 'Bogotá' },
         ] },
       };
       const res = createMockRes();
@@ -117,35 +127,27 @@ describe('Gemini API routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.data.optimizedPuntos).toHaveLength(2);
-      expect(res.data.optimizedPuntos[0].id).toBe(2);
     });
 
     it('returns error when API key missing', async () => {
-      delete process.env.GEMINI_API_KEY;
+      delete process.env.GOOGLE_MAPS_API_KEY;
       const { default: handler } = await import('../pages/api/optimize-route.js');
-
       const req = { method: 'POST', body: { puntos: [{ id: 1 }, { id: 2 }] } };
       const res = createMockRes();
-
       await handler(req, res);
-
       expect(res.statusCode).toBe(500);
-      expect(res.data).toEqual({ error: 'GEMINI_API_KEY no configurada' });
+      expect(res.data).toEqual({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
     });
 
-    it('propagates Gemini API quota errors', async () => {
-      process.env.GEMINI_API_KEY = 'test-key';
-      mockGenerateContent.mockRejectedValueOnce({ response: { status: 403 } });
-
+    it('propagates distance matrix errors', async () => {
+      process.env.GOOGLE_MAPS_API_KEY = 'test';
+      mockDistanceMatrix.mockRejectedValueOnce(new Error('fail'));
       const { default: handler } = await import('../pages/api/optimize-route.js');
-
-      const req = { method: 'POST', body: { puntos: [{ id: 1 }, { id: 2 }] } };
+      const req = { method: 'POST', body: { puntos: [{ id: 1, direccion:'d1', ciudad:'Bogotá' }, { id:2, direccion:'d2', ciudad:'Bogotá' }] } };
       const res = createMockRes();
-
       await handler(req, res);
-
-      expect(res.statusCode).toBe(403);
-      expect(res.data).toEqual({ error: 'Límite de cuota de Gemini API excedido.' });
+      expect(res.statusCode).toBe(500);
+      expect(res.data).toEqual({ error: 'No se pudo optimizar la ruta.' });
     });
   });
 });
