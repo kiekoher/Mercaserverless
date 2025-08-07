@@ -1,6 +1,7 @@
 import { Client } from '@googlemaps/google-maps-services-js';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
+import { z } from 'zod';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,10 +13,17 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const { puntos } = req.body;
-  if (!puntos || !Array.isArray(puntos) || puntos.length < 2) {
-    return res.status(400).json({ error: 'Se requiere una lista de al menos 2 puntos de venta.' });
+  const puntoSchema = z.object({
+    id: z.any(),
+    direccion: z.string().min(1),
+    ciudad: z.string().min(1)
+  });
+  const schema = z.array(puntoSchema).min(2);
+  const parsed = schema.safeParse(req.body.puntos);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Formato de puntos inválido' });
   }
+  const puntos = parsed.data;
 
   if (!checkRateLimit(req)) {
     return res.status(429).json({ error: 'Too many requests' });

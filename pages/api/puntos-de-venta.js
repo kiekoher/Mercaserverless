@@ -87,9 +87,23 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
-    const { page = 1, search = '' } = req.query;
+    const { page = '1', search = '', all } = req.query;
+
+    if (all === 'true') {
+      const { data, error } = await supabase.from('puntos_de_venta').select('*');
+      if (error) {
+        return res.status(500).json({ error: error.message });
+      }
+      return res.status(200).json(data);
+    }
+
+    const pageNumber = parseInt(page, 10);
+    if (Number.isNaN(pageNumber) || pageNumber < 1) {
+      return res.status(400).json({ error: 'Parámetro page inválido' });
+    }
+
     const limit = 10;
-    const offset = (page - 1) * limit;
+    const offset = (pageNumber - 1) * limit;
 
     const query = supabase.from('puntos_de_venta').select('*', { count: 'exact' });
 

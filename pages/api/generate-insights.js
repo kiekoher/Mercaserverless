@@ -1,5 +1,6 @@
 import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,8 +39,8 @@ export default async function handler(req, res) {
 
     // 2. Format the data for the AI prompt
     const promptData = visitas.map(v =>
-      `- Punto: ${v.puntos_de_venta.nombre}, Estado: ${v.estado}, Check-in: ${v.check_in_at}, Check-out: ${v.check_out_at}, Observaciones: ${v.observaciones || 'N/A'}`
-    ).join('\n');
+      `- Punto: ${sanitizeInput(v.puntos_de_venta.nombre)}, Estado: ${sanitizeInput(v.estado)}, Check-in: ${sanitizeInput(v.check_in_at)}, Check-out: ${sanitizeInput(v.check_out_at)}, Observaciones: ${sanitizeInput(v.observaciones || 'N/A')}`
+    ).join('\n'); // Sanitización básica; no garantiza protección total contra prompt injection
 
     const prompt = `
       Eres un asistente de análisis de operaciones para una fuerza de ventas.

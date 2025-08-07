@@ -50,15 +50,26 @@ describe('optimize-route API', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('returns 400 for malformed points', async () => {
+    const { default: handler } = await import('../../pages/api/optimize-route.js');
+    const req = {
+      method: 'POST',
+      body: { puntos: [{ direccion: 'A' }, { direccion: 'B', ciudad: 'Y' }] },
+    };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
   it('returns optimized route', async () => {
     const { default: handler } = await import('../../pages/api/optimize-route.js');
     const req = {
       method: 'POST',
       body: {
         puntos: [
-          { direccion: 'A', ciudad: 'X' },
-          { direccion: 'B', ciudad: 'Y' },
-          { direccion: 'C', ciudad: 'Z' },
+          { id: 1, direccion: 'A', ciudad: 'X' },
+          { id: 2, direccion: 'B', ciudad: 'Y' },
+          { id: 3, direccion: 'C', ciudad: 'Z' },
         ],
       },
     };

@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 // This API route is for E2E testing only and should not be exposed in production.
+// Ensure it is excluded from production builds.
 export default async function handler(req, res) {
   if (
-    process.env.NODE_ENV === 'production' ||
+    process.env.NODE_ENV !== 'test' ||
     process.env.ENABLE_E2E_LOGIN !== 'true'
   ) {
     return res.status(404).json({ error: 'Not found' });
