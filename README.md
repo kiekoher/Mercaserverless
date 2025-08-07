@@ -45,8 +45,10 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
     NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+    GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     ```
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env.local` es necesario.*
+    Asegúrate de definir `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan.
 
 3.  **Instala las dependencias del proyecto:**
     Abre una terminal en la raíz del proyecto y ejecuta:

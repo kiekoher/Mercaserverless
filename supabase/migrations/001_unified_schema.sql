@@ -67,7 +67,7 @@ CREATE TABLE public.visitas (
   ruta_id BIGINT REFERENCES public.rutas(id) ON DELETE CASCADE,
   punto_de_venta_id BIGINT REFERENCES public.puntos_de_venta(id) ON DELETE CASCADE,
   mercaderista_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  check_in_at TIMESTAMTz,
+  check_in_at TIMESTAMPTZ,
   check_out_at TIMESTAMPTZ,
   estado TEXT DEFAULT 'Pendiente' NOT NULL, -- Estados: Pendiente, En Progreso, Completada, Incidencia
   observaciones TEXT,
@@ -155,7 +155,11 @@ CREATE POLICY "Allow authenticated read access" ON public.puntos_de_venta FOR SE
 CREATE POLICY "Allow supervisors and admins to insert" ON public.puntos_de_venta FOR INSERT WITH CHECK (get_my_role() IN ('supervisor', 'admin'));
 
 -- Políticas para 'rutas'
-CREATE POLICY "Allow authenticated read access" ON public.rutas FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow assigned or privileged read access" ON public.rutas
+  FOR SELECT
+  USING (
+    auth.uid() = mercaderista_id OR get_my_role() IN ('supervisor', 'admin')
+  );
 CREATE POLICY "Allow supervisors and admins to insert" ON public.rutas FOR INSERT WITH CHECK (get_my_role() IN ('supervisor', 'admin'));
 
 -- Políticas para 'profiles'

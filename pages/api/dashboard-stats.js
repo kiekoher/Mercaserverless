@@ -14,6 +14,16 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const { data, error } = await supabase.rpc('get_dashboard_stats');
 
   if (error) {

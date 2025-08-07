@@ -4,13 +4,31 @@ import { Client } from '@googlemaps/google-maps-services-js';
 const googleMapsClient = new Client({});
 
 export default async function handler(req, res) {
+  if (!process.env.GOOGLE_MAPS_API_KEY) {
+    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
+  }
+
   const supabase = createPagesServerClient({ req, res });
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) {
+    return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+  }
+
   if (req.method === 'POST') {
+    if (!['supervisor', 'admin'].includes(profile.role)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const { nombre, direccion, ciudad } = req.body;
     if (!nombre || !direccion || !ciudad) {
       return res.status(400).json({ error: 'Nombre, dirección y ciudad son requeridos.' });
@@ -23,7 +41,7 @@ export default async function handler(req, res) {
       const geocodeRequest = {
         params: {
           address: `${direccion}, ${ciudad}, Colombia`,
-          key: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_TEST_API_KEY', // Using placeholder
+          key: process.env.GOOGLE_MAPS_API_KEY,
         },
         timeout: 1000, // optional
       };
@@ -53,6 +71,10 @@ export default async function handler(req, res) {
     return res.status(201).json(data);
 
   } else if (req.method === 'GET') {
+    if (!['supervisor', 'admin'].includes(profile.role)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const { page = 1, search = '' } = req.query;
     const limit = 10;
     const offset = (page - 1) * limit;
