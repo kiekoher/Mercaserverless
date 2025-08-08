@@ -52,6 +52,8 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
     Asegúrate de definir `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. Para entornos de producción también se recomienda definir `REDIS_URL` y `LOG_LEVEL`.
 
+    Este archivo `.env` es solo para desarrollo local. Está incluido en `.gitignore` y no debe subirse al repositorio ni copiarse a servidores.
+
 3.  **Instala las dependencias del proyecto:**
     Abre una terminal en la raíz del proyecto y ejecuta:
     ```bash
@@ -60,22 +62,29 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
 
 ### Gestión de secretos en producción
 
-Para entornos de producción, evita almacenar credenciales en archivos `.env` dentro del servidor. Carga las variables sensibles desde el entorno del host o mediante [Docker Secrets](https://docs.docker.com/engine/swarm/secrets/).
+En producción **no** copies el archivo `.env` al servidor. En su lugar, crea un archivo exclusivo para el servidor (no versionado) que Docker Compose cargará automáticamente.
 
-Ejemplo usando variables de entorno al levantar el contenedor:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... docker-compose up -d
-```
-
-Para mayor seguridad con Docker Secrets:
+Ejemplo en un servidor Ubuntu, creando `/etc/mercaderista.env` con los secretos:
 
 ```bash
-echo "valor" | docker secret create supabase-url -
-echo "valor" | docker secret create supabase-key -
+sudo tee /etc/mercaderista.env <<'EOF'
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+GEMINI_API_KEY=...
+GOOGLE_MAPS_API_KEY=...
+REDIS_URL=redis://localhost:6379
+LOG_LEVEL=info
+EOF
+sudo chmod 600 /etc/mercaderista.env
 ```
 
-Y en `docker-compose.yml` referenciar los secretos en la sección `secrets`.
+El archivo debe ser administrado únicamente en el servidor. El repositorio incluye la plantilla `.env.example` para referencia, pero **todos** los archivos que coincidan con `.env*` están ignorados por Git.
+
+Una vez creado el archivo, levanta la aplicación con:
+
+```bash
+docker compose up -d
+```
 
 ### Ejecución
 
