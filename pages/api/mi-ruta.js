@@ -1,9 +1,9 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
 
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);

@@ -58,6 +58,25 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     npm install
     ```
 
+### Gestión de secretos en producción
+
+Para entornos de producción, evita almacenar credenciales en archivos `.env` dentro del servidor. Carga las variables sensibles desde el entorno del host o mediante [Docker Secrets](https://docs.docker.com/engine/swarm/secrets/).
+
+Ejemplo usando variables de entorno al levantar el contenedor:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... docker-compose up -d
+```
+
+Para mayor seguridad con Docker Secrets:
+
+```bash
+echo "valor" | docker secret create supabase-url -
+echo "valor" | docker secret create supabase-key -
+```
+
+Y en `docker-compose.yml` referenciar los secretos en la sección `secrets`.
+
 ### Ejecución
 
 #### Modo Local (Sin Docker)

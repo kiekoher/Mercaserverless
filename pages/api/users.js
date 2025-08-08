@@ -1,10 +1,10 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
   
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {

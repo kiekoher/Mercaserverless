@@ -106,23 +106,32 @@ export default function RutasPage() {
     }
   }, [page, debouncedSearchTerm, enqueueSnackbar, fetchVisitasForRuta]);
 
-  const fetchAllPuntosDeVenta = useCallback(async () => {
+  const [puntoSearch, setPuntoSearch] = useState('');
+  const debouncedPuntoSearch = useDebounce(puntoSearch, 500);
+
+  const fetchPuntosDeVenta = useCallback(async () => {
     try {
-        const res = await fetch('/api/puntos-de-venta?all=true'); // Assume an 'all' flag to get all points
-        if(!res.ok) throw new Error('Failed to fetch points of sale');
-        const data = await res.json();
-        setPuntos(data);
+      const params = new URLSearchParams({ search: debouncedPuntoSearch });
+      const res = await fetch(`/api/puntos-de-venta?${params.toString()}`);
+      if(!res.ok) throw new Error('Failed to fetch points of sale');
+      const data = await res.json();
+      setPuntos(data);
     } catch(err) {
-        enqueueSnackbar(err.message, { variant: 'error' });
+      enqueueSnackbar(err.message, { variant: 'error' });
     }
-  }, [enqueueSnackbar]);
+  }, [debouncedPuntoSearch, enqueueSnackbar]);
 
   useEffect(() => {
     if (user) {
       fetchRutas();
-      fetchAllPuntosDeVenta();
     }
-  }, [user, fetchRutas, fetchAllPuntosDeVenta]);
+  }, [user, fetchRutas]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPuntosDeVenta();
+    }
+  }, [user, debouncedPuntoSearch, fetchPuntosDeVenta]);
 
   const handleOpenModal = async (ruta) => {
     setSelectedRuta(ruta);
@@ -366,16 +375,17 @@ export default function RutasPage() {
                 <form onSubmit={handleSubmit}>
                     <TextField label="Fecha" type="date" value={fecha} onChange={e => setFecha(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
                     <TextField label="ID Mercaderista" value={mercaderistaId} onChange={e => setMercaderistaId(e.target.value)} fullWidth sx={{ mb: 2 }} />
-                    <Typography>Puntos de Venta</Typography>
-                    <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto', p: 1, mb: 2 }}>
-                        <FormGroup>
-                            {puntos.map(p => (
-                                <FormControlLabel key={p.id} control={<Checkbox checked={selectedPuntos.includes(p.id)} onChange={() => {
-                                    setSelectedPuntos(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])
-                                }} />} label={p.nombre} />
-                            ))}
-                        </FormGroup>
-                    </Paper>
+                      <Typography>Puntos de Venta</Typography>
+                      <TextField label="Buscar punto" value={puntoSearch} onChange={e => setPuntoSearch(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                      <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto', p: 1, mb: 2 }}>
+                          <FormGroup>
+                              {puntos.map(p => (
+                                  <FormControlLabel key={p.id} control={<Checkbox checked={selectedPuntos.includes(p.id)} onChange={() => {
+                                      setSelectedPuntos(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])
+                                  }} />} label={p.nombre} />
+                              ))}
+                          </FormGroup>
+                      </Paper>
                     <Button onClick={handleOptimizeRoute} variant="outlined" fullWidth disabled={isOptimizing || selectedPuntos.length < 2} sx={{ mb: 2 }}>
                       {isOptimizing ? 'Optimizando...' : 'Optimizar'}
                     </Button>

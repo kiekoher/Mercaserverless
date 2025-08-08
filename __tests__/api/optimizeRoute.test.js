@@ -36,8 +36,8 @@ jest.mock('../../lib/logger', () => ({
   default: { error: jest.fn() },
 }));
 
-jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createPagesServerClient: jest.fn(),
+jest.mock('../../lib/supabaseServer', () => ({
+  getSupabaseServerClient: jest.fn(),
 }));
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
@@ -46,8 +46,8 @@ describe('optimize-route API', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
-    const { createPagesServerClient } = require('@supabase/auth-helpers-nextjs');
-    createPagesServerClient.mockReturnValue({
+    const { getSupabaseServerClient } = require('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
       auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
       from: () => ({
         select: () => ({

@@ -1,4 +1,4 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { Client } from '@googlemaps/google-maps-services-js';
 import logger from '../../lib/logger';
 import pLimit from 'p-limit';
@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     logger.warn('Unauthorized access attempt to import-pdv');

@@ -8,6 +8,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    # Carga las variables del .env para que estén disponibles en el contenedor en ejecución
+    # Carga las variables del .env para desarrollo local.
+    # En producción, se recomienda inyectar las variables mediante el entorno del host o Docker Secrets.
     env_file:
       - .env

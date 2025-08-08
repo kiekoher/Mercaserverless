@@ -13,8 +13,8 @@ function createMockRes() {
   };
 }
 
-jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createPagesServerClient: jest.fn(),
+jest.mock('../../lib/supabaseServer', () => ({
+  getSupabaseServerClient: jest.fn(),
 }));
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
@@ -25,8 +25,8 @@ describe('visitas API', () => {
   });
 
   it('returns 401 if user not authenticated', async () => {
-    const { createPagesServerClient } = await import('@supabase/auth-helpers-nextjs');
-    createPagesServerClient.mockReturnValue({
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
       auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
     });
     const { default: handler } = await import('../../pages/api/visitas.js');
@@ -37,8 +37,8 @@ describe('visitas API', () => {
   });
 
   it('allows mercaderistas to create visits', async () => {
-    const { createPagesServerClient } = await import('@supabase/auth-helpers-nextjs');
-    createPagesServerClient.mockReturnValue({
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
       auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
       from: (table) => {
         if (table === 'profiles') {
