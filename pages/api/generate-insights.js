@@ -1,4 +1,4 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
@@ -25,7 +25,7 @@ export default async function handler(req, res) {
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     logger.warn('Unauthorized access attempt to generate-insights');
@@ -73,28 +73,37 @@ export default async function handler(req, res) {
     ).join('\n'); // Sanitización básica; no garantiza protección total contra prompt injection
 
     const prompt = `
-      Eres un asistente de análisis de operaciones para una fuerza de ventas.
-      Analiza los siguientes datos de visitas de una ruta de un mercaderista y genera un resumen ejecutivo conciso.
-      El resumen debe incluir:
-      1.  Un KPI clave: Porcentaje de visitas completadas vs. con incidencia.
-      2.  Un insight sobre la eficiencia: ¿Hay tiempos muertos o visitas demasiado largas/cortas?
-      3.  Una observación cualitativa: ¿Qué temas comunes aparecen en las observaciones?
-      4.  Una recomendación accionable para el supervisor.
+        Eres un asistente de análisis de operaciones para una fuerza de ventas.
+        Analiza los siguientes datos de visitas de una ruta de un mercaderista y responde exclusivamente en JSON con el siguiente formato:
+        {"kpi":"...","insight":"...","observation":"...","recommendation":"..."}
+        No incluyas texto adicional.
 
-      Aquí están los datos de las visitas:
-      ${promptData}
+        Datos:
+        ${promptData}
+      `;
 
-      Por favor, presenta el resultado en formato de texto plano, claro y directo.
-    `;
+      // 3. Call the Gemini API
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().replace(/```json|```/g, '');
 
-    // 3. Call the Gemini API
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+      const outputSchema = z.object({
+        kpi: z.string(),
+        insight: z.string(),
+        observation: z.string(),
+        recommendation: z.string()
+      });
 
-    // 4. Return the AI-generated summary
-    res.status(200).json({ summary: text });
+      let parsedOutput;
+      try {
+        parsedOutput = outputSchema.parse(JSON.parse(text));
+      } catch (e) {
+        logger.error({ err: e, text }, 'Failed to parse AI response');
+        return res.status(500).json({ error: 'Respuesta de IA inválida' });
+      }
+
+      res.status(200).json(parsedOutput);
 
   } catch (error) {
     logger.error({ err: error }, 'Error generating insights');

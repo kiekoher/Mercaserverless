@@ -76,7 +76,7 @@ describe('RutasPage', () => {
     // Wait for the routes to be fetched and rendered
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith('/api/rutas?page=1&search=');
-      expect(fetch).toHaveBeenCalledWith('/api/puntos-de-venta?all=true');
+      expect(fetch).toHaveBeenCalledWith('/api/puntos-de-venta?search=');
     });
 
     // Check if the mock route is displayed in the table

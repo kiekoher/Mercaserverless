@@ -9,6 +9,7 @@ import createEmotionCache from '../components/createEmotionCache';
 import { AuthProvider } from '../context/Auth';
 import { SnackbarProvider } from 'notistack';
 import { useEffect } from 'react';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();
@@ -31,7 +32,9 @@ export default function MyApp(props) {
           {/* CssBaseline kickstarts an elegant, consistent, and simple baseline to build upon. */}
           <CssBaseline />
           <AuthProvider>
-            <Component {...pageProps} />
+            <ErrorBoundary>
+              <Component {...pageProps} />
+            </ErrorBoundary>
           </AuthProvider>
         </SnackbarProvider>
       </ThemeProvider>

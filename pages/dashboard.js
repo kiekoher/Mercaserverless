@@ -11,7 +11,7 @@ export default function DashboardPage() {
   const { enqueueSnackbar } = useSnackbar();
 
   const [stats, setStats] = useState(null);
-  const [insights, setInsights] = useState('');
+  const [insights, setInsights] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(false);
 
@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   const handleGenerateInsights = async () => {
     setLoadingInsights(true);
-    setInsights('');
+    setInsights(null);
     try {
       // For this example, we'll analyze the first route found.
       // A real implementation might let the user select a date range.
@@ -62,7 +62,7 @@ export default function DashboardPage() {
       }
 
       const data = await res.json();
-      setInsights(data.summary);
+      setInsights(data);
       enqueueSnackbar('Análisis generado con éxito.', { variant: 'success' });
 
     } catch (err) {
@@ -118,7 +118,10 @@ export default function DashboardPage() {
 
         {insights && (
           <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, whiteSpace: 'pre-wrap' }}>
-            <Typography variant="body1">{insights}</Typography>
+            <Typography variant="body1"><strong>KPI:</strong> {insights.kpi}</Typography>
+            <Typography variant="body1"><strong>Insight:</strong> {insights.insight}</Typography>
+            <Typography variant="body1"><strong>Observación:</strong> {insights.observation}</Typography>
+            <Typography variant="body1"><strong>Recomendación:</strong> {insights.recommendation}</Typography>
           </Box>
         )}
       </Paper>

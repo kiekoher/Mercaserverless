@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
   }
 
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     logger.warn('Unauthorized access attempt to generate-summary');
@@ -68,25 +68,35 @@ export default async function handler(req, res) {
   const safeMercaderista = sanitizeInput(mercaderistaId);
   const safePuntos = puntos.map(p => sanitizeInput(p.nombre));
 
-  const prompt = `
-    Genera un resumen corto y amigable para una ruta de mercaderista.
-    El resumen debe ser de no más de 40 palabras, en un tono motivador y profesional.
-    Aquí están los detalles:
-    - Fecha: ${safeFecha}
-    - Mercaderista: ${safeMercaderista}
-    - Número de paradas: ${puntos.length}
-    - Puntos de venta: ${safePuntos.join(', ')}
-
-    Ejemplo de respuesta: "¡Excelente día, ${safeMercaderista}! Hoy tu ruta del ${safeFecha} te llevará a ${puntos.length} puntos clave, incluyendo ${safePuntos[0]}. ¡A darlo todo!"
-  `; // Sanitización básica; no garantiza protección total contra prompt injection
+    const prompt = `
+      Genera un resumen corto y amigable para una ruta de mercaderista.
+      Responde exclusivamente en formato JSON con la clave \"summary\":
+      {"summary":"..."}
+      No incluyas texto adicional.
+      Detalles:
+      - Fecha: ${safeFecha}
+      - Mercaderista: ${safeMercaderista}
+      - Número de paradas: ${puntos.length}
+      - Puntos de venta: ${safePuntos.join(', ')}
+    `; // Sanitización básica; no garantiza protección total contra prompt injection
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const summary = await response.text();
+      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = (await response.text()).replace(/```json|```/g, '');
 
-    res.status(200).json({ summary });
+      const outputSchema = z.object({ summary: z.string() });
+
+      let parsed;
+      try {
+        parsed = outputSchema.parse(JSON.parse(text));
+      } catch (e) {
+        logger.error({ err: e, text }, 'Failed to parse summary response');
+        return res.status(500).json({ error: 'Respuesta de IA inválida' });
+      }
+
+      res.status(200).json(parsed);
 
   } catch (error) {
     logger.error({ err: error }, 'Error calling Gemini API');

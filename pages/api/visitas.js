@@ -1,10 +1,10 @@
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 
 export default async function handler(req, res) {
-  const supabase = createPagesServerClient({ req, res });
+  const supabase = getSupabaseServerClient(req, res);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });

@@ -13,8 +13,8 @@ function createMockRes() {
   };
 }
 
-jest.mock('@supabase/auth-helpers-nextjs', () => ({
-  createPagesServerClient: jest.fn(),
+jest.mock('../../lib/supabaseServer', () => ({
+  getSupabaseServerClient: jest.fn(),
 }));
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
@@ -40,8 +40,8 @@ describe('generate-summary API', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    const { createPagesServerClient } = await import('@supabase/auth-helpers-nextjs');
-    createPagesServerClient.mockReturnValue({
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
       auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
     });
     const { default: handler } = await import('../../pages/api/generate-summary.js');
