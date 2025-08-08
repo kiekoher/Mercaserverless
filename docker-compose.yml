@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    # Carga las variables del .env para desarrollo local.
-    # En producción, se recomienda inyectar las variables mediante el entorno del host o Docker Secrets.
+    # Carga variables de entorno desde un archivo administrado en el servidor.
+    # Este archivo no debe versionarse ni copiarse desde el entorno local.
     env_file:
-      - .env
+      - /etc/mercaderista.env

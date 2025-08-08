@@ -11,8 +11,8 @@
 /out
 
 # Local environment variables
-.env*.local
-.env
+.env*
+!.env.example
 
 # Test results
 /coverage
