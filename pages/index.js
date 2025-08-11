@@ -81,7 +81,6 @@ const MercaderistaDashboard = () => (
   </Card>
 );
 
-// **MEJORA: Se añaden títulos para mayor claridad en el rol de admin**
 const renderDashboardByRole = (role) => {
   switch (role) {
     case 'admin':
@@ -114,7 +113,6 @@ export default function HomePage() {
   }, [user, router]);
 
   if (!user || !profile) {
-    // **MEJORA: Usar el layout compartido para mantener la barra de navegación visible durante la carga**
     return (
       <AppLayout>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>

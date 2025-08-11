@@ -4,7 +4,6 @@ import { verifyCsrf } from '../../lib/csrf';
 import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
-  // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
   const supabase = getSupabaseServerClient(req, res);
   
   const { data: { user } } = await supabase.auth.getUser();

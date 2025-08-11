@@ -4,6 +4,7 @@ import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { sanitizeInput } from '../../lib/sanitize';
 
 const googleMapsClient = new Client({});
 
@@ -52,6 +53,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: parsed.error.format() });
     }
     const { nombre, direccion, ciudad } = parsed.data;
+    const safeNombre = sanitizeInput(nombre);
+    const safeDireccion = sanitizeInput(direccion);
+    const safeCiudad = sanitizeInput(ciudad);
 
     let latitud = null;
     let longitud = null;
@@ -80,7 +84,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('puntos_de_venta')
-      .insert({ nombre, direccion, ciudad, latitud, longitud })
+      .insert({ nombre: safeNombre, direccion: safeDireccion, ciudad: safeCiudad, latitud, longitud })
       .select()
       .single();
 
@@ -110,10 +114,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: parsed.error.format() });
     }
     const { id, nombre, direccion, ciudad } = parsed.data;
+    const safeNombre = sanitizeInput(nombre);
+    const safeDireccion = sanitizeInput(direccion);
+    const safeCiudad = sanitizeInput(ciudad);
 
     const { data, error } = await supabase
       .from('puntos_de_venta')
-      .update({ nombre, direccion, ciudad })
+      .update({ nombre: safeNombre, direccion: safeDireccion, ciudad: safeCiudad })
       .eq('id', id)
       .select()
       .single();

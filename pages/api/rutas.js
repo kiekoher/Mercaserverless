@@ -3,6 +3,7 @@ import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { sanitizeInput } from '../../lib/sanitize';
 
 export default async function handler(req, res) {
   // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
@@ -34,7 +35,8 @@ export default async function handler(req, res) {
       .select('*', { count: 'exact' });
 
     if (search) {
-      query = query.ilike('mercaderista_id', `%${search}%`);
+      const safeSearch = sanitizeInput(search);
+      query = query.ilike('mercaderista_id', `%${safeSearch}%`);
     }
 
     const { data, error, count } = await query
@@ -73,11 +75,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
     const { fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
+    const safeFecha = sanitizeInput(fecha);
 
     const { data, error } = await supabase
       .from('rutas')
       .insert([{
-         fecha,
+         fecha: safeFecha,
          mercaderista_id: mercaderistaId,
          puntos_de_venta_ids: puntosDeVentaIds
       }])
@@ -110,11 +113,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
     const { id, fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
+    const safeFecha = sanitizeInput(fecha);
 
     const { data, error } = await supabase
       .from('rutas')
       .update({
-        fecha,
+        fecha: safeFecha,
         mercaderista_id: mercaderistaId,
         puntos_de_venta_ids: puntosDeVentaIds,
       })

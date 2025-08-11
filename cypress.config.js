@@ -4,6 +4,11 @@ const { createClient } = require('@supabase/supabase-js');
 module.exports = defineConfig({
   e2e: {
     baseUrl: 'http://localhost:3000',
+    env: {
+      adminId: process.env.CYPRESS_ADMIN_ID,
+      supervisorId: process.env.CYPRESS_SUPERVISOR_ID,
+      mercaderistaId: process.env.CYPRESS_MERCADERISTA_ID,
+    },
     setupNodeEvents(on, config) {
       on('task', {
         async e2eLogin({ role }) {
@@ -13,9 +18,9 @@ module.exports = defineConfig({
           );
 
           const testUserIds = {
-            admin: 'a1b2c3d4-e5f6-7890-1234-abcdef123456',
-            supervisor: 'b2c3d4e5-f6a7-8901-2345-bcdefa123456',
-            mercaderista: 'c3d4e5f6-a7b8-9012-3456-cdefab123456',
+            admin: config.env.adminId,
+            supervisor: config.env.supervisorId,
+            mercaderista: config.env.mercaderistaId,
           };
 
           const userId = testUserIds[role];

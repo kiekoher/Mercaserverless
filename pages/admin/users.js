@@ -65,10 +65,8 @@ export default function UserManagementPage() {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to update role');
       }
-      // **MEJORA: Añadir mensaje de éxito**
       enqueueSnackbar('Rol de usuario actualizado con éxito', { variant: 'success' });
     } catch (err) {
-      // **MEJORA: Mostrar error en Snackbar también**
       enqueueSnackbar(err.message, { variant: 'error' });
       setError(err.message);
       fetchUsers(); // Re-fetch to revert optimistic update on error
