@@ -5,11 +5,12 @@ import {
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useSnackbar } from 'notistack';
-import fetchWithCsrf from '../lib/fetchWithCsrf';
+import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
+  const fetchWithCsrf = useCsrfFetcher();
 
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState(null);

@@ -1,4 +1,4 @@
-name: Node.js CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,82 +7,105 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  lint:
+    name: "Lint Code"
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint
 
+  jest-tests:
+    name: "Run Jest Unit Tests"
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         node-version: [18.x, 20.x]
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Jest tests
+        run: npm test
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24ifQ.epso991aI-2H1i_M62YocM24z89i_d_1z_p9a1i2e3g
+          SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSJ9.epso991aI-2H1i_M62YocM24z89i_d_1z_p9a1i2e3g
+          GEMINI_API_KEY: FAKE_API_KEY_FOR_TESTING
+          GOOGLE_MAPS_API_KEY: FAKE_MAPS_KEY_FOR_TESTING
 
-    - name: Set up Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run Jest tests
-      run: npm test
-      env:
-        # We need to provide dummy env vars for the tests to run
-        # The values do not matter as the APIs are mocked in the tests
-        NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-        GEMINI_API_KEY: FAKE_API_KEY_FOR_TESTING
-        GOOGLE_MAPS_API_KEY: FAKE_MAPS_KEY
-        SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY
-
-    - name: Run Cypress tests
-      run: |
-        npm run build
-        npx start-server-and-test 'npm start' http://localhost:3000 'npm run cy:run'
-      env:
-        NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-        SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY
-        GEMINI_API_KEY: FAKE_API_KEY_FOR_TESTING
-        GOOGLE_MAPS_API_KEY: FAKE_MAPS_KEY
-
-    - name: Run ESLint
-      run: npm run lint
-
-    - name: Build project
-      run: npm run build
+  cypress-tests:
+    name: "Run Cypress E2E Tests"
+    runs-on: ubuntu-latest
+    needs: [lint, jest-tests]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@v6
+        with:
+          build: npm run build
+          start: npm start
+        env:
+          NODE_ENV: test
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24ifQ.epso991aI-2H1i_M62YocM24z89i_d_1z_p9a1i2e3g
+          SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSJ9.epso991aI-2H1i_M62YocM24z89i_d_1z_p9a1i2e3g
 
   docker:
-    needs: build
+    name: "Build and Push Docker Image"
     runs-on: ubuntu-latest
+    needs: [cypress-tests] # Depends on E2E tests passing
+    if: github.ref == 'refs/heads/main' # Only run on main branch
     steps:
-    - uses: actions/checkout@v4
-    - name: Log in to GHCR
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }}
 
   deploy:
-    needs: docker
+    name: "Deploy to Production"
     runs-on: ubuntu-latest
+    needs: docker
+    if: github.ref == 'refs/heads/main' # Only run on main branch
     steps:
-    - name: Deploy to production
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.PRODUCTION_HOST }}
-        username: ${{ secrets.PRODUCTION_USER }}
-        key: ${{ secrets.PRODUCTION_SSH_KEY }}
-        script: |
-          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
-          cd /srv/app && docker-compose up -d
+      - name: Deploy to production
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+            cd /srv/app && docker-compose up -d

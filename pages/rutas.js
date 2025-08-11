@@ -14,7 +14,7 @@ import MapIcon from '@mui/icons-material/Map';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import dynamic from 'next/dynamic';
 import { useAuthorization } from '../hooks/useAuthorization';
-import fetchWithCsrf from '../lib/fetchWithCsrf';
+import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 
 const RutaMap = dynamic(() => import('../components/RutaMap'), { ssr: false });
 
@@ -36,6 +36,7 @@ export default function RutasPage() {
   const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const { can, role } = useAuthorization();
+  const fetchWithCsrf = useCsrfFetcher();
 
   const [rutas, setRutas] = useState([]);
   const [puntos, setPuntos] = useState([]);

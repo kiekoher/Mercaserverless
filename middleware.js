@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { randomBytes } from 'crypto';
 
 export async function middleware(req) {
   const res = NextResponse.next();
@@ -23,59 +24,58 @@ export async function middleware(req) {
   const { data: { session } } = await supabase.auth.getSession();
   const { pathname } = req.nextUrl;
 
-  // Si no hay sesión y la ruta no es /login, redirigir a /login
-  if (!session && pathname !== '/login') {
+  // Redirect to login if no session and not on the login page
+  if (!session && pathname !== '/login' && !pathname.startsWith('/api')) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Si hay sesión y el usuario está en /login, redirigir al dashboard
+  // Redirect to dashboard if session exists and user is on the login page
   if (session && pathname === '/login') {
     const url = req.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
-  // Si hay sesión, verificar roles para rutas protegidas
-  if (session) {
-    let userRole = req.cookies.get('user-role')?.value;
-    if (!userRole) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
-      userRole = profile?.role;
-      if (userRole) {
-        res.cookies.set('user-role', userRole, { path: '/' });
-      }
-    }
+  // Generate and add nonce to headers for CSP
+  const nonce = Buffer.from(randomBytes(16)).toString('base64');
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-nonce', nonce);
 
-    const url = req.nextUrl.clone();
-    url.pathname = '/dashboard'; // URL de fallback si no tiene permiso
+  // Set CSP header using the nonce
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' blob: data: https://maps.gstatic.com;
+    media-src 'none';
+    frame-src 'none';
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' wss://${process.env.NEXT_PUBLIC_SUPABASE_URL_HOSTNAME} https://*.supabase.co https://*.googleapis.com;
+  `.replace(/\s{2,}/g, ' ').trim();
 
-    // Rutas de Admin
-    if (pathname.startsWith('/admin') && userRole !== 'admin') {
-      return NextResponse.redirect(url);
-    }
-
-    // Rutas de Supervisor
-    if ((pathname.startsWith('/rutas') || pathname.startsWith('/puntos-de-venta')) && !['supervisor', 'admin'].includes(userRole)) {
-      return NextResponse.redirect(url);
-    }
-  }
+  // Set all security headers
+  res.headers.set('Content-Security-Policy', cspHeader);
+  res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  res.headers.set('Referrer-Policy', 'no-referrer');
+  res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
 
   return res;
 }
 
 export const config = {
   matcher: [
-    '/dashboard',
-    '/mi-ruta',
-    '/rutas/:path*',
-    '/puntos-de-venta/:path*',
-    '/admin/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - / (the root path, for public access)
+     * - /login (the login page)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|login|$).*)',
   ],
 };
-
