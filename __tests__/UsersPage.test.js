@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { useAuth } from '../context/Auth';
 import UsersPage from '../pages/admin/users.js';
+import { CsrfProvider } from '../context/Csrf';
 
 // Mock the fetch API
 global.fetch = jest.fn();
@@ -40,7 +41,11 @@ describe('UsersPage', () => {
       json: async () => mockUsers,
     });
 
-    render(<UsersPage />);
+    render(
+      <CsrfProvider>
+        <UsersPage />
+      </CsrfProvider>
+    );
 
     // Check that the main heading is rendered
     expect(screen.getByRole('heading', { name: /administración de usuarios/i })).toBeInTheDocument();
@@ -62,7 +67,11 @@ describe('UsersPage', () => {
       profile: { role: 'mercaderista' },
     });
 
-    render(<UsersPage />);
+    render(
+      <CsrfProvider>
+        <UsersPage />
+      </CsrfProvider>
+    );
 
     // Check that the permission denied alert is shown
     expect(screen.getByRole('alert')).toHaveTextContent(/no tienes permiso para acceder a esta página/i);

@@ -47,6 +47,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
     GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
+    RATE_LIMITER_FAIL_OPEN=false # Permite un fallback en memoria cuando Redis falla
     LOG_LEVEL=info # Nivel de logs
     ```
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
@@ -73,6 +74,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 GEMINI_API_KEY=...
 GOOGLE_MAPS_API_KEY=...
 REDIS_URL=redis://localhost:6379
+RATE_LIMITER_FAIL_OPEN=false
 LOG_LEVEL=info
 EOF
 sudo chmod 600 /etc/mercaderista.env
@@ -118,3 +120,7 @@ Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compos
     ```bash
     docker-compose down
     ```
+
+### Seguridad y sanitización
+
+Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.

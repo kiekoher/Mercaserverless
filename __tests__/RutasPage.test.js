@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { useAuth } from '../context/Auth';
 import RutasPage from '../pages/rutas.js';
+import { CsrfProvider } from '../context/Csrf';
 
 // Mock the fetch API
 global.fetch = jest.fn();
@@ -68,7 +69,11 @@ describe('RutasPage', () => {
       return Promise.reject(new Error(`Unhandled fetch call: ${url}`));
     });
 
-    render(<RutasPage />);
+    render(
+      <CsrfProvider>
+        <RutasPage />
+      </CsrfProvider>
+    );
 
     // Check that the main heading is rendered
     expect(screen.getByRole('heading', { name: /gestión y seguimiento de rutas/i })).toBeInTheDocument();
@@ -91,7 +96,11 @@ describe('RutasPage', () => {
       profile: { role: 'mercaderista' },
     });
 
-    render(<RutasPage />);
+    render(
+      <CsrfProvider>
+        <RutasPage />
+      </CsrfProvider>
+    );
 
     // Check that the permission denied alert is shown
     expect(screen.getByRole('alert')).toHaveTextContent(/no tienes permiso para ver esta página/i);

@@ -9,6 +9,7 @@ import DirectionsIcon from '@mui/icons-material/Directions';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AppLayout from '../components/AppLayout';
 import { useSnackbar } from 'notistack';
+import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 
 // Estilo para el Modal de feedback
 const modalStyle = {
@@ -28,6 +29,7 @@ export default function MiRutaPage() {
   const { user, profile } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const router = useRouter();
+  const fetchWithCsrf = useCsrfFetcher();
   
   const [ruta, setRuta] = useState(null);
   const [visitas, setVisitas] = useState([]);
@@ -74,9 +76,8 @@ export default function MiRutaPage() {
 
   const handleCheckIn = async (puntoId) => {
     try {
-      const res = await fetch('/api/visitas', {
+      const res = await fetchWithCsrf('/api/visitas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ruta_id: ruta.id, punto_de_venta_id: puntoId }),
       });
       if (!res.ok) {
@@ -104,9 +105,8 @@ export default function MiRutaPage() {
   const handleCheckOut = async () => {
     if (!currentVisita) return;
     try {
-      const res = await fetch('/api/visitas', {
+      const res = await fetchWithCsrf('/api/visitas', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ visita_id: currentVisita.id, ...feedback }),
       });
       if (!res.ok) {
