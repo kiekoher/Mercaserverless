@@ -77,4 +77,44 @@ describe('visitas API', () => {
     expect(res.statusCode).toBe(201);
     expect(res.data.id).toBe(1);
   });
+
+  it('sanitizes observaciones on update', async () => {
+    const updateMock = jest.fn().mockReturnValue({
+      eq: () => ({
+        eq: () => ({
+          select: () => ({
+            single: () => Promise.resolve({ data: {} })
+          })
+        })
+      })
+    });
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
+              })
+            })
+          };
+        }
+        if (table === 'visitas') {
+          return { update: updateMock };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/visitas.js');
+    const req = {
+      method: 'PUT',
+      body: { visita_id: 1, estado: 'Completada', observaciones: '<script>bad()</script>' }
+    };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(updateMock).toHaveBeenCalled();
+    const sent = updateMock.mock.calls[0][0];
+    expect(sent.observaciones).toBe('');
+  });
 });

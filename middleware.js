@@ -4,8 +4,13 @@ import { randomBytes } from 'crypto';
 
 export async function middleware(req) {
   const res = NextResponse.next();
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not defined');
+  }
+  const supabaseHost = new URL(supabaseUrl).host;
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    supabaseUrl,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
@@ -52,7 +57,7 @@ export async function middleware(req) {
     media-src 'none';
     frame-src 'none';
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' wss://${process.env.NEXT_PUBLIC_SUPABASE_URL_HOSTNAME} https://*.supabase.co https://*.googleapis.com;
+    connect-src 'self' wss://${supabaseHost} https://*.supabase.co https://*.googleapis.com;
   `.replace(/\s{2,}/g, ' ').trim();
 
   // Set all security headers

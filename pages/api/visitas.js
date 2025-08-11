@@ -2,6 +2,7 @@ import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import { sanitizeInput } from '../../lib/sanitize';
 
 export default async function handler(req, res) {
   const supabase = getSupabaseServerClient(req, res);
@@ -123,12 +124,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Datos de actualización inválidos.' });
     }
     const { visita_id, estado, observaciones, url_foto } = parsed.data;
+    const sanitizedObs = observaciones ? sanitizeInput(observaciones) : undefined;
 
     const { data, error } = await supabase
       .from('visitas')
       .update({
         estado,
-        observaciones,
+        observaciones: sanitizedObs,
         url_foto,
         check_out_at: new Date().toISOString(),
       })
