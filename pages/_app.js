@@ -10,6 +10,7 @@ import { AuthProvider } from '../context/Auth';
 import { SnackbarProvider } from 'notistack';
 import { useEffect } from 'react';
 import ErrorBoundary from '../components/ErrorBoundary';
+import logger from '../lib/logger';
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();
@@ -18,8 +19,14 @@ export default function MyApp(props) {
   const { Component, emotionCache = clientSideEmotionCache, pageProps } = props;
 
   useEffect(() => {
-    // Obtiene un token CSRF y lo almacena en la cookie `csrf-token`
-    fetch('/api/csrf');
+    const initCsrf = async () => {
+      try {
+        await fetch('/api/csrf');
+      } catch (err) {
+        logger.warn({ err }, 'Failed to fetch CSRF token');
+      }
+    };
+    initCsrf();
   }, []);
 
   return (

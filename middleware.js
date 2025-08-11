@@ -21,7 +21,6 @@ export async function middleware(req) {
     }
   );
   const { data: { session } } = await supabase.auth.getSession();
-
   const { pathname } = req.nextUrl;
 
   // Si no hay sesión y la ruta no es /login, redirigir a /login
@@ -40,13 +39,19 @@ export async function middleware(req) {
 
   // Si hay sesión, verificar roles para rutas protegidas
   if (session) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
+    let userRole = req.cookies.get('user-role')?.value;
+    if (!userRole) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      userRole = profile?.role;
+      if (userRole) {
+        res.cookies.set('user-role', userRole, { path: '/' });
+      }
+    }
 
-    const userRole = profile?.role;
     const url = req.nextUrl.clone();
     url.pathname = '/dashboard'; // URL de fallback si no tiene permiso
 
@@ -66,14 +71,11 @@ export async function middleware(req) {
 
 export const config = {
   matcher: [
-    /*
-     * Coincidir con todas las rutas de solicitud excepto las siguientes:
-     * - api (rutas de API)
-     * - _next/static (archivos estáticos)
-     * - _next/image (archivos de optimización de imágenes)
-     * - favicon.ico (archivo de favicon)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/dashboard',
+    '/mi-ruta',
+    '/rutas/:path*',
+    '/puntos-de-venta/:path*',
+    '/admin/:path*',
   ],
 };
 

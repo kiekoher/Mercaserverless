@@ -36,6 +36,18 @@ jobs:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
         GEMINI_API_KEY: FAKE_API_KEY_FOR_TESTING
         GOOGLE_MAPS_API_KEY: FAKE_MAPS_KEY
+        SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY
+
+    - name: Run Cypress tests
+      run: |
+        npm run build
+        npx start-server-and-test 'npm start' http://localhost:3000 'npm run cy:run'
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+        SUPABASE_SERVICE_KEY: SERVICE_ROLE_KEY
+        GEMINI_API_KEY: FAKE_API_KEY_FOR_TESTING
+        GOOGLE_MAPS_API_KEY: FAKE_MAPS_KEY
 
     - name: Run ESLint
       run: npm run lint
