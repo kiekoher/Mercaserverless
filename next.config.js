@@ -7,13 +7,13 @@
 
 const CspHeader = `
     default-src 'self';
-    script-src 'self';
-    style-src 'self' https://fonts.googleapis.com;
-    img-src 'self' blob: data:;
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' blob: data: https://maps.gstatic.com;
     media-src 'none';
     frame-src 'none';
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' *.supabase.co *.googleapis.com;
+    connect-src 'self' https://*.supabase.co https://*.googleapis.com;
 `.replace(/\s{2,}/g, ' ').trim();
 
 const securityHeaders = [

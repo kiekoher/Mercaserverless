@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useSnackbar } from 'notistack';
+import fetchWithCsrf from '../lib/fetchWithCsrf';
 
 export default function DashboardPage() {
   const { user, profile } = useAuth();
@@ -50,9 +51,8 @@ export default function DashboardPage() {
 
       const rutaId = routes[0].id; // Analyze the most recent route
 
-      const res = await fetch('/api/generate-insights', {
+      const res = await fetchWithCsrf('/api/generate-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rutaId }),
       });
 

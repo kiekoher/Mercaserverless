@@ -34,5 +34,6 @@ COPY --from=builder /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 ENV PORT 3000
+HEALTHCHECK CMD wget -qO- http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]
