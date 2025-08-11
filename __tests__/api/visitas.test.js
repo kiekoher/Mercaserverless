@@ -18,6 +18,7 @@ jest.mock('../../lib/supabaseServer', () => ({
 }));
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 describe('visitas API', () => {
   beforeEach(() => {

@@ -53,7 +53,7 @@ export async function middleware(req) {
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://maps.gstatic.com;
+    img-src 'self' blob: data: https://maps.gstatic.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
     media-src 'none';
     frame-src 'none';
     font-src 'self' https://fonts.gstatic.com;
@@ -78,9 +78,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - / (the root path, for public access)
      * - /login (the login page)
      */
-    '/((?!_next/static|_next/image|favicon.ico|login|$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|login).*)',
   ],
 };
