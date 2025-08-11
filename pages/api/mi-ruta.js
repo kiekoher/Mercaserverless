@@ -3,7 +3,6 @@ import logger from '../../lib/logger';
 import { checkRateLimit } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
-  // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
   const supabase = getSupabaseServerClient(req, res);
 
   if (req.method !== 'GET') {

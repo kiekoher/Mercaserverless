@@ -48,13 +48,15 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
     GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
-    RATE_LIMITER_FAIL_OPEN=false # Permite un fallback en memoria cuando Redis falla
     LOG_LEVEL=info # Nivel de logs
+    LOG_FILE_PATH=./logs/app.log # Ruta del archivo de logs
+    LOG_MAX_SIZE=10485760 # Tamaño máximo antes de rotar
+    CYPRESS_ADMIN_ID=<uuid>
+    CYPRESS_SUPERVISOR_ID=<uuid>
+    CYPRESS_MERCADERISTA_ID=<uuid>
     ```
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
-    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. Para entornos de producción también se recomienda definir `REDIS_URL` y `LOG_LEVEL`.
-
-    Si `REDIS_URL` no está configurada, el rate limiter utilizará un almacenamiento en memoria con un máximo de 10 000 claves, adecuado solo para desarrollo.
+    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. `REDIS_URL` es obligatorio para el rate limiter en producción, de lo contrario las solicitudes serán bloqueadas.
 
     Este archivo `.env` es solo para desarrollo local. Está incluido en `.gitignore` y no debe subirse al repositorio ni copiarse a servidores.
 
@@ -63,6 +65,11 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     ```bash
     npm install
     ```
+4.  **Audita las dependencias:**
+    ```bash
+    npm audit --omit=dev
+    ```
+    El comando fallará si se detectan vulnerabilidades altas o críticas.
 
 ### Gestión de secretos en producción
 
@@ -78,8 +85,9 @@ SUPABASE_SERVICE_KEY=...
 GEMINI_API_KEY=...
 GOOGLE_MAPS_API_KEY=...
 REDIS_URL=redis://localhost:6379
-RATE_LIMITER_FAIL_OPEN=false
 LOG_LEVEL=info
+LOG_FILE_PATH=/var/log/mercaderista/app.log
+LOG_MAX_SIZE=10485760
 EOF
 sudo chmod 600 /etc/mercaderista.env
 ```
@@ -126,6 +134,10 @@ Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compos
     ```bash
     docker-compose down
     ```
+
+### Logs
+
+Los registros se generan con [pino](https://github.com/pinojs/pino). En producción se escriben en el archivo indicado por `LOG_FILE_PATH` y se rotan automáticamente al alcanzar `LOG_MAX_SIZE` bytes. En desarrollo se utiliza un formato legible en la terminal.
 
 ### Seguridad y sanitización
 

@@ -52,7 +52,7 @@ export async function middleware(req) {
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com;
     img-src 'self' blob: data: https://maps.gstatic.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
     media-src 'none';
     frame-src 'none';

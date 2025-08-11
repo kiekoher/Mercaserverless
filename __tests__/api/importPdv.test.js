@@ -23,7 +23,7 @@ jest.mock('@googlemaps/google-maps-services-js', () => ({
   Client: jest.fn().mockImplementation(() => ({ geocode: jest.fn() })),
 }));
 
-jest.mock('p-limit', () => jest.fn(() => (fn) => fn));
+jest.mock('p-limit', () => jest.fn(() => (fn) => fn()));
 
 describe('import-pdv API', () => {
   beforeEach(() => {
@@ -41,6 +41,38 @@ describe('import-pdv API', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(401);
+  });
+
+  it('sanitizes each imported point', async () => {
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    let inserted;
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
+            })
+          };
+        }
+        if (table === 'puntos_de_venta') {
+          return {
+            insert: (arr) => {
+              inserted = arr;
+              return { error: null };
+            }
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/import-pdv.js');
+    const req = { method: 'POST', body: { puntos: [{ nombre: '<b>N</b>', direccion: '<i>D</i>', ciudad: 'C' }] } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(inserted[0].nombre).toBe('N');
+    expect(inserted[0].direccion).toBe('D');
   });
 });
 

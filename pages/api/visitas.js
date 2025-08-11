@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     }
     const { ruta_id, punto_de_venta_id } = parsed.data;
 
-    // **MEJORA: Validar que el punto de venta pertenezca a la ruta y que la ruta le pertenezca al mercaderista**
+    // Validación: comprobar que el punto de venta pertenezca a la ruta y que la ruta corresponda al mercaderista
     const { data: rutaData, error: rutaError } = await supabase
       .from('rutas')
       .select('mercaderista_id, puntos_de_venta_ids')

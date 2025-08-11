@@ -77,6 +77,65 @@ describe('puntos-de-venta API', () => {
     expect(res.data.id).toBe(1);
   });
 
+  it('sanitizes input before inserting', async () => {
+    process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    let insertedPayload;
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { role: 'supervisor' } })
+              })
+            })
+          };
+        }
+        if (table === 'puntos_de_venta') {
+          return {
+            insert: (payload) => {
+              insertedPayload = payload;
+              return {
+                select: () => ({ single: () => Promise.resolve({ data: { id: 1 } }) })
+              };
+            }
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/puntos-de-venta.js');
+    const req = { method: 'POST', body: { nombre: '<b>P</b>', direccion: '<i>D</i>', ciudad: 'C' } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(201);
+    expect(insertedPayload.nombre).toBe('P');
+    expect(insertedPayload.direccion).toBe('D');
+  });
+
+  it('denies access to mercaderistas', async () => {
+    process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u2' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({ single: () => Promise.resolve({ data: { role: 'mercaderista' } }) })
+            })
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/puntos-de-venta.js');
+    const req = { method: 'GET', query: {} };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+  });
+
   it('allows supervisors to update points', async () => {
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
     const { getSupabaseServerClient } = await import('../../lib/supabaseServer');

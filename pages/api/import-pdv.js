@@ -5,6 +5,7 @@ import pLimit from 'p-limit';
 import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
+import { sanitizeInput } from '../../lib/sanitize';
 
 const googleMapsClient = new Client({});
 
@@ -102,9 +103,9 @@ export default async function handler(req, res) {
       }
 
       return {
-        nombre: punto.nombre,
-        direccion: punto.direccion,
-        ciudad: punto.ciudad,
+        nombre: sanitizeInput(punto.nombre),
+        direccion: sanitizeInput(punto.direccion),
+        ciudad: sanitizeInput(punto.ciudad),
         latitud,
         longitud,
       };
