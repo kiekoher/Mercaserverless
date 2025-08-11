@@ -1,13 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import LoginPage from '../pages/login.js';
 
+const mockSupabase = {
+  auth: {
+    signInWithPassword: jest.fn(),
+  },
+};
+
 // Mock the supabase client as it's used in the component
 jest.mock('../lib/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      signInWithPassword: jest.fn(),
-    },
-  },
+  getSupabaseClient: () => mockSupabase,
 }));
 
 // Mock the router as it's used for redirection (if any)
