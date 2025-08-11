@@ -43,7 +43,7 @@ export default async function handler(req, res) {
 
     if (error) {
       logger.error({ err: error }, 'Error fetching routes');
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
 
     res.setHeader('X-Total-Count', count);
@@ -86,7 +86,7 @@ export default async function handler(req, res) {
 
     if (error) {
       logger.error({ err: error }, 'Error inserting route');
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(201).json(data);
 
@@ -124,7 +124,7 @@ export default async function handler(req, res) {
 
     if (error) {
       logger.error({ err: error }, 'Error updating route');
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json(data);
 
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
 
     if (error) {
       logger.error({ err: error }, 'Error deleting route');
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json({ message: 'Ruta eliminada' });
 

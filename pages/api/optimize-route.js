@@ -34,7 +34,7 @@ export default async function handler(req, res) {
   }
 
   const puntoSchema = z.object({
-    id: z.any(),
+    id: z.number().int(),
     direccion: z.string().min(1),
     ciudad: z.string().min(1)
   });

@@ -120,7 +120,8 @@ export default async function handler(req, res) {
     const { error } = await supabase.from('puntos_de_venta').insert(puntosToInsert);
 
     if (error) {
-      throw new Error(`Error en la base de datos: ${error.message}`);
+      logger.error({ err: error }, 'Database insert error during bulk import');
+      throw new Error('Error en la base de datos');
     }
 
     res.status(200).json({ message: `${puntosToInsert.length} puntos de venta importados con éxito.` });

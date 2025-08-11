@@ -14,9 +14,16 @@ import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 import Papa from 'papaparse';
 
 const CSVImport = ({ onImport, isImporting }) => {
+  const { enqueueSnackbar } = useSnackbar();
+  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        enqueueSnackbar('El archivo excede el tamaño máximo de 2MB', { variant: 'error' });
+        return;
+      }
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,

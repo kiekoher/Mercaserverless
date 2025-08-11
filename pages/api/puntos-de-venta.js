@@ -85,7 +85,8 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Error inserting point of sale');
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(201).json(data);
 
@@ -118,7 +119,8 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Error updating point of sale');
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json(data);
 
@@ -142,7 +144,8 @@ export default async function handler(req, res) {
       .eq('id', Number(id));
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Error deleting point of sale');
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json({ message: 'Punto de venta eliminado' });
 
@@ -156,7 +159,8 @@ export default async function handler(req, res) {
     if (all === 'true') {
       const { data, error } = await supabase.from('puntos_de_venta').select('*');
       if (error) {
-        return res.status(500).json({ error: error.message });
+        logger.error({ err: error }, 'Error fetching all points of sale');
+        return res.status(500).json({ error: 'Internal Server Error' });
       }
       return res.status(200).json(data);
     }
@@ -178,7 +182,8 @@ export default async function handler(req, res) {
     const { data, error, count } = await query.range(offset, offset + limit - 1);
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Error fetching paginated points of sale');
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
 
     res.setHeader('X-Total-Count', count);

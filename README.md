@@ -53,6 +53,8 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
     Asegúrate de definir `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. Para entornos de producción también se recomienda definir `REDIS_URL` y `LOG_LEVEL`.
 
+    Si `REDIS_URL` no está configurada, el rate limiter utilizará un almacenamiento en memoria con un máximo de 10 000 claves, adecuado solo para desarrollo.
+
     Este archivo `.env` es solo para desarrollo local. Está incluido en `.gitignore` y no debe subirse al repositorio ni copiarse a servidores.
 
 3.  **Instala las dependencias del proyecto:**
@@ -106,14 +108,16 @@ docker compose up -d
 
 #### Modo Dockerizado (Recomendado)
 
-Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compose instalados.
+Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compose instalados. El archivo `docker-compose.yml` levanta los servicios de la aplicación junto con PostgreSQL y Redis, necesarios para la base de datos y el rate limiter.
 
-1.  **Construir y levantar el contenedor:**
+1.  **Construir y levantar los contenedores:**
     Desde la raíz del proyecto, ejecuta:
     ```bash
     docker-compose up --build
     ```
     La primera vez tomará un tiempo mientras se construye la imagen. Las siguientes veces será mucho más rápido. La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
+
+    El contenedor de PostgreSQL se inicia vacío; aplica tus migraciones de Supabase (`supabase db push` o restaurando un dump) antes de usar la aplicación.
 
 2.  **Detener el contenedor:**
     Presiona `Ctrl + C` en la terminal. Para eliminar el contenedor y la red, puedes ejecutar:

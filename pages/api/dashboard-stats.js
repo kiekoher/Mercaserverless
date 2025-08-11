@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -30,6 +31,10 @@ export default async function handler(req, res) {
   if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
     logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to dashboard-stats');
     return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (!await checkRateLimit(req, { userId: user.id })) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   const { data, error } = await supabase.rpc('get_dashboard_stats');

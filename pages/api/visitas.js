@@ -43,7 +43,8 @@ export default async function handler(req, res) {
         .eq('ruta_id', ruta_id);
 
     if (error) {
-        return res.status(500).json({ error: error.message });
+        logger.error({ err: error }, 'Error fetching visits');
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json(data);
   }
@@ -101,7 +102,7 @@ export default async function handler(req, res) {
 
     if (error) {
       logger.error({ err: error }, 'Error creating visit');
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(201).json(data);
   }
@@ -141,7 +142,7 @@ export default async function handler(req, res) {
 
     if (error) {
         logger.error({ err: error }, 'Error updating visit');
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
     return res.status(200).json(data);
   }
