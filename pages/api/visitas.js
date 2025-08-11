@@ -3,6 +3,7 @@ import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   const supabase = getSupabaseServerClient(req, res);
@@ -32,6 +33,10 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'No tienes permiso para ver esta información.' });
     }
 
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too Many Requests' });
+    }
+
     const { ruta_id } = req.query;
     if (!ruta_id) {
       return res.status(400).json({ error: 'Se requiere el ID de la ruta.' });
@@ -55,7 +60,11 @@ export default async function handler(req, res) {
     if (profile.role !== 'mercaderista') {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
     }
-    
+
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too Many Requests' });
+    }
+
     const postSchema = z.object({
       ruta_id: z.number(),
       punto_de_venta_id: z.number(),
@@ -112,6 +121,10 @@ export default async function handler(req, res) {
     if (!verifyCsrf(req, res)) return;
     if (profile.role !== 'mercaderista') {
         return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
+    }
+
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too Many Requests' });
     }
 
     const putSchema = z.object({

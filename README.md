@@ -44,6 +44,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     ```
     NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
     NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+    SUPABASE_SERVICE_KEY=YOUR_SUPABASE_SERVICE_KEY # Clave de servicio (solo servidor)
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
     GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
@@ -51,7 +52,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     LOG_LEVEL=info # Nivel de logs
     ```
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
-    Asegúrate de definir `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. Para entornos de producción también se recomienda definir `REDIS_URL` y `LOG_LEVEL`.
+    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. Para entornos de producción también se recomienda definir `REDIS_URL` y `LOG_LEVEL`.
 
     Si `REDIS_URL` no está configurada, el rate limiter utilizará un almacenamiento en memoria con un máximo de 10 000 claves, adecuado solo para desarrollo.
 
@@ -73,6 +74,7 @@ Ejemplo en un servidor Ubuntu, creando `/etc/mercaderista.env` con los secretos:
 sudo tee /etc/mercaderista.env <<'EOF'
 NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_KEY=...
 GEMINI_API_KEY=...
 GOOGLE_MAPS_API_KEY=...
 REDIS_URL=redis://localhost:6379
