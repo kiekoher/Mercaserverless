@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { useSnackbar } from 'notistack';
+import { useSnackbar, SnackbarProvider } from 'notistack';
 import DashboardPage from '../pages/dashboard.js';
+import { AuthProvider } from '../context/Auth';
+import { CsrfProvider } from '../context/Csrf';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from '../components/theme';
 
 // Mock the API endpoints
 global.fetch = jest.fn();
@@ -12,16 +16,36 @@ jest.mock('next/router', () => ({
   }),
 }));
 
+// We will provide a mock AuthContext, but we can still mock the hook if needed for specific scenarios
 jest.mock('../context/Auth', () => ({
   useAuth: () => ({
     user: { email: 'test@example.com' },
     profile: { role: 'supervisor' },
   }),
+  AuthProvider: ({ children }) => <div>{children}</div>, // Simple passthrough for the test
 }));
 
 jest.mock('notistack', () => ({
+  ...jest.requireActual('notistack'), // Import actual notistack for SnackbarProvider
   useSnackbar: jest.fn(),
 }));
+
+// A custom render function that wraps components with necessary providers
+const renderWithProviders = (ui, { providerProps, ...renderOptions } = {}) => {
+  return render(
+    <ThemeProvider theme={theme}>
+      <SnackbarProvider>
+        <AuthProvider>
+          <CsrfProvider>
+            {ui}
+          </CsrfProvider>
+        </AuthProvider>
+      </SnackbarProvider>
+    </ThemeProvider>,
+    renderOptions
+  );
+};
+
 
 describe('DashboardPage', () => {
   let enqueueSnackbar;
@@ -38,19 +62,23 @@ describe('DashboardPage', () => {
       total_puntos_visitados: 120,
     };
 
+    // Mock for the stats fetch
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => mockStats,
     });
+    // Mock for the CSRF token fetch
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ csrfToken: 'test-token' }),
+    });
 
-    render(<DashboardPage />);
+    renderWithProviders(<DashboardPage />);
 
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
-
-    // Use findBy queries which automatically wait for elements to appear
+    // Wait for the heading to ensure the page is loaded
     expect(await screen.findByRole('heading', { name: /dashboard de operaciones/i })).toBeInTheDocument();
 
-    // Check that the component loaded without errors
+    // Check that the stats fetch was called
     expect(fetch).toHaveBeenCalledWith('/api/dashboard-stats');
 
     // Check for the AI insights section
@@ -59,13 +87,19 @@ describe('DashboardPage', () => {
   });
 
   it('renders an error message if the stats fetch fails', async () => {
-    // Make the mock more specific to how the component handles it
+    // Mock for the stats fetch failing
     fetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: 'Database connection error' }),
     });
+    // Mock for the CSRF token fetch succeeding
+    fetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ csrfToken: 'test-token' }),
+    });
 
-    render(<DashboardPage />);
+
+    renderWithProviders(<DashboardPage />);
 
     await waitFor(() => {
       expect(enqueueSnackbar).toHaveBeenCalledWith('No se pudieron cargar las estadísticas.', { variant: 'error' });

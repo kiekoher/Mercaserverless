@@ -6,9 +6,10 @@ import createEmotionCache from '../components/createEmotionCache';
 
 export default class MyDocument extends Document {
   render() {
+    const nonce = this.props.nonce;
     return (
       <Html lang="es">
-        <Head>
+        <Head nonce={nonce}>
           {/* PWA primary color */}
           <meta name="theme-color" content={theme.palette.primary.main} />
           <link rel="shortcut icon" href="/favicon.ico" />
@@ -17,22 +18,20 @@ export default class MyDocument extends Document {
         </Head>
         <body>
           <Main />
-          <NextScript />
+          <NextScript nonce={nonce} />
         </body>
       </Html>
     );
   }
 }
 
-// `getInitialProps` belongs to `_document` (instead of `_app`),
-// it's compatible with static-site generation (SSG).
 MyDocument.getInitialProps = async (ctx) => {
   const originalRenderPage = ctx.renderPage;
-
-  // You can consider sharing the same Emotion cache between all the SSR requests to speed up performance.
-  // However, be aware that it can have global side effects.
   const cache = createEmotionCache();
   const { extractCriticalToChunks } = createEmotionServer(cache);
+
+  // Get nonce from request headers if available (during SSR)
+  const nonce = ctx.req?.headers['x-nonce'];
 
   ctx.renderPage = () =>
     originalRenderPage({
@@ -43,20 +42,19 @@ MyDocument.getInitialProps = async (ctx) => {
     });
 
   const initialProps = await Document.getInitialProps(ctx);
-  // This is important. It prevents Emotion to render invalid HTML.
-  // See https://github.com/mui/material-ui/issues/26561#issuecomment-855286153
   const emotionStyles = extractCriticalToChunks(initialProps.html);
   const emotionStyleTags = emotionStyles.styles.map((style) => (
     <style
       data-emotion={`${style.key} ${style.ids.join(' ')}`}
       key={style.key}
-      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: style.css }}
+      nonce={nonce}
     />
   ));
 
   return {
     ...initialProps,
     emotionStyleTags,
+    nonce, // Pass nonce to the class component
   };
 };

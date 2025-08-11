@@ -34,6 +34,8 @@ COPY --from=builder /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 ENV PORT 3000
-HEALTHCHECK CMD wget -qO- http://localhost:3000/api/health || exit 1
+# Healthcheck to ensure the app is responsive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
 
 CMD ["node", "server.js"]

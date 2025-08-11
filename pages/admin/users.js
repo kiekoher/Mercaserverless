@@ -8,12 +8,13 @@ import {
 import AppLayout from '../../components/AppLayout';
 import { useSnackbar } from 'notistack'; // Importar useSnackbar
 import { useAuthorization } from '../../hooks/useAuthorization';
-import fetchWithCsrf from '../../lib/fetchWithCsrf';
+import { useCsrfFetcher } from '../../lib/fetchWithCsrf';
 
 export default function UserManagementPage() {
   const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const { can, role } = useAuthorization();
+  const fetchWithCsrf = useCsrfFetcher();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

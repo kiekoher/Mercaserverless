@@ -10,7 +10,7 @@ import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
 import { useSnackbar } from 'notistack';
 import { useAuthorization } from '../hooks/useAuthorization';
-import fetchWithCsrf from '../lib/fetchWithCsrf';
+import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 import Papa from 'papaparse';
 
 const CSVImport = ({ onImport, isImporting }) => {
@@ -53,6 +53,7 @@ export default function PuntosDeVentaPage() {
   const { user } = useAuth();
   const { can, role } = useAuthorization();
   const { enqueueSnackbar } = useSnackbar();
+  const fetchWithCsrf = useCsrfFetcher();
   const [puntos, setPuntos] = useState([]);
   const [loading, setLoading] = useState(true);
 
