@@ -1,6 +1,7 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import logger from '../../lib/logger';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -42,7 +43,8 @@ export default async function handler(req, res) {
     const { data, error, count } = await query;
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      logger.error({ err: error }, 'Error fetching users');
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
 
     res.setHeader('X-Total-Count', count);
@@ -69,7 +71,10 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      logger.error({ err: error }, 'Error updating user role');
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
     return res.status(200).json(data);
   }
 

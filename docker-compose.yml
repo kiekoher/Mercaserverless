@@ -12,3 +12,28 @@ services:
     # Este archivo no debe versionarse ni copiarse desde el entorno local.
     env_file:
       - /etc/mercaderista.env
+    depends_on:
+      - postgres
+      - redis
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mercaderista
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres-data:
+  redis-data:

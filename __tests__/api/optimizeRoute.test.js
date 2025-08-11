@@ -76,6 +76,17 @@ describe('optimize-route API', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('returns 400 when id is not a number', async () => {
+    const { default: handler } = await import('../../pages/api/optimize-route.js');
+    const req = {
+      method: 'POST',
+      body: { puntos: [{ id: 'a', direccion: 'A', ciudad: 'X' }, { id: 2, direccion: 'B', ciudad: 'Y' }] },
+    };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+  });
+
   it('returns optimized route', async () => {
     const { default: handler } = await import('../../pages/api/optimize-route.js');
     const req = {

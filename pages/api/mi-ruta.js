@@ -1,5 +1,6 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   // **MEJORA: Actualizado al nuevo método recomendado por Supabase**
@@ -13,6 +14,10 @@ export default async function handler(req, res) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!await checkRateLimit(req, { userId: user.id })) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   // La función RPC espera el ID como texto, así que nos aseguramos de pasarlo como string.
