@@ -2,23 +2,26 @@ import { render, screen } from '@testing-library/react';
 import HomePage from '../pages/index.js';
 import { useAuth } from '../context/Auth.js';
 
-// Mock the supabase client to prevent it from initializing
-jest.mock('../lib/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn(),
-      onAuthStateChange: jest.fn(() => ({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      })),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn(),
-        })),
+const mockSupabase = {
+  auth: {
+    getSession: jest.fn(),
+    onAuthStateChange: jest.fn(() => ({
+      data: { subscription: { unsubscribe: jest.fn() } },
+    })),
+    signOut: jest.fn(),
+  },
+  from: jest.fn(() => ({
+    select: jest.fn(() => ({
+      eq: jest.fn(() => ({
+        single: jest.fn(),
       })),
     })),
-  },
+  })),
+};
+
+// Mock the supabase client to prevent it from initializing
+jest.mock('../lib/supabaseClient', () => ({
+  getSupabaseClient: () => mockSupabase,
 }));
 
 // Mock the router

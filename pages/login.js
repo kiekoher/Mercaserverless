@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { getSupabaseClient } from '../lib/supabaseClient';
 import { useRouter } from 'next/router';
 import { Container, Box, Typography, TextField, Button, CircularProgress, Alert } from '@mui/material';
 
@@ -15,6 +15,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
+      const supabase = getSupabaseClient();
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
