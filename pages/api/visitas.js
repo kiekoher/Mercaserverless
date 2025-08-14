@@ -37,10 +37,12 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too Many Requests' });
     }
 
-    const { ruta_id } = req.query;
-    if (!ruta_id) {
-      return res.status(400).json({ error: 'Se requiere el ID de la ruta.' });
+    const querySchema = z.object({ ruta_id: z.coerce.number() });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Se requiere un ID de ruta válido.' });
     }
+    const { ruta_id } = parsed.data;
 
     const { data, error } = await supabase
         .from('visitas')

@@ -50,7 +50,8 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
     LOG_LEVEL=info # Nivel de logs
     LOG_FILE_PATH=./logs/app.log # Ruta del archivo de logs
-    LOG_MAX_SIZE=10485760 # Tamaño máximo antes de rotar
+    LOG_MAX_SIZE=10485760 # Tamaño máximo antes de rotar (bytes)
+    LOG_MAX_FILES=5 # Número máximo de archivos de log
     CYPRESS_ADMIN_ID=<uuid>
     CYPRESS_SUPERVISOR_ID=<uuid>
     CYPRESS_MERCADERISTA_ID=<uuid>
@@ -137,7 +138,7 @@ Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compos
 
 ### Logs
 
-Los registros se generan con [pino](https://github.com/pinojs/pino). En producción se escriben en el archivo indicado por `LOG_FILE_PATH` y se rotan automáticamente al alcanzar `LOG_MAX_SIZE` bytes. En desarrollo se utiliza un formato legible en la terminal.
+Los registros se generan con [pino](https://github.com/pinojs/pino). En producción se utiliza el transporte [`pino-roll`](https://github.com/mcollina/pino-roll#readme), que rota el archivo indicado por `LOG_FILE_PATH` cuando supera `LOG_MAX_SIZE` (en bytes) y mantiene hasta `LOG_MAX_FILES` archivos. En desarrollo se utiliza un formato legible en la terminal.
 
 ### Seguridad y sanitización
 
