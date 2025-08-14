@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 
 export async function middleware(req) {
-  const res = NextResponse.next();
   const { pathname } = req.nextUrl;
 
   // Simple session check based on Supabase auth cookie
@@ -22,9 +21,13 @@ export async function middleware(req) {
   // Generate and add nonce to headers for CSP using Web Crypto API
   const nonceArray = new Uint8Array(16);
   crypto.getRandomValues(nonceArray);
-  const nonce = btoa(String.fromCharCode(...nonceArray));
+  const nonce = Buffer.from(nonceArray).toString('base64');
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
+
+  const res = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '';
