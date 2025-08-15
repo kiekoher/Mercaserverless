@@ -41,6 +41,7 @@ export async function middleware(req) {
     frame-src 'none';
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' wss://${supabaseHost} https://*.supabase.co https://*.googleapis.com;
+    frame-ancestors 'none';
   `.replace(/\s{2,}/g, ' ').trim();
 
   res.headers.set('Content-Security-Policy', cspHeader);

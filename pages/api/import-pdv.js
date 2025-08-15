@@ -9,6 +9,9 @@ import { sanitizeInput } from '../../lib/sanitize';
 
 const googleMapsClient = new Client({});
 
+const GEOCODE_TIMEOUT_MS = parseInt(process.env.GEOCODE_TIMEOUT_MS || '1000', 10);
+const GEOCODE_RETRIES = parseInt(process.env.GEOCODE_RETRIES || '3', 10);
+
 // Importación masiva con geocodificación paralela y manejo de errores por punto
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -83,23 +86,30 @@ export default async function handler(req, res) {
       let latitud = null;
       let longitud = null;
 
-      try {
-        const geocodeRequest = {
-          params: {
-            address: `${punto.direccion}, ${punto.ciudad}, Colombia`,
-            key: process.env.GOOGLE_MAPS_API_KEY,
-          },
-          timeout: 1000,
-        };
-        const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
-        if (geocodeResponse.data.results.length > 0) {
-          const location = geocodeResponse.data.results[0].geometry.location;
-          latitud = location.lat;
-          longitud = location.lng;
+      for (let attempt = 1; attempt <= GEOCODE_RETRIES; attempt++) {
+        try {
+          const geocodeRequest = {
+            params: {
+              address: `${punto.direccion}, ${punto.ciudad}, Colombia`,
+              key: process.env.GOOGLE_MAPS_API_KEY,
+            },
+            timeout: GEOCODE_TIMEOUT_MS,
+          };
+          const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
+          if (geocodeResponse.data.results.length > 0) {
+            const location = geocodeResponse.data.results[0].geometry.location;
+            latitud = location.lat;
+            longitud = location.lng;
+          }
+          break;
+        } catch (e) {
+          if (attempt === GEOCODE_RETRIES) {
+            logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
+          } else {
+            const delay = 100 * Math.pow(2, attempt - 1);
+            await new Promise((r) => setTimeout(r, delay));
+          }
         }
-      } catch (e) {
-        logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
-        // Continue without coordinates if geocoding fails
       }
 
       return {
