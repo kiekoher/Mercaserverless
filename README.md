@@ -140,6 +140,14 @@ Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compos
 
 Los registros se generan con [pino](https://github.com/pinojs/pino). En producción se utiliza el transporte [`pino-roll`](https://github.com/mcollina/pino-roll#readme), que rota el archivo indicado por `LOG_FILE_PATH` cuando supera `LOG_MAX_SIZE` (en bytes) y mantiene hasta `LOG_MAX_FILES` archivos. En desarrollo se utiliza un formato legible en la terminal.
 
+Si se define la variable `LOG_REMOTE_URL`, los logs se enviarán también a ese endpoint HTTP para agregación centralizada.
+
+Para evitar que los registros ocupen espacio indefinidamente, se recomienda programar un `cron` que elimine archivos antiguos, por ejemplo:
+
+```bash
+find /var/log/mercaderista -type f -mtime +30 -delete
+```
+
 ### Seguridad y sanitización
 
 Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
