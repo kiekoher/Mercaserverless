@@ -2,6 +2,8 @@ import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import logger from '../../lib/logger';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { sanitizeInput } from '../../lib/sanitize';
 
 export default async function handler(req, res) {
   const supabase = getSupabaseServerClient(req, res);
@@ -22,9 +24,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Permission denied' });
   }
 
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
   if (req.method === 'GET') {
     const page = parseInt(req.query.page || '1', 10);
-    const search = req.query.search || '';
+    const search = req.query.search ? sanitizeInput(req.query.search) : '';
     const PAGE_SIZE = 10;
     const from = (page - 1) * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;

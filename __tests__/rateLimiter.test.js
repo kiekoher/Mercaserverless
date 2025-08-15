@@ -7,12 +7,9 @@ describe('checkRateLimit', () => {
     jest.resetModules();
   });
 
-  it('rejects requests in production when Redis is unavailable', async () => {
+  it('throws on startup if REDIS_URL is missing in production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.REDIS_URL;
-    jest.resetModules();
-    const { checkRateLimit } = await import('../lib/rateLimiter');
-    const allowed = await checkRateLimit({ headers: {}, socket: { remoteAddress: '1.1.1.1' } });
-    expect(allowed).toBe(false);
+    await expect(import('../lib/rateLimiter')).rejects.toThrow('REDIS_URL not configured in production');
   });
 });

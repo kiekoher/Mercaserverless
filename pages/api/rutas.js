@@ -25,6 +25,13 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    if (!['admin', 'supervisor'].includes(profile.role)) {
+      return res.status(403).json({ error: 'No tienes permiso para ver rutas.' });
+    }
+    if (!(await checkRateLimit(req, { userId: user.id }))) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
+
     const { page = 1, search = '' } = req.query;
     const pageSize = 10;
     const from = (page - 1) * pageSize;

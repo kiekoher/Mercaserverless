@@ -22,6 +22,31 @@ jobs:
         run: npm ci
       - name: Run npm audit
         run: npm audit --omit=dev --audit-level=high
+      - name: Check outdated dependencies
+        run: npm outdated > outdated-deps.txt || true
+      - name: Upload outdated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: outdated-dependencies
+          path: outdated-deps.txt
+
+  security-scan:
+    name: "Security Scan"
+    runs-on: ubuntu-latest
+    needs: audit
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
 
   lint:
     name: "Lint Code"
