@@ -4,6 +4,7 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import { sanitizeInput } from '../../lib/sanitize';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
   }
 
   const client = new Client({});
-  const addresses = puntos.map(p => `${p.direccion}, ${p.ciudad}, Colombia`);
+  const addresses = puntos.map(p => `${sanitizeInput(p.direccion)}, ${sanitizeInput(p.ciudad)}, Colombia`);
 
   try {
     const origin = addresses[0];

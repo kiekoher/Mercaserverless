@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         try {
           const geocodeRequest = {
             params: {
-              address: `${punto.direccion}, ${punto.ciudad}, Colombia`,
+              address: `${sanitizeInput(punto.direccion)}, ${sanitizeInput(punto.ciudad)}, Colombia`,
               key: process.env.GOOGLE_MAPS_API_KEY,
             },
             timeout: GEOCODE_TIMEOUT_MS,

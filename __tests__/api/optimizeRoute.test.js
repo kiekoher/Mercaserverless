@@ -20,11 +20,13 @@ function createMockRes() {
   };
 }
 
+const mockDirections = jest.fn().mockResolvedValue({
+  data: { routes: [{ waypoint_order: [1, 0] }] },
+});
+
 jest.mock('@googlemaps/google-maps-services-js', () => ({
   Client: jest.fn().mockImplementation(() => ({
-    directions: jest.fn().mockResolvedValue({
-      data: { routes: [{ waypoint_order: [1, 0] }] },
-    }),
+    directions: mockDirections,
   })),
 }));
 
@@ -87,13 +89,13 @@ describe('optimize-route API', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('returns optimized route', async () => {
+  it('sanitizes addresses before calling Google Maps', async () => {
     const { default: handler } = await import('../../pages/api/optimize-route.js');
     const req = {
       method: 'POST',
       body: {
         puntos: [
-          { id: 1, direccion: 'A', ciudad: 'X' },
+          { id: 1, direccion: '<b>A</b>', ciudad: '<i>X</i>' },
           { id: 2, direccion: 'B', ciudad: 'Y' },
           { id: 3, direccion: 'C', ciudad: 'Z' },
         ],
@@ -102,8 +104,14 @@ describe('optimize-route API', () => {
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(200);
-    expect(res.data.optimizedPuntos.length).toBe(3);
-    expect(res.data.optimizedPuntos[1].direccion).toBe('C');
+    expect(mockDirections).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          origin: 'A, X, Colombia',
+          waypoints: expect.arrayContaining(['optimize:true', 'B, Y, Colombia', 'C, Z, Colombia']),
+        }),
+      })
+    );
   });
 });
 

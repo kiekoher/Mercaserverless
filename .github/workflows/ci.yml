@@ -23,6 +23,7 @@ jobs:
       - name: Run npm audit
         run: npm audit --omit=dev --audit-level=high
       - name: Check outdated dependencies
+        run: npm outdated || true
   lint:
     name: "Lint Code"
     runs-on: ubuntu-latest
