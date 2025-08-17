@@ -1,10 +1,10 @@
 import { Client } from '@googlemaps/google-maps-services-js';
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,20 +18,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
-    return res.status(403).json({ error: 'Forbidden' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   const puntoSchema = z.object({

@@ -1,35 +1,16 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  const supabase = getSupabaseServerClient(req, res);
-  
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
+  }
+
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).end('Method Not Allowed');
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    logger.warn('Unauthorized access attempt to dashboard-stats');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    logger.error({ err: profileError }, 'Error fetching profile');
-    return res.status(500).json({ error: 'Error fetching user profile' });
-  }
-
-  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
-    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to dashboard-stats');
-    return res.status(403).json({ error: 'Forbidden' });
   }
 
   if (!await checkRateLimit(req, { userId: user.id })) {

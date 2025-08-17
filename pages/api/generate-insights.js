@@ -1,10 +1,10 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
+import { requireUser } from '../../lib/auth';
 
 const insightsSchema = z.object({
   rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }),
@@ -25,23 +25,12 @@ export default async function handler(req, res) {
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    logger.warn('Unauthorized access attempt to generate-insights');
-    return res.status(401).json({ error: 'Unauthorized' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
-    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to generate-insights');
-    return res.status(403).json({ error: 'Forbidden' });
-  }
+  logger.info({ userId: user.id }, 'generate-insights invoked');
 
   if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too many requests' });
@@ -82,11 +71,36 @@ export default async function handler(req, res) {
         ${promptData}
       `;
 
-      // 3. Call the Gemini API
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const result = await model.generateContent(prompt);
+    const MAX_PROMPT_LENGTH = 5000;
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return res.status(400).json({ error: 'Prompt demasiado largo' });
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), parseInt(process.env.AI_TIMEOUT_MS || '10000', 10));
+
+    // 3. Call the Gemini API with timeout
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    let text;
+    try {
+      const result = await model.generateContent(prompt, { signal: controller.signal });
       const response = await result.response;
-      const text = response.text().replace(/```json|```/g, '');
+      text = response.text().replace(/```json|```/g, '');
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        logger.error('Gemini API request timed out');
+        return res.status(504).json({ error: 'Tiempo de espera agotado para la API de IA' });
+      }
+      throw e;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const MAX_RESPONSE_LENGTH = 2000;
+    if (text.length > MAX_RESPONSE_LENGTH) {
+      logger.error('AI response too long');
+      return res.status(500).json({ error: 'Respuesta de IA demasiado larga' });
+    }
 
       const outputSchema = z.object({
         kpi: z.string(),

@@ -1,27 +1,14 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import logger from '../../lib/logger';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  const supabase = getSupabaseServerClient(req, res);
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  // Check if the user is an admin
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profile?.role !== 'admin') {
-    return res.status(403).json({ error: 'Permission denied' });
+  const { error: authError, supabase, user, role } = await requireUser(req, res, ['admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   if (!(await checkRateLimit(req, { userId: user.id }))) {

@@ -1,10 +1,10 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
+import { requireUser } from '../../lib/auth';
 
 const summarySchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }),
@@ -29,22 +29,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    logger.warn('Unauthorized access attempt to generate-summary');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
-    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to generate-summary');
-    return res.status(403).json({ error: 'Forbidden' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   if (!(await checkRateLimit(req, { userId: user.id }))) {
