@@ -9,7 +9,7 @@ describe('Mercaderista Main Workflow', () => {
     cy.visit('/mi-ruta');
 
     // 2. Verify the main title is visible
-    cy.contains('h4', 'Mi Ruta Asignada').should('be.visible');
+    cy.contains('h4', 'Tu Ruta para Hoy').should('be.visible');
 
     // 3. The most likely state for a random test run is that no route is assigned.
     // We can check for the message that informs the user about this.

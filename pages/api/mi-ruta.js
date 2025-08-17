@@ -1,18 +1,16 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  const supabase = getSupabaseServerClient(req, res);
+  const { error: authError, supabase, user } = await requireUser(req, res);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
+  }
 
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).end('Method Not Allowed');
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   if (!await checkRateLimit(req, { userId: user.id })) {

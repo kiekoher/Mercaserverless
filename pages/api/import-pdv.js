@@ -1,4 +1,3 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { Client } from '@googlemaps/google-maps-services-js';
 import logger from '../../lib/logger';
 import pLimit from 'p-limit';
@@ -6,6 +5,7 @@ import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
+import { requireUser } from '../../lib/auth';
 
 const googleMapsClient = new Client({});
 
@@ -26,27 +26,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    logger.warn('Unauthorized access attempt to import-pdv');
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    logger.error({ err: profileError }, 'Error fetching profile');
-    return res.status(500).json({ error: 'Error fetching user profile' });
-  }
-
-  if (!profile || !['supervisor', 'admin'].includes(profile.role)) {
-    logger.warn({ userId: user.id, role: profile?.role }, 'Forbidden access attempt to import-pdv');
-    return res.status(403).json({ error: 'Forbidden' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   if (!(await checkRateLimit(req, { userId: user.id }))) {

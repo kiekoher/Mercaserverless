@@ -1,10 +1,10 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import { Client } from '@googlemaps/google-maps-services-js';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
+import { requireUser } from '../../lib/auth';
 
 const googleMapsClient = new Client({});
 
@@ -13,34 +13,15 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    logger.error({ err: profileError }, 'Error fetching profile');
-    return res.status(500).json({ error: 'Error fetching user profile' });
-  }
-
-  if (!profile) {
-    return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   if (req.method === 'POST') {
     if (!verifyCsrf(req, res)) return;
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
-    }
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
     }
 
     const schema = z.object({
@@ -95,9 +76,6 @@ export default async function handler(req, res) {
     return res.status(201).json(data);
 
   } else if (req.method === 'PUT') {
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
     if (!verifyCsrf(req, res)) return;
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
@@ -132,9 +110,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } else if (req.method === 'DELETE') {
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
     if (!verifyCsrf(req, res)) return;
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
@@ -157,11 +132,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Punto de venta eliminado' });
 
   } else if (req.method === 'GET') {
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-
     const { page = '1', search = '', all } = req.query;
+    const safeSearch = sanitizeInput(search).slice(0, 50);
 
     if (all === 'true') {
       const { data, error } = await supabase.from('puntos_de_venta').select('*');
@@ -182,8 +154,8 @@ export default async function handler(req, res) {
 
     const query = supabase.from('puntos_de_venta').select('*', { count: 'exact' });
 
-    if (search) {
-      query.ilike('nombre', `%${search}%`);
+    if (safeSearch) {
+      query.ilike('nombre', `%${safeSearch}%`);
     }
 
     const { data, error, count } = await query.range(offset, offset + limit - 1);
