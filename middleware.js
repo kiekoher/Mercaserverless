@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 
+function isValidJwt(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
-  // Simple session check based on Supabase auth cookie
-  const hasSession = !!req.cookies.get('sb-access-token')?.value;
+  const token = req.cookies.get('sb-access-token')?.value;
+  const hasSession = token && isValidJwt(token);
 
   if (!hasSession && pathname !== '/login' && !pathname.startsWith('/api')) {
     const url = req.nextUrl.clone();

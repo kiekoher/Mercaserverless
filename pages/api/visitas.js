@@ -1,35 +1,19 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError) {
-    logger.error({ err: profileError }, 'Error fetching profile');
-    return res.status(500).json({ error: 'Error fetching user profile' });
-  }
-
-  if (!profile) {
-    return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+  const { error: authError, supabase, user, role } = await requireUser(req, res);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   // MÉTODO GET: Para que supervisores puedan ver las visitas de una ruta
   if (req.method === 'GET') {
-     if (!['supervisor', 'admin'].includes(profile.role)) {
+     if (!['supervisor', 'admin'].includes(role)) {
       return res.status(403).json({ error: 'No tienes permiso para ver esta información.' });
     }
 
@@ -59,7 +43,7 @@ export default async function handler(req, res) {
   // MÉTODO POST: Para crear un registro de visita (Check-in)
   if (req.method === 'POST') {
     if (!verifyCsrf(req, res)) return;
-    if (profile.role !== 'mercaderista') {
+    if (role !== 'mercaderista') {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
     }
 
@@ -121,7 +105,7 @@ export default async function handler(req, res) {
   // MÉTODO PUT: Para actualizar una visita (Check-out y feedback)
   if (req.method === 'PUT') {
     if (!verifyCsrf(req, res)) return;
-    if (profile.role !== 'mercaderista') {
+    if (role !== 'mercaderista') {
         return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
     }
 

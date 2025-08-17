@@ -1,33 +1,17 @@
-import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
+import { requireUser } from '../../lib/auth';
 
 export default async function handler(req, res) {
-  // CORRECCIÓN: Se utiliza el nuevo método recomendado por Supabase.
-  const supabase = getSupabaseServerClient(req, res);
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return res.status(500).json({ error: 'No se pudo verificar el rol del usuario.' });
+  const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
 
   if (req.method === 'GET') {
-    if (!['admin', 'supervisor'].includes(profile.role)) {
-      return res.status(403).json({ error: 'No tienes permiso para ver rutas.' });
-    }
     if (!(await checkRateLimit(req, { userId: user.id }))) {
       return res.status(429).json({ error: 'Too many requests' });
     }
@@ -68,9 +52,6 @@ export default async function handler(req, res) {
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
     }
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'No tienes permiso para crear rutas.' });
-    }
 
     const schema = z.object({
       fecha: z.string().min(1),
@@ -101,9 +82,6 @@ export default async function handler(req, res) {
     return res.status(201).json(data);
 
   } else if (req.method === 'PUT') {
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'No tienes permiso para actualizar rutas.' });
-    }
     if (!verifyCsrf(req, res)) return;
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
@@ -140,9 +118,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } else if (req.method === 'DELETE') {
-    if (!['supervisor', 'admin'].includes(profile.role)) {
-      return res.status(403).json({ error: 'No tienes permiso para eliminar rutas.' });
-    }
     if (!verifyCsrf(req, res)) return;
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
