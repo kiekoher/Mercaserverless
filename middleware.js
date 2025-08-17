@@ -21,7 +21,7 @@ export async function middleware(req) {
   // Generate and add nonce to headers for CSP using Web Crypto API
   const nonceArray = new Uint8Array(16);
   crypto.getRandomValues(nonceArray);
-  const nonce = Buffer.from(nonceArray).toString('base64');
+  const nonce = btoa(String.fromCharCode(...nonceArray));
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
 
@@ -39,6 +39,8 @@ export async function middleware(req) {
     img-src 'self' blob: data: https://maps.gstatic.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
     media-src 'none';
     frame-src 'none';
+    object-src 'none';
+    base-uri 'none';
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' wss://${supabaseHost} https://*.supabase.co https://*.googleapis.com;
     frame-ancestors 'none';

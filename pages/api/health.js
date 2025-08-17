@@ -2,6 +2,8 @@ import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import Redis from 'ioredis';
 import logger from '../../lib/logger';
 
+let redis;
+
 export default async function handler(req, res) {
   try {
     const supabase = getSupabaseServerClient(req, res);
@@ -11,9 +13,11 @@ export default async function handler(req, res) {
     if (!process.env.REDIS_URL) {
       throw new Error('REDIS_URL not configured');
     }
-    const redis = new Redis(process.env.REDIS_URL);
+    if (!redis) {
+      redis = new Redis(process.env.REDIS_URL);
+      redis.on('error', (e) => logger.error({ err: e }, 'Redis error'));
+    }
     await redis.ping();
-    await redis.quit();
 
     res.status(200).json({ status: 'ok' });
   } catch (err) {

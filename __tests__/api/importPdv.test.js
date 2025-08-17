@@ -19,8 +19,9 @@ jest.mock('../../lib/supabaseServer', () => ({
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 
+const mockGeocode = jest.fn();
 jest.mock('@googlemaps/google-maps-services-js', () => ({
-  Client: jest.fn().mockImplementation(() => ({ geocode: jest.fn() })),
+  Client: jest.fn().mockImplementation(() => ({ geocode: mockGeocode })),
 }));
 
 jest.mock('p-limit', () => jest.fn(() => (fn) => fn()));
@@ -73,6 +74,35 @@ describe('import-pdv API', () => {
     expect(res.statusCode).toBe(200);
     expect(inserted[0].nombre).toBe('N');
     expect(inserted[0].direccion).toBe('D');
+  });
+
+  it('sanitizes address before geocoding', async () => {
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    mockGeocode.mockResolvedValue({ data: { results: [] } });
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
+            })
+          };
+        }
+        if (table === 'puntos_de_venta') {
+          return { insert: () => ({ error: null }) };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/import-pdv.js');
+    const req = { method: 'POST', body: { puntos: [{ nombre: 'N', direccion: '<b>D</b>', ciudad: '<i>C</i>' }] } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(mockGeocode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ address: 'D, C, Colombia' })
+      })
+    );
   });
 });
 
