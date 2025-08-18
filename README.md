@@ -23,6 +23,16 @@ Este proyecto fue desarrollado como parte de una iniciativa para Kimberly-Clark 
 - **Testing:** [Jest](https://jestjs.io/) con [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
 - **Estilos:** CSS plano (inline y global)
 
+## Decisiones Arquitectónicas
+
+### Almacenamiento de Puntos de Venta en Rutas
+
+Durante el diseño del esquema de la base de datos, se tomó la decisión de almacenar los IDs de los puntos de venta de una ruta como un array de enteros (`BIGINT[]`) en la tabla `rutas`.
+
+- **Ventaja:** Este enfoque desnormalizado simplifica las consultas de lectura para obtener una ruta completa y sus puntos, evitando la necesidad de un `JOIN` con una tabla intermedia. Para el caso de uso principal de la aplicación (mostrar la ruta del día de un mercaderista), esto es muy eficiente.
+- **Desventaja:** Complica las consultas inversas (p. ej., encontrar todas las rutas que incluyen un punto de venta específico).
+- **Conclusión:** Para la fase actual del proyecto, la eficiencia en la lectura de rutas se consideró prioritaria. Si en el futuro surgen necesidades de consulta más complejas, se podría considerar una refactorización a un esquema normalizado con una tabla de unión (`ruta_puntos_de_venta`).
+
 ## Cómo Empezar
 
 Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local.

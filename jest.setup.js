@@ -1,7 +1,3 @@
-// Polyfill setImmediate for JSDOM environment which is used by Jest
-import { setImmediate } from 'timers';
-global.setImmediate = setImmediate;
-
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 import logger from './lib/logger';
