@@ -3,7 +3,11 @@ Cypress.Commands.add('login', (role) => {
     if (!session) {
       throw new Error('Failed to obtain test session');
     }
-    const supabaseLocalStorageKey = `sb-qaceecznfveabbnpteox-auth-token`;
+    const supabaseProjectId = Cypress.env('supabaseProjectId');
+    if (!supabaseProjectId) {
+      throw new Error('Cypress.env.supabaseProjectId is not set');
+    }
+    const supabaseLocalStorageKey = `sb-${supabaseProjectId}-auth-token`;
     window.localStorage.setItem(supabaseLocalStorageKey, JSON.stringify(session));
   });
 });
