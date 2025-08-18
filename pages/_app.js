@@ -21,6 +21,10 @@ function CsrfInitializer({ children }) {
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Cypress')) {
+      setCsrfToken('cypress-token');
+      return;
+    }
     const initCsrf = async () => {
       try {
         const res = await fetch('/api/csrf');

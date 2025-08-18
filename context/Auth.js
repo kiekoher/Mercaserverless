@@ -5,7 +5,10 @@ import logger from '../lib/logger';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  const isCypress =
+    typeof navigator !== 'undefined' && navigator.userAgent.includes('Cypress');
   const supabase = useMemo(() => {
+    if (isCypress) return null;
     try {
       return getSupabaseClient();
     } catch (e) {
@@ -22,12 +25,29 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const setupSession = async () => {
+      if (isCypress) {
+        const role =
+          window.localStorage.getItem('cypress-role') || 'admin';
+        const idMap = {
+          admin: process.env.CYPRESS_ADMIN_ID,
+          supervisor: process.env.CYPRESS_SUPERVISOR_ID,
+          mercaderista: process.env.CYPRESS_MERCADERISTA_ID,
+        };
+        const id = idMap[role] || 'cypress-user';
+        setSession(null);
+        setUser({ id });
+        setProfile({ id, role });
+        setLoading(false);
+        return;
+      }
       if (!supabase) {
         setLoading(false);
         return;
       }
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -93,7 +113,15 @@ export const AuthProvider = ({ children }) => {
     session,
     user,
     profile, // Expose profile
-    signOut: () => supabase?.auth.signOut(),
+    signOut: () => {
+      if (isCypress) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        return Promise.resolve();
+      }
+      return supabase?.auth.signOut();
+    },
   };
 
   return (

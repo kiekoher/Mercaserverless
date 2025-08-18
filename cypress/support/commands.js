@@ -9,6 +9,7 @@ Cypress.Commands.add('login', (role) => {
     }
     const supabaseLocalStorageKey = `sb-${supabaseProjectId}-auth-token`;
     window.localStorage.setItem(supabaseLocalStorageKey, JSON.stringify(session));
+    window.localStorage.setItem('cypress-role', role);
   });
 });
 

@@ -18,3 +18,16 @@ import './commands.js'
 
 // Alternatively, you can use CommonJS syntax:
 // require('./commands')
+
+Cypress.on('window:before:load', (win) => {
+  const origFetch = win.fetch.bind(win);
+  cy.stub(win, 'fetch')
+    .callsFake((...args) => {
+      const [resource] = args;
+      if (typeof resource === 'string' && resource.endsWith('/api/csrf')) {
+        throw new Error('Unexpected CSRF fetch during Cypress tests');
+      }
+      return origFetch(...args);
+    })
+    .as('fetch');
+});
