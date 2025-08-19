@@ -1,4 +1,4 @@
--- Migration generated on 2025-08-17
+-- Migration generated on 2025-08-18
 -- Fix for High-Priority Functional Blocker (A-1) and Medium-Priority Gap (M-2)
 
 -- Drop the old, separate SELECT policies on the profiles table
