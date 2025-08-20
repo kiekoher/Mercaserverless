@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, Grid, Paper, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Checkbox, FormControlLabel,
   FormGroup, Tooltip, Pagination, Alert, Modal, Chip, LinearProgress, List, ListItem, ListItemText, IconButton,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, InputLabel, FormControl
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -58,6 +58,7 @@ export default function RutasPage() {
   const [selectedPuntos, setSelectedPuntos] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [transportMode, setTransportMode] = useState('driving');
 
   const [editRutaOpen, setEditRutaOpen] = useState(false);
   const [deleteRutaOpen, setDeleteRutaOpen] = useState(false);
@@ -71,6 +72,14 @@ export default function RutasPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // State for Monthly Planner
+  const [planMercaderistaId, setPlanMercaderistaId] = useState('');
+  const [planStartDate, setPlanStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [planEndDate, setPlanEndDate] = useState('');
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [planResult, setPlanResult] = useState(null);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
 
   const fetchVisitasForRuta = useCallback(async (rutaId) => {
     try {
@@ -222,12 +231,12 @@ export default function RutasPage() {
       });
       const res = await fetchWithCsrf('/api/optimize-route', {
         method: 'POST',
-        body: JSON.stringify({ puntos: puntosData })
+        body: JSON.stringify({ puntos: puntosData, modo_transporte: transportMode })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo optimizar');
       setSelectedPuntos(data.optimizedPuntos.map(p => p.id));
-      enqueueSnackbar('Ruta optimizada', { variant: 'success' });
+      enqueueSnackbar(`Ruta optimizada para: ${transportMode}`, { variant: 'success' });
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
@@ -278,6 +287,37 @@ export default function RutasPage() {
       fetchRutas();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  };
+
+  const handlePlanSubmit = async (e) => {
+    e.preventDefault();
+    if (!planMercaderistaId || !planStartDate || !planEndDate) {
+        enqueueSnackbar('Por favor, complete todos los campos del planificador.', { variant: 'warning' });
+        return;
+    }
+    setIsPlanning(true);
+    setPlanResult(null);
+    try {
+        const res = await fetchWithCsrf('/api/planificar-rutas', {
+            method: 'POST',
+            body: JSON.stringify({
+                mercaderistaId: planMercaderistaId,
+                startDate: planStartDate,
+                endDate: planEndDate
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Error al generar la planificación.');
+        }
+        setPlanResult(data.plan);
+        setPlanModalOpen(true);
+        enqueueSnackbar(data.message, { variant: 'success' });
+    } catch (err) {
+        enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+        setIsPlanning(false);
     }
   };
 
@@ -370,8 +410,20 @@ export default function RutasPage() {
         </Grid>
 
         <Grid item xs={12} md={5}>
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Typography variant="h6" gutterBottom>Planificador Mensual</Typography>
+                <form onSubmit={handlePlanSubmit}>
+                    <TextField label="ID Mercaderista" value={planMercaderistaId} onChange={e => setPlanMercaderistaId(e.target.value)} required fullWidth sx={{ mb: 2 }} />
+                    <TextField label="Fecha de Inicio" type="date" value={planStartDate} onChange={e => setPlanStartDate(e.target.value)} InputLabelProps={{ shrink: true }} required fullWidth sx={{ mb: 2 }} />
+                    <TextField label="Fecha de Fin" type="date" value={planEndDate} onChange={e => setPlanEndDate(e.target.value)} InputLabelProps={{ shrink: true }} required fullWidth sx={{ mb: 2 }} />
+                    <Button type="submit" variant="contained" color="primary" fullWidth disabled={isPlanning}>
+                        {isPlanning ? <CircularProgress size={24} /> : 'Generar Plan'}
+                    </Button>
+                </form>
+            </Paper>
+
             <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>Crear Nueva Ruta</Typography>
+                <Typography variant="h6" gutterBottom>Crear Nueva Ruta (Manual)</Typography>
                 {/* Formulario de creación de ruta simplificado para el ejemplo */}
                 <form onSubmit={handleSubmit}>
                     <TextField label="Fecha" type="date" value={fecha} onChange={e => setFecha(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
@@ -387,6 +439,19 @@ export default function RutasPage() {
                               ))}
                           </FormGroup>
                       </Paper>
+                    <FormControl fullWidth sx={{ mb: 2 }}>
+                        <InputLabel id="transport-mode-label">Modo de Transporte</InputLabel>
+                        <Select
+                            labelId="transport-mode-label"
+                            value={transportMode}
+                            label="Modo de Transporte"
+                            onChange={(e) => setTransportMode(e.target.value)}
+                        >
+                            <MenuItem value="driving">Vehículo</MenuItem>
+                            <MenuItem value="walking">A pie</MenuItem>
+                            <MenuItem value="transit">Transporte Público</MenuItem>
+                        </Select>
+                    </FormControl>
                     <Button onClick={handleOptimizeRoute} variant="outlined" fullWidth disabled={isOptimizing || selectedPuntos.length < 2} sx={{ mb: 2 }}>
                       {isOptimizing ? 'Optimizando...' : 'Optimizar'}
                     </Button>
@@ -414,8 +479,14 @@ export default function RutasPage() {
                 return (
                   <ListItem key={puntoId} divider>
                     <ListItemText
-                      primary={<>{punto?.nombre} <Chip label={estado} size="small" color={chipColor} /></>}
-                      secondary={visita?.observaciones ? `Observación: ${visita.observaciones}` : 'Sin feedback.'}
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body1">{punto?.nombre}</Typography>
+                          {punto?.tipologia && <Chip label={punto.tipologia} size="small" />}
+                          <Chip label={estado} size="small" color={chipColor} />
+                        </Box>
+                      }
+                      secondary={`Frec: ${punto?.frecuencia_mensual || 'N/A'} | T. Serv: ${punto?.minutos_servicio || 'N/A'} min. | ${visita?.observaciones ? `Obs: ${visita.observaciones}` : 'Sin feedback.'}`}
                     />
                   </ListItem>
                 );
@@ -477,6 +548,25 @@ export default function RutasPage() {
           <Button color="error" onClick={handleDeleteRutaConfirm}>Eliminar</Button>
         </DialogActions>
       </Dialog>
+
+      <Modal open={planModalOpen} onClose={() => setPlanModalOpen(false)}>
+        <Box sx={modalStyle}>
+            <Typography variant="h6" gutterBottom>Resumen de Planificación</Typography>
+            {planResult ? (
+                <Box>
+                    <Typography variant="body1"><strong>Periodo:</strong> {planResult.period.startDate} al {planResult.period.endDate}</Typography>
+                    <Typography variant="body1"><strong>Total de Visitas a Planificar:</strong> {planResult.summary.totalVisitsToPlan}</Typography>
+                    <Typography variant="body1"><strong>Horas Estimadas:</strong> {planResult.summary.estimatedTotalHours}</Typography>
+                    <Typography variant="body1"><strong>Puntos de Venta a Planificar:</strong> {planResult.summary.pointsToPlan}</Typography>
+                    <Typography variant="subtitle1" sx={{mt: 2}}>Rutas Diarias (próximamente)</Typography>
+                    {/* Aquí se renderizaría el calendario de rutas diarias */}
+                </Box>
+            ) : <CircularProgress />}
+             <Button onClick={() => setPlanModalOpen(false)} sx={{ mt: 2 }}>
+                Cerrar
+            </Button>
+        </Box>
+      </Modal>
 
     </AppLayout>
   );

@@ -1,5 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSnackbar, SnackbarProvider } from 'notistack';
+
+// Polyfill for ResizeObserver for this test file only
+global.ResizeObserver = class ResizeObserver {
+  observe() {
+    // do nothing
+  }
+  unobserve() {
+    // do nothing
+  }
+  disconnect() {
+    // do nothing
+  }
+};
 import DashboardPage from '../pages/dashboard.js';
 import { AuthProvider } from '../context/Auth';
 import { CsrfProvider } from '../context/Csrf';
@@ -62,15 +75,31 @@ describe('DashboardPage', () => {
       total_puntos_visitados: 120,
     };
 
-    // Mock for the stats fetch
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockStats,
-    });
-    // Mock for the CSRF token fetch
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ csrfToken: 'test-token' }),
+    const mockProjections = {
+      workload: [{ mercaderista: 'test', hours: 30 }],
+      frequency: { planned: 1, required: 2, percentage: '50.0' }
+    };
+
+    fetch.mockImplementation((url) => {
+      if (url === '/api/dashboard-stats') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockStats),
+        });
+      }
+      if (url === '/api/dashboard-projections') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockProjections),
+        });
+      }
+      if (url === '/api/csrf') {
+         return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ csrfToken: 'test-token' }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled fetch: ${url}`));
     });
 
     renderWithProviders(<DashboardPage />);

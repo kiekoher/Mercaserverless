@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'jest-environment-jsdom',
-  setupFilesAfterEnv: ['<rootDir>/jest.polyfill.js', '<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/jest.polyfill.js', '<rootDir>/jest.setup.js', 'jest-canvas-mock'],
   moduleNameMapper: {
     // Handle CSS imports (if you're not using CSS modules)
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
