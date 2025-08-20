@@ -4,7 +4,7 @@ import {
   Typography, Button, Grid, Paper, TextField, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow,
   CircularProgress, Box, Pagination, Alert, Dialog,
-  DialogTitle, DialogContent, DialogActions
+  DialogTitle, DialogContent, DialogActions, Chip
 } from '@mui/material';
 import AppLayout from '../components/AppLayout';
 import { useDebounce } from '../hooks/useDebounce';
@@ -41,7 +41,10 @@ const CSVImport = ({ onImport, isImporting }) => {
     <Paper sx={{ p: 2, mb: 2 }}>
       <Typography variant="h6" gutterBottom>Importar desde CSV</Typography>
       <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
-        El archivo debe tener las columnas: `nombre`, `direccion`, `ciudad`.
+        Columnas requeridas: `nombre`, `direccion`, `ciudad`.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+        Columnas opcionales: `CUOTA`, `TIPOLOGIA`, `FRECUENCIA`, `MINUTOS SERVICIO`.
       </Typography>
       <Button
         variant="contained"
@@ -233,27 +236,41 @@ export default function PuntosDeVentaPage() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Nombre</TableCell>
+                    <TableCell>Tipología</TableCell>
+                    <TableCell>Frecuencia</TableCell>
+                    <TableCell>T. Servicio</TableCell>
                     <TableCell>Dirección</TableCell>
-                    <TableCell>Ciudad</TableCell>
                     <TableCell align="right">Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={3} align="center"><CircularProgress /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} align="center"><CircularProgress /></TableCell></TableRow>
                   ) : puntos.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} align="center">No se encontraron puntos de venta.</TableCell></TableRow>
-                  ) : puntos.map((punto) => (
-                    <TableRow key={punto.id}>
-                      <TableCell>{punto.nombre}</TableCell>
-                      <TableCell>{punto.direccion}</TableCell>
-                      <TableCell>{punto.ciudad}</TableCell>
-                      <TableCell align="right">
-                        <Button size="small" onClick={() => openEditDialog(punto)}>Editar</Button>
-                        <Button size="small" color="error" onClick={() => openDeleteDialog(punto)}>Eliminar</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                    <TableRow><TableCell colSpan={6} align="center">No se encontraron puntos de venta.</TableCell></TableRow>
+                  ) : puntos.map((punto) => {
+                    const tipologiaColor = {
+                        'A': 'error',
+                        'B': 'warning',
+                        'C': 'info',
+                    }[punto.tipologia] || 'default';
+
+                    return (
+                        <TableRow key={punto.id}>
+                            <TableCell>{punto.nombre}</TableCell>
+                            <TableCell>
+                                {punto.tipologia && <Chip label={punto.tipologia} color={tipologiaColor} size="small" />}
+                            </TableCell>
+                            <TableCell align="center">{punto.frecuencia_mensual || '-'}</TableCell>
+                            <TableCell align="center">{punto.minutos_servicio || '-'}</TableCell>
+                            <TableCell>{punto.direccion}</TableCell>
+                            <TableCell align="right">
+                                <Button size="small" onClick={() => openEditDialog(punto)}>Editar</Button>
+                                <Button size="small" color="error" onClick={() => openDeleteDialog(punto)}>Eliminar</Button>
+                            </TableCell>
+                        </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>

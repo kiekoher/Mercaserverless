@@ -28,12 +28,17 @@ export default async function handler(req, res) {
     direccion: z.string().min(1),
     ciudad: z.string().min(1)
   });
-  const schema = z.array(puntoSchema).min(2);
-  const parsed = schema.safeParse(req.body.puntos);
+  const schema = z.object({
+    puntos: z.array(puntoSchema).min(2),
+    modo_transporte: z.enum(['driving', 'walking', 'transit']).optional().default('driving')
+  });
+
+  const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Formato de puntos inválido' });
+    return res.status(400).json({ error: 'Formato de puntos inválido o modo de transporte no soportado.' });
   }
-  const puntos = parsed.data;
+
+  const { puntos, modo_transporte } = parsed.data;
 
   if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too many requests' });
@@ -50,6 +55,7 @@ export default async function handler(req, res) {
         origin,
         destination: origin,
         waypoints: ['optimize:true', ...waypoints],
+        mode: modo_transporte,
         key: process.env.GOOGLE_MAPS_API_KEY,
       },
     });

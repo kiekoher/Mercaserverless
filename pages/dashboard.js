@@ -3,6 +3,16 @@ import { useAuth } from '../context/Auth';
 import {
   Box, Typography, Button, Paper, CircularProgress, Alert, Grid, Card, CardContent
 } from '@mui/material';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 import AppLayout from '../components/AppLayout';
 import { useSnackbar } from 'notistack';
 import { useCsrfFetcher } from '../lib/fetchWithCsrf';
@@ -12,28 +22,49 @@ export default function DashboardPage() {
   const { enqueueSnackbar } = useSnackbar();
   const fetchWithCsrf = useCsrfFetcher();
 
+  ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend
+  );
+
   const [stats, setStats] = useState(null);
   const [insights, setInsights] = useState(null);
+  const [projectionData, setProjectionData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [loadingProjections, setLoadingProjections] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchAllData = async () => {
       setLoadingStats(true);
+      setLoadingProjections(true);
       try {
-        const res = await fetch('/api/dashboard-stats');
-        if (!res.ok) throw new Error('No se pudieron cargar las estadísticas.');
-        const data = await res.json();
-        setStats(data);
+        // Fetch existing stats
+        const statsRes = await fetch('/api/dashboard-stats');
+        if (!statsRes.ok) throw new Error('No se pudieron cargar las estadísticas.');
+        const statsData = await statsRes.json();
+        setStats(statsData);
+
+        // Fetch new projection data
+        const projectionsRes = await fetch('/api/dashboard-projections');
+        if (!projectionsRes.ok) throw new Error('No se pudieron cargar las proyecciones.');
+        const projectionsData = await projectionsRes.json();
+        setProjectionData(projectionsData);
+
       } catch (err) {
         enqueueSnackbar(err.message, { variant: 'error' });
       } finally {
         setLoadingStats(false);
+        setLoadingProjections(false);
       }
     };
 
     if (profile?.role === 'supervisor' || profile?.role === 'admin') {
-      fetchStats();
+      fetchAllData();
     }
   }, [profile, enqueueSnackbar]);
 
@@ -87,8 +118,8 @@ export default function DashboardPage() {
       <Typography variant="h4" gutterBottom>Dashboard de Operaciones</Typography>
 
       {loadingStats ? <CircularProgress /> : stats && (
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} md={6}>
+        <Grid container spacing={3} sx={{ mb: 2 }}>
+          <Grid item xs={6} md={3}>
             <Card>
               <CardContent>
                 <Typography variant="h6">Rutas Totales</Typography>
@@ -96,10 +127,10 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={6} md={3}>
             <Card>
               <CardContent>
-                <Typography variant="h6">Puntos de Venta Visitados (Total)</Typography>
+                <Typography variant="h6">Puntos Visitados</Typography>
                 <Typography variant="h3">{stats.total_puntos_visitados}</Typography>
               </CardContent>
             </Card>
@@ -107,7 +138,45 @@ export default function DashboardPage() {
         </Grid>
       )}
 
-      <Paper sx={{ p: 2 }}>
+      <Typography variant="h5" sx={{ mt: 4, mb: 2 }}>Proyecciones y Rendimiento</Typography>
+      {loadingProjections ? <CircularProgress /> : (projectionData && projectionData.workload && projectionData.frequency) && (
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+              <Grid item xs={12} md={8}>
+                  <Card>
+                      <CardContent>
+                          <Typography variant="h6">Carga de Trabajo Semanal (Horas)</Typography>
+                          <Bar
+                              data={{
+                                  labels: projectionData.workload.map(w => w.mercaderista),
+                                  datasets: [{
+                                      label: 'Horas Asignadas',
+                                      data: projectionData.workload.map(w => w.hours),
+                                      backgroundColor: projectionData.workload.map(w => w.hours > 40 ? '#d32f2f' : 'rgba(75, 192, 192, 0.6)'),
+                                  }]
+                              }}
+                              options={{
+                                  scales: { y: { beginAtZero: true, max: 50 } },
+                                  plugins: { legend: { display: false } }
+                              }}
+                          />
+                      </CardContent>
+                  </Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                  <Card>
+                      <CardContent>
+                          <Typography variant="h6">Cumplimiento de Frecuencia (Mensual)</Typography>
+                          <Typography variant="h3" color="primary">{projectionData.frequency.percentage}%</Typography>
+                          <Typography variant="body1">
+                              {projectionData.frequency.planned} de {projectionData.frequency.required} visitas planificadas.
+                          </Typography>
+                      </CardContent>
+                  </Card>
+              </Grid>
+          </Grid>
+      )}
+
+      <Paper sx={{ p: 2, mt: 4 }}>
         <Typography variant="h5" gutterBottom>Insights de la Operación por IA</Typography>
         <Button
           variant="contained"

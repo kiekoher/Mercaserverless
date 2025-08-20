@@ -38,7 +38,12 @@ export default async function handler(req, res) {
   const puntoSchema = z.object({
     nombre: z.string().min(1),
     direccion: z.string().min(1),
-    ciudad: z.string().min(1)
+    ciudad: z.string().min(1),
+    // Nuevos campos opcionales
+    CUOTA: z.string().optional(),
+    TIPOLOGIA: z.string().optional(),
+    FRECUENCIA: z.string().optional(),
+    'MINUTOS SERVICIO': z.string().optional()
   });
   const schema = z.array(puntoSchema).min(1);
   const parsed = schema.safeParse(req.body.puntos);
@@ -94,12 +99,21 @@ export default async function handler(req, res) {
         }
       }
 
+      // Limpieza y conversión de tipos para los nuevos campos
+      const cuota = punto.CUOTA ? parseFloat(String(punto.CUOTA).replace(/[^0-9.-]+/g,"")) : null;
+      const frecuencia_mensual = punto.FRECUENCIA ? parseInt(punto.FRECUENCIA, 10) : null;
+      const minutos_servicio = punto['MINUTOS SERVICIO'] ? parseInt(punto['MINUTOS SERVICIO'], 10) : null;
+
       return {
         nombre: sanitizeInput(punto.nombre),
         direccion: sanitizeInput(punto.direccion),
         ciudad: sanitizeInput(punto.ciudad),
         latitud,
         longitud,
+        cuota: !isNaN(cuota) ? cuota : null,
+        tipologia: punto.TIPOLOGIA ? sanitizeInput(punto.TIPOLOGIA) : null,
+        frecuencia_mensual: !isNaN(frecuencia_mensual) ? frecuencia_mensual : null,
+        minutos_servicio: !isNaN(minutos_servicio) ? minutos_servicio : null,
       };
     }));
 

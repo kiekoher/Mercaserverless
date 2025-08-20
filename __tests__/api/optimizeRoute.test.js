@@ -113,5 +113,29 @@ describe('optimize-route API', () => {
       })
     );
   });
+
+  it('passes the transport mode to Google Maps API', async () => {
+    const { default: handler } = await import('../../pages/api/optimize-route.js');
+    const req = {
+      method: 'POST',
+      body: {
+        puntos: [
+          { id: 1, direccion: 'A', ciudad: 'X' },
+          { id: 2, direccion: 'B', ciudad: 'Y' },
+        ],
+        modo_transporte: 'walking',
+      },
+    };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(mockDirections).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          mode: 'walking',
+        }),
+      })
+    );
+  });
 });
 
