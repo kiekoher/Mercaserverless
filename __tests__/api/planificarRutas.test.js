@@ -6,7 +6,7 @@ import { getISOWeek, getISOWeekYear } from 'date-fns';
 
 // Mock dependencies first
 jest.mock('../../lib/auth');
-jest.mock('../../lib/logger', () => ({ error: jest.fn(), warn: jest.fn() }));
+jest.mock('../../lib/logger.server', () => ({ error: jest.fn(), warn: jest.fn() }));
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 

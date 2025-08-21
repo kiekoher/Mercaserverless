@@ -11,7 +11,7 @@ import { CsrfProvider, useCsrf } from '../context/Csrf';
 import { SnackbarProvider, useSnackbar } from 'notistack';
 import { useEffect } from 'react';
 import ErrorBoundary from '../components/ErrorBoundary';
-import logger from '../lib/logger';
+import logger from '../lib/logger.client';
 
 // Client-side cache, shared for the whole session of the user in the browser.
 const clientSideEmotionCache = createEmotionCache();

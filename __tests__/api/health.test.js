@@ -16,8 +16,8 @@ jest.mock('../../lib/supabaseServer', () => ({
   getSupabaseServerClient: jest.fn(),
 }));
 
-jest.mock('../../lib/logger', () => ({
-  default: { error: jest.fn() }
+jest.mock('../../lib/logger.server', () => ({
+  error: jest.fn()
 }));
 
 const mockPing = jest.fn().mockResolvedValue('PONG');

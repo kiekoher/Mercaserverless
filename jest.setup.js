@@ -1,6 +1,6 @@
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
-import logger from './lib/logger';
+import logger from './lib/logger.server';
 import { closeRedis } from './lib/rateLimiter';
 
 // Environment variables are loaded in jest.env.js, executed via setupFiles.

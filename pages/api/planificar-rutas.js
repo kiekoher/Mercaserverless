@@ -1,6 +1,6 @@
 import { requireUser } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { getISOWeek, getISOWeekYear } from 'date-fns';

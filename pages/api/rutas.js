@@ -1,4 +1,4 @@
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import logger from '../lib/logger';
+import logger from '../lib/logger.client';
 
 const AuthContext = createContext(null);
 

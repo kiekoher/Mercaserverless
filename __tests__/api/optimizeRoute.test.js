@@ -34,8 +34,8 @@ jest.mock('../../lib/rateLimiter', () => ({
   checkRateLimit: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('../../lib/logger', () => ({
-  default: { error: jest.fn() },
+jest.mock('../../lib/logger.server', () => ({
+  error: jest.fn(),
 }));
 
 jest.mock('../../lib/supabaseServer', () => ({

@@ -1,6 +1,6 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import Redis from 'ioredis';
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 
 let redis;
 

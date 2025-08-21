@@ -1,4 +1,4 @@
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { requireUser } from '../../lib/auth';
 
