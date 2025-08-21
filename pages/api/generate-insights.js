@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
 import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';

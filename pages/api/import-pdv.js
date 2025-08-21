@@ -1,5 +1,5 @@
 import { Client } from '@googlemaps/google-maps-services-js';
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import pLimit from 'p-limit';
 import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
-import logger from '../../lib/logger';
+import logger from '../../lib/logger.server';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';

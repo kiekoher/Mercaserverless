@@ -14,7 +14,7 @@ jest.mock('@supabase/supabase-js', () => ({
 }));
 
 // Mock logger
-jest.mock('../../lib/logger');
+jest.mock('../../lib/logger.server');
 
 describe('/api/dashboard-projections', () => {
   beforeEach(() => {

@@ -106,7 +106,7 @@ describe('import-pdv API', () => {
   });
 
   it('handles undefined geocode response gracefully without crashing', async () => {
-    const { default: logger } = await import('../../lib/logger');
+    const { default: logger } = await import('../../lib/logger.server');
     const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
     let insertedData = [];
 
