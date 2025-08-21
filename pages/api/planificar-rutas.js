@@ -59,14 +59,40 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No se encontraron puntos de venta con frecuencia y tiempo de servicio definidos.' });
     }
 
-    // 2. Implement the planning logic (this is a simplified placeholder)
-    // A real implementation would be much more complex, involving calendar logic,
-    // workload balancing, and potentially route optimization per day.
+    // 2. Generate the plan using our business logic function
     const plan = generateMonthlyPlan(puntos, startDate, endDate);
 
-    // For now, we'll just return the generated plan as a success response.
-    // In a real scenario, you might save this plan to the 'rutas' table.
-    res.status(200).json({ message: 'Planificación generada con éxito.', plan });
+    if (!plan || !plan.dailyRoutes || plan.dailyRoutes.length === 0) {
+      return res.status(200).json({
+        message: 'No se generaron rutas. Verifique los días laborables en el período y la cantidad de puntos de venta.',
+        plan
+      });
+    }
+
+    // 3. Transform the plan into the format expected by the RPC function
+    const routesToInsert = plan.dailyRoutes.map(route => ({
+      fecha: route.date,
+      puntos_de_venta_ids: route.points.map(p => p.id)
+    }));
+
+    // 4. Call the Supabase RPC to bulk-insert the routes
+    const { error: rpcError } = await supabaseAdmin.rpc('bulk_insert_planned_routes', {
+      mercaderista_id_param: mercaderistaId,
+      start_date_param: startDate,
+      end_date_param: endDate,
+      routes_payload: routesToInsert
+    });
+
+    if (rpcError) {
+      logger.error({ err: rpcError, body: req.body }, 'Error saving planned routes via RPC');
+      throw new Error('Error al guardar la planificación en la base de datos.');
+    }
+
+    // 5. Return success response
+    res.status(200).json({
+      message: `Planificación para ${plan.summary.workingDays} días generada y guardada con éxito.`,
+      summary: plan.summary
+    });
 
   } catch (error) {
     logger.error({ err: error, body: req.body }, 'Error in route planning');
