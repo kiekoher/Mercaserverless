@@ -86,19 +86,45 @@ export default async function handler(req, res) {
       nombre: z.string().min(1),
       direccion: z.string().min(1),
       ciudad: z.string().min(1),
+      cuota: z.preprocess(
+        (val) => (val === '' || val === null ? null : parseFloat(val)),
+        z.number().nullable().optional()
+      ),
+      tipologia: z.preprocess(
+        (val) => (val === '' ? null : val),
+        z.string().nullable().optional()
+      ),
+      frecuencia_mensual: z.preprocess(
+        (val) => (val === '' || val === null ? null : parseInt(val, 10)),
+        z.number().int().nullable().optional()
+      ),
+      minutos_servicio: z.preprocess(
+        (val) => (val === '' || val === null ? null : parseInt(val, 10)),
+        z.number().int().nullable().optional()
+      ),
     });
+
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.format() });
+      logger.warn({ error: parsed.error.format() }, 'Invalid update payload for punto de venta');
+      return res.status(400).json({ error: 'Datos inválidos.', details: parsed.error.format() });
     }
-    const { id, nombre, direccion, ciudad } = parsed.data;
-    const safeNombre = sanitizeInput(nombre);
-    const safeDireccion = sanitizeInput(direccion);
-    const safeCiudad = sanitizeInput(ciudad);
+
+    const { id, nombre, direccion, ciudad, cuota, tipologia, frecuencia_mensual, minutos_servicio } = parsed.data;
+
+    const updatePayload = {
+      nombre: sanitizeInput(nombre),
+      direccion: sanitizeInput(direccion),
+      ciudad: sanitizeInput(ciudad),
+      cuota,
+      tipologia: tipologia ? sanitizeInput(tipologia) : null,
+      frecuencia_mensual,
+      minutos_servicio,
+    };
 
     const { data, error } = await supabase
       .from('puntos_de_venta')
-      .update({ nombre: safeNombre, direccion: safeDireccion, ciudad: safeCiudad })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();

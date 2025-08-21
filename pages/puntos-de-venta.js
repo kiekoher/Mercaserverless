@@ -81,6 +81,10 @@ export default function PuntosDeVentaPage() {
   const [editNombre, setEditNombre] = useState('');
   const [editDireccion, setEditDireccion] = useState('');
   const [editCiudad, setEditCiudad] = useState('');
+  const [editCuota, setEditCuota] = useState('');
+  const [editTipologia, setEditTipologia] = useState('');
+  const [editFrecuencia, setEditFrecuencia] = useState('');
+  const [editMinutos, setEditMinutos] = useState('');
 
   // Pagination and Search state
   const [page, setPage] = useState(1);
@@ -163,6 +167,10 @@ export default function PuntosDeVentaPage() {
     setEditNombre(punto.nombre);
     setEditDireccion(punto.direccion);
     setEditCiudad(punto.ciudad);
+    setEditCuota(punto.cuota || '');
+    setEditTipologia(punto.tipologia || '');
+    setEditFrecuencia(punto.frecuencia_mensual || '');
+    setEditMinutos(punto.minutos_servicio || '');
     setEditOpen(true);
   };
 
@@ -170,7 +178,16 @@ export default function PuntosDeVentaPage() {
     try {
       const res = await fetchWithCsrf('/api/puntos-de-venta', {
         method: 'PUT',
-        body: JSON.stringify({ id: currentPunto.id, nombre: editNombre, direccion: editDireccion, ciudad: editCiudad })
+        body: JSON.stringify({
+          id: currentPunto.id,
+          nombre: editNombre,
+          direccion: editDireccion,
+          ciudad: editCiudad,
+          cuota: editCuota,
+          tipologia: editTipologia,
+          frecuencia_mensual: editFrecuencia,
+          minutos_servicio: editMinutos,
+        })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -306,6 +323,10 @@ export default function PuntosDeVentaPage() {
           <TextField margin="dense" label="Nombre" fullWidth value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
           <TextField margin="dense" label="Dirección" fullWidth value={editDireccion} onChange={(e) => setEditDireccion(e.target.value)} />
           <TextField margin="dense" label="Ciudad" fullWidth value={editCiudad} onChange={(e) => setEditCiudad(e.target.value)} />
+          <TextField margin="dense" label="Tipología" fullWidth value={editTipologia} onChange={(e) => setEditTipologia(e.target.value)} helperText="Ej: A, B, C" />
+          <TextField margin="dense" label="Cuota" fullWidth value={editCuota} onChange={(e) => setEditCuota(e.target.value)} type="number" />
+          <TextField margin="dense" label="Frecuencia Mensual" fullWidth value={editFrecuencia} onChange={(e) => setEditFrecuencia(e.target.value)} type="number" />
+          <TextField margin="dense" label="Minutos de Servicio" fullWidth value={editMinutos} onChange={(e) => setEditMinutos(e.target.value)} type="number" />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditOpen(false)}>Cancelar</Button>

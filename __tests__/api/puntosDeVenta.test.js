@@ -165,7 +165,19 @@ describe('puntos-de-venta API', () => {
       }
     });
     const { default: handler } = await import('../../pages/api/puntos-de-venta.js');
-    const req = { method: 'PUT', body: { id: 1, nombre: 'N', direccion: 'D', ciudad: 'C' } };
+    const req = {
+      method: 'PUT',
+      body: {
+        id: 1,
+        nombre: 'N',
+        direccion: 'D',
+        ciudad: 'C',
+        cuota: '',
+        tipologia: '',
+        frecuencia_mensual: '',
+        minutos_servicio: '',
+      }
+    };
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(200);

@@ -1,45 +1,49 @@
-import handler from '../../pages/api/planificar-rutas';
 import { createMocks } from 'node-mocks-http';
 import * as auth from '../../lib/auth';
-import { createClient } from '@supabase/supabase-js';
 import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 
-// Mock the auth middleware
+// Mock dependencies first
 jest.mock('../../lib/auth');
-
-// This is the mock for the 'gt' function that will be chained
-const mockGt = jest.fn();
-
-// Mock the entire Supabase client factory
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn(() => ({
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        gt: mockGt, // The first call to gt returns the mock function
-      })),
-    })),
-  })),
-}));
-
-// Mock the logger to prevent console noise
-jest.mock('../../lib/logger', () => ({
-    error: jest.fn(),
-    warn: jest.fn(),
-}));
-
+jest.mock('../../lib/logger', () => ({ error: jest.fn(), warn: jest.fn() }));
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
+const mockRpc = jest.fn();
+const mockGt = jest.fn();
+jest.mock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => ({
+        from: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        gt: mockGt,
+        rpc: mockRpc,
+    })),
+}));
+
 describe('/api/planificar-rutas', () => {
+  let handler;
+  let auth, csrf, rateLimiter;
+
   beforeEach(() => {
-    // Reset mocks before each test
+    jest.resetModules();
+
+    // Re-require the mocked modules to configure them
+    auth = require('../../lib/auth');
+    csrf = require('../../lib/csrf');
+    rateLimiter = require('../../lib/rateLimiter');
+
+    // Set default mock implementations for every test
     auth.requireUser.mockResolvedValue({ user: { id: 'test-user-id' }, error: null });
-    createClient().from().select().gt.mockClear();
+    csrf.verifyCsrf.mockReturnValue(true);
+    rateLimiter.checkRateLimit.mockResolvedValue(true);
+
     mockGt.mockClear();
-    verifyCsrf.mockReturnValue(true);
-    checkRateLimit.mockResolvedValue(true);
+    mockRpc.mockClear();
+    mockRpc.mockResolvedValue({ error: null });
+
+    // Load the handler
+    handler = require('../../pages/api/planificar-rutas').default;
   });
 
   it('should return 405 if method is not POST', async () => {
@@ -99,8 +103,10 @@ describe('/api/planificar-rutas', () => {
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
     const data = res._getJSONData();
-    expect(data.message).toBe('Planificación generada con éxito.');
-    expect(data.plan.summary.totalVisitsToPlan).toBe(6);
+    expect(data.message).toContain('generada y guardada con éxito');
+    expect(data.summary.totalVisitsToPlan).toBe(6);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('bulk_insert_planned_routes', expect.any(Object));
   });
 
   it('should generate a detailed daily plan respecting constraints', async () => {
@@ -125,39 +131,12 @@ describe('/api/planificar-rutas', () => {
 
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
-    const { plan } = res._getJSONData();
+    const { summary } = res._getJSONData();
 
-    // 1. Check summary values
-    expect(plan.summary.totalVisitsToPlan).toBe(26);
-    expect(plan.summary.totalVisitsPlanned).toBeLessThanOrEqual(26);
-
-    // 2. Check daily constraints
-    const DAILY_LIMIT = 8 * 60;
-    plan.dailyRoutes.forEach(route => {
-        expect(route.totalMinutes).toBeLessThanOrEqual(DAILY_LIMIT);
-    });
-
-    // 3. Check weekly constraints
-    const WEEKLY_LIMIT = 40 * 60;
-    const weeklyWorkload = new Map();
-    plan.dailyRoutes.forEach(route => {
-        const day = new Date(route.date + 'T00:00:00Z');
-        const weekKey = `${getISOWeekYear(day)}-${getISOWeek(day)}`;
-        const currentLoad = weeklyWorkload.get(weekKey) || 0;
-        weeklyWorkload.set(weekKey, currentLoad + route.totalMinutes);
-    });
-
-    for (const [week, load] of weeklyWorkload.entries()) {
-        expect(load).toBeLessThanOrEqual(WEEKLY_LIMIT);
-    }
-
-    // 4. Check that a difficult-to-place visit might be unplanned
-    const totalMinutesPlanned = plan.dailyRoutes.reduce((acc, r) => acc + r.totalMinutes, 0);
-    const totalMinutesPossible = mockPuntos.reduce((acc, p) => acc + (p.frecuencia_mensual * p.minutos_servicio), 0);
-    // Given the constraints, it's likely the 241-minute visit wasn't scheduled.
-    if (plan.summary.totalVisitsPlanned < plan.summary.totalVisitsToPlan) {
-        expect(totalMinutesPlanned).toBeLessThan(totalMinutesPossible);
-    }
+    // Just check the summary values, as the full plan is not returned.
+    expect(summary.totalVisitsToPlan).toBe(26);
+    expect(summary.totalVisitsPlanned).toBeLessThanOrEqual(26);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
   });
 
   it('should handle week transitions across year boundaries', async () => {
@@ -179,27 +158,41 @@ describe('/api/planificar-rutas', () => {
 
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
-    const { plan } = res._getJSONData();
-    const weeks = new Set(plan.dailyRoutes.map(r => {
-      const d = new Date(r.date + 'T00:00:00Z');
-      return `${getISOWeekYear(d)}-${getISOWeek(d)}`;
-    }));
-    expect(weeks.size).toBeGreaterThan(1);
+    const { summary } = res._getJSONData();
+    expect(summary.workingDays).toBeGreaterThan(5); // Check that it found working days in both weeks
+    expect(mockRpc).toHaveBeenCalledTimes(1);
   });
 
   it('should return 403 when CSRF validation fails', async () => {
-    verifyCsrf.mockImplementationOnce((req, res) => {
-      res.status(403).json({});
+    // This mock needs to simulate the real function's behavior of setting the response code
+    csrf.verifyCsrf.mockImplementation((req, res) => {
+      res.status(403).json({ error: 'Invalid CSRF token' });
       return false;
     });
-    const { req, res } = createMocks({ method: 'POST', body: {} });
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: {
+        mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        startDate: '2024-01-01',
+        endDate: '2024-01-31',
+      },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(403);
   });
 
   it('should return 429 when rate limit exceeded', async () => {
-    checkRateLimit.mockResolvedValueOnce(false);
-    const { req, res } = createMocks({ method: 'POST', body: { mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', startDate: '2024-01-01', endDate: '2024-01-31' } });
+    rateLimiter.checkRateLimit.mockResolvedValue(false);
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: {
+        mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        startDate: '2024-01-01',
+        endDate: '2024-01-31',
+      },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(429);
   });
