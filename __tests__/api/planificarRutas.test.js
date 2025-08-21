@@ -26,6 +26,7 @@ jest.mock('@supabase/supabase-js', () => ({
 // Mock the logger to prevent console noise
 jest.mock('../../lib/logger', () => ({
     error: jest.fn(),
+    warn: jest.fn(),
 }));
 
 jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
@@ -201,5 +202,33 @@ describe('/api/planificar-rutas', () => {
     const { req, res } = createMocks({ method: 'POST', body: { mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', startDate: '2024-01-01', endDate: '2024-01-31' } });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(429);
+  });
+
+  it('should handle cases where no visits can be scheduled', async () => {
+    const mockPuntos = [
+      // All points have service time greater than the daily limit of 480 minutes
+      { id: 1, nombre: 'Impossible Point A', frecuencia_mensual: 1, minutos_servicio: 500 },
+      { id: 2, nombre: 'Impossible Point B', frecuencia_mensual: 1, minutos_servicio: 600 },
+    ];
+    mockGt.mockImplementationOnce(() => ({
+        gt: jest.fn().mockResolvedValue({ data: mockPuntos, error: null })
+    }));
+
+    const { req, res } = createMocks({
+        method: 'POST',
+        body: {
+            mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+            startDate: '2024-08-01',
+            endDate: '2024-08-31',
+        },
+    });
+
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(200);
+    const { plan } = res._getJSONData();
+
+    expect(plan.summary.totalVisitsToPlan).toBe(2);
+    expect(plan.summary.totalVisitsPlanned).toBe(0);
+    expect(plan.dailyRoutes.length).toBe(0);
   });
 });
