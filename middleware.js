@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(req) {
-  const res = NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
 
   // Bypass authentication logic for Cypress tests
   const userAgent = req.headers.get('user-agent') || '';
@@ -45,6 +46,7 @@ export async function middleware(req) {
   const nonceArray = new Uint8Array(16);
   crypto.getRandomValues(nonceArray);
   const nonce = btoa(String.fromCharCode(...nonceArray));
+  requestHeaders.set('x-nonce', nonce);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '';

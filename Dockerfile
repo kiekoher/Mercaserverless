@@ -3,7 +3,7 @@ FROM node:20.11-alpine AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --omit=dev
 
 # Stage 2: Build the application
 FROM node:20.11-alpine AS builder
@@ -29,8 +29,8 @@ RUN addgroup --system --gid 1001 nextjs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-# Copy only the necessary files from the builder stage
+COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 

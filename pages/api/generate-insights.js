@@ -7,7 +7,7 @@ import { verifyCsrf } from '../../lib/csrf';
 import { requireUser } from '../../lib/auth';
 
 const insightsSchema = z.object({
-  rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }),
+  rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }).max(1_000_000),
 });
 
 export default async function handler(req, res) {
