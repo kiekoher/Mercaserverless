@@ -66,36 +66,104 @@ export default async function handler(req, res) {
 }
 
 /**
- * Generates a simplified monthly visit plan.
- * @param {Array} puntos - Array of points of sale.
- * @param {string} startDate - Start date of the planning period.
- * @param {string} endDate - End date of the planning period.
- * @returns {Object} - A plan object.
+ * Generates a detailed monthly visit plan, respecting workload constraints.
+ * @param {Array} puntos - Array of points of sale with id, nombre, frecuencia_mensual, and minutos_servicio.
+ * @param {string} startDateStr - Start date of the planning period (YYYY-MM-DD).
+ * @param {string} endDateStr - End date of the planning period (YYYY-MM-DD).
+ * @returns {Object} - A structured plan with daily routes and a summary.
  */
-function generateMonthlyPlan(puntos, startDate, endDate) {
-  // This is a placeholder for the complex planning logic.
-  // A real algorithm would:
-  // 1. Calculate the number of working days in the date range.
-  // 2. Calculate the total required visits for all PDVs.
-  // 3. Distribute visits evenly across the days, respecting the 40-hour weekly limit.
-  // 4. Group visits into daily routes.
+function generateMonthlyPlan(puntos, startDateStr, endDateStr) {
+  const WEEKLY_WORK_MINUTES = 40 * 60;
+  const DAILY_WORK_MINUTES = 8 * 60;
 
-  const totalVisits = puntos.reduce((acc, p) => acc + (p.frecuencia_mensual || 0), 0);
-  const totalMinutes = puntos.reduce((acc, p) => acc + ((p.frecuencia_mensual || 0) * (p.minutos_servicio || 0)), 0);
-  const totalHours = totalMinutes / 60;
+  // 1. Get all working days (Mon-Fri) in the period
+  const workingDays = [];
+  let currentDate = new Date(`${startDateStr}T00:00:00Z`);
+  const endDate = new Date(`${endDateStr}T00:00:00Z`);
+
+  while (currentDate <= endDate) {
+    const dayOfWeek = currentDate.getUTCDay();
+    if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+      workingDays.push(new Date(currentDate));
+    }
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+  }
+
+  if (workingDays.length === 0) {
+    return { error: "No working days found in the selected period." };
+  }
+
+  // 2. Create a pool of all required visits for the month
+  let visitPool = [];
+  puntos.forEach(punto => {
+    for (let i = 0; i < (punto.frecuencia_mensual || 0); i++) {
+      visitPool.push({ ...punto, visit_id: `${punto.id}-${i}` });
+    }
+  });
+
+  // Sort visit pool to prioritize points with higher service time
+  visitPool.sort((a, b) => (b.minutos_servicio || 0) - (a.minutos_servicio || 0));
+
+  // 3. Distribute visits across working days
+  const dailyRoutes = new Map();
+  const weeklyWorkload = new Map();
+
+  workingDays.forEach(day => {
+    const isoDate = day.toISOString().split('T')[0];
+    const weekNumber = Math.floor(day.getUTCDate() / 7);
+    dailyRoutes.set(isoDate, { date: isoDate, points: [], totalMinutes: 0 });
+    if (!weeklyWorkload.has(weekNumber)) {
+      weeklyWorkload.set(weekNumber, 0);
+    }
+  });
+
+  let dayIndex = 0;
+  while (visitPool.length > 0) {
+    const visit = visitPool.shift(); // Get the next visit from the pool
+
+    // Find the next available day that can accommodate the visit
+    let placed = false;
+    for (let i = 0; i < workingDays.length; i++) {
+      const currentDayIndex = (dayIndex + i) % workingDays.length;
+      const day = workingDays[currentDayIndex];
+      const isoDate = day.toISOString().split('T')[0];
+      const weekNumber = Math.floor(day.getUTCDate() / 7);
+
+      const route = dailyRoutes.get(isoDate);
+      const currentWeekMinutes = weeklyWorkload.get(weekNumber);
+
+      if (route.totalMinutes + visit.minutos_servicio <= DAILY_WORK_MINUTES &&
+          currentWeekMinutes + visit.minutos_servicio <= WEEKLY_WORK_MINUTES) {
+
+        route.points.push(visit);
+        route.totalMinutes += visit.minutos_servicio;
+        weeklyWorkload.set(weekNumber, currentWeekMinutes + visit.minutos_servicio);
+        placed = true;
+        dayIndex = currentDayIndex + 1; // Start next search from the next day
+        break;
+      }
+    }
+
+    if (!placed) {
+      // If a visit couldn't be placed, add it back to a separate "unplanned" list
+      // This indicates a capacity issue. For now, we log it.
+      logger.warn({ visit }, "Could not schedule visit due to capacity constraints.");
+    }
+  }
+
+  const finalDailyRoutes = Array.from(dailyRoutes.values()).filter(r => r.points.length > 0);
+  const totalVisitsPlanned = finalDailyRoutes.reduce((acc, r) => acc + r.points.length, 0);
+  const totalMinutesPlanned = finalDailyRoutes.reduce((acc, r) => acc + r.totalMinutes, 0);
 
   return {
-    period: { startDate, endDate },
+    period: { startDate: startDateStr, endDate: endDateStr },
     summary: {
-      totalVisitsToPlan: totalVisits,
-      estimatedTotalHours: totalHours.toFixed(2),
+      totalVisitsToPlan: puntos.reduce((acc, p) => acc + (p.frecuencia_mensual || 0), 0),
+      totalVisitsPlanned,
+      estimatedTotalHours: (totalMinutesPlanned / 60).toFixed(2),
       pointsToPlan: puntos.length,
+      workingDays: workingDays.length,
     },
-    // The detailed daily plan would be generated here
-    dailyRoutes: [
-      // Example structure:
-      // { date: '2024-08-01', points: [ { id: 1, nombre: 'PDV 1' }, ... ] },
-      // { date: '2024-08-02', points: [ { id: 3, nombre: 'PDV 3' }, ... ] },
-    ]
+    dailyRoutes: finalDailyRoutes,
   };
 }

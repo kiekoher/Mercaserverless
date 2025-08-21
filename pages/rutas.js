@@ -550,16 +550,39 @@ export default function RutasPage() {
       </Dialog>
 
       <Modal open={planModalOpen} onClose={() => setPlanModalOpen(false)}>
-        <Box sx={modalStyle}>
-            <Typography variant="h6" gutterBottom>Resumen de Planificación</Typography>
+        <Box sx={{...modalStyle, width: { xs: '95%', md: 800 }, maxHeight: '90vh', overflowY: 'auto' }}>
+            <Typography variant="h6" gutterBottom>Resultado de la Planificación</Typography>
             {planResult ? (
                 <Box>
-                    <Typography variant="body1"><strong>Periodo:</strong> {planResult.period.startDate} al {planResult.period.endDate}</Typography>
-                    <Typography variant="body1"><strong>Total de Visitas a Planificar:</strong> {planResult.summary.totalVisitsToPlan}</Typography>
-                    <Typography variant="body1"><strong>Horas Estimadas:</strong> {planResult.summary.estimatedTotalHours}</Typography>
-                    <Typography variant="body1"><strong>Puntos de Venta a Planificar:</strong> {planResult.summary.pointsToPlan}</Typography>
-                    <Typography variant="subtitle1" sx={{mt: 2}}>Rutas Diarias (próximamente)</Typography>
-                    {/* Aquí se renderizaría el calendario de rutas diarias */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                        <Grid item xs={6} sm={3}><Chip label="Periodo" color="primary" sx={{width: '100%'}} /><Typography variant="body2" align="center">{planResult.period.startDate} al {planResult.period.endDate}</Typography></Grid>
+                        <Grid item xs={6} sm={3}><Chip label="Visitas Planificadas" color="primary" sx={{width: '100%'}} /><Typography variant="body2" align="center">{planResult.summary.totalVisitsPlanned} / {planResult.summary.totalVisitsToPlan}</Typography></Grid>
+                        <Grid item xs={6} sm={3}><Chip label="Horas Estimadas" color="primary" sx={{width: '100%'}} /><Typography variant="body2" align="center">{planResult.summary.estimatedTotalHours}</Typography></Grid>
+                        <Grid item xs={6} sm={3}><Chip label="Días Laborables" color="primary" sx={{width: '100%'}} /><Typography variant="body2" align="center">{planResult.summary.workingDays}</Typography></Grid>
+                    </Grid>
+                    <Typography variant="subtitle1" sx={{mt: 2, mb: 1}}>Rutas Diarias Generadas</Typography>
+                    <Box sx={{ maxHeight: 400, overflow: 'auto', border: '1px solid #eee', p: 1, borderRadius: 1 }}>
+                      {planResult.dailyRoutes && planResult.dailyRoutes.length > 0 ? (
+                        <List dense>
+                          {planResult.dailyRoutes.map(route => (
+                            <ListItem key={route.date} divider>
+                              <ListItemText
+                                primary={<Typography variant="body1"><strong>{new Date(route.date + 'T00:00:00Z').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}</strong> ({route.totalMinutes} min)</Typography>}
+                                secondary={
+                                  <List dense sx={{ pl: 2 }}>
+                                    {route.points.map(p => (
+                                      <ListItemText key={p.visit_id} primary={`${p.nombre}`} secondary={`(ID: ${p.id}, T.Serv: ${p.minutos_servicio} min)`} />
+                                    ))}
+                                  </List>
+                                }
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" align="center" sx={{p: 2}}>No se generaron rutas. Verifique la capacidad y los datos de los puntos de venta.</Typography>
+                      )}
+                    </Box>
                 </Box>
             ) : <CircularProgress />}
              <Button onClick={() => setPlanModalOpen(false)} sx={{ mt: 2 }}>
