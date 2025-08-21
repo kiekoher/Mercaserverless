@@ -1,11 +1,14 @@
 import { requireUser } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import logger from '../../lib/logger';
+import { verifyCsrf } from '../../lib/csrf';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { z } from 'zod';
 
 // This would typically be in a shared config
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
 const planSchema = z.object({
@@ -21,9 +24,15 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
+  if (!verifyCsrf(req, res)) return;
+
   const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
+  }
+
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   const parsed = planSchema.safeParse(req.body);
@@ -110,10 +119,10 @@ function generateMonthlyPlan(puntos, startDateStr, endDateStr) {
 
   workingDays.forEach(day => {
     const isoDate = day.toISOString().split('T')[0];
-    const weekNumber = Math.floor(day.getUTCDate() / 7);
+    const weekKey = `${getISOWeekYear(day)}-${getISOWeek(day)}`;
     dailyRoutes.set(isoDate, { date: isoDate, points: [], totalMinutes: 0 });
-    if (!weeklyWorkload.has(weekNumber)) {
-      weeklyWorkload.set(weekNumber, 0);
+    if (!weeklyWorkload.has(weekKey)) {
+      weeklyWorkload.set(weekKey, 0);
     }
   });
 
@@ -127,17 +136,17 @@ function generateMonthlyPlan(puntos, startDateStr, endDateStr) {
       const currentDayIndex = (dayIndex + i) % workingDays.length;
       const day = workingDays[currentDayIndex];
       const isoDate = day.toISOString().split('T')[0];
-      const weekNumber = Math.floor(day.getUTCDate() / 7);
+      const weekKey = `${getISOWeekYear(day)}-${getISOWeek(day)}`;
 
       const route = dailyRoutes.get(isoDate);
-      const currentWeekMinutes = weeklyWorkload.get(weekNumber);
+      const currentWeekMinutes = weeklyWorkload.get(weekKey);
 
       if (route.totalMinutes + visit.minutos_servicio <= DAILY_WORK_MINUTES &&
           currentWeekMinutes + visit.minutos_servicio <= WEEKLY_WORK_MINUTES) {
 
         route.points.push(visit);
         route.totalMinutes += visit.minutos_servicio;
-        weeklyWorkload.set(weekNumber, currentWeekMinutes + visit.minutos_servicio);
+        weeklyWorkload.set(weekKey, currentWeekMinutes + visit.minutos_servicio);
         placed = true;
         dayIndex = currentDayIndex + 1; // Start next search from the next day
         break;

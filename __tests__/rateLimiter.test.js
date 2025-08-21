@@ -7,11 +7,11 @@ describe('checkRateLimit', () => {
     jest.resetModules();
   });
 
-  it('falls back to in-memory store when REDIS_URL is missing in production', async () => {
+  it('blocks requests when REDIS_URL is missing in production', async () => {
     process.env.NODE_ENV = 'production';
     delete process.env.REDIS_URL;
     const { checkRateLimit } = await import('../lib/rateLimiter');
     const allowed = await checkRateLimit({ headers: {}, socket: { remoteAddress: '1.1.1.1' } });
-    expect(allowed).toBe(true);
+    expect(allowed).toBe(false);
   });
 });

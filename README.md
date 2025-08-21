@@ -58,6 +58,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     GEMINI_API_KEY=YOUR_GEMINI_API_KEY
     GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
     REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
+    RATE_LIMIT_FAIL_OPEN=true # Permite que el rate limiter falle abierto en desarrollo
     LOG_LEVEL=info # Nivel de logs
     LOG_FILE_PATH=./logs/app.log # Ruta del archivo de logs
     LOG_MAX_SIZE=10485760 # Tamaño máximo antes de rotar (bytes)
@@ -67,7 +68,7 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     CYPRESS_MERCADERISTA_ID=<uuid>
     ```
     *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
-    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. `REDIS_URL` es obligatorio para el rate limiter en producción, de lo contrario las solicitudes serán bloqueadas.
+    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. `REDIS_URL` es obligatorio para el rate limiter en producción, de lo contrario las solicitudes serán bloqueadas. Usa `RATE_LIMIT_FAIL_OPEN=true` solo en desarrollo para evitar bloqueos cuando Redis no esté disponible.
 
     Este archivo `.env` es solo para desarrollo local. Está incluido en `.gitignore` y no debe subirse al repositorio ni copiarse a servidores.
 

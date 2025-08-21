@@ -7,11 +7,11 @@ import { verifyCsrf } from '../../lib/csrf';
 import { requireUser } from '../../lib/auth';
 
 const summarySchema = z.object({
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }),
-  mercaderistaId: z.string().min(1, { message: "El ID del mercaderista es requerido" }),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }).length(10),
+  mercaderistaId: z.string().uuid({ message: "El ID del mercaderista es requerido" }),
   puntos: z.array(
     z.object({
-      nombre: z.string().min(1, { message: "El nombre del punto de venta es requerido" })
+      nombre: z.string().min(1, { message: "El nombre del punto de venta es requerido" }).max(100)
     })
   ).min(1, { message: "Debe haber al menos un punto de venta" }),
 });
