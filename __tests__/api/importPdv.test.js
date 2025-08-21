@@ -104,5 +104,63 @@ describe('import-pdv API', () => {
       })
     );
   });
+
+  it('handles undefined geocode response gracefully without crashing', async () => {
+    const { default: logger } = await import('../../lib/logger');
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    let insertedData = [];
+
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) }) }) };
+        }
+        if (table === 'puntos_de_venta') {
+          return {
+            insert: (arr) => {
+              insertedData = arr;
+              return { error: null };
+            }
+          };
+        }
+      }
+    });
+
+    mockGeocode.mockResolvedValue(undefined);
+
+    // Spy on logger.error. This is the key.
+    const loggerErrorSpy = jest.spyOn(logger, 'error');
+
+    const { default: handler } = await import('../../pages/api/import-pdv.js');
+    const req = {
+      method: 'POST',
+      body: {
+        puntos: [
+          { nombre: 'Store A', direccion: '123 Main St', ciudad: 'Anytown' }
+        ]
+      }
+    };
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    // This is the crucial assertion.
+    // The buggy code logs a TypeError. The test should fail if it does.
+    expect(loggerErrorSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.any(TypeError)
+      }),
+      expect.any(String)
+    );
+
+    // The rest of the assertions remain the same.
+    expect(res.statusCode).toBe(200);
+    expect(insertedData[0]).toBeDefined();
+    expect(insertedData[0].latitud).toBeNull();
+    expect(insertedData[0].longitud).toBeNull();
+
+    loggerErrorSpy.mockRestore();
+  });
 });
 

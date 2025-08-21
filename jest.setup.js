@@ -3,9 +3,7 @@ import '@testing-library/jest-dom';
 import logger from './lib/logger';
 import { closeRedis } from './lib/rateLimiter';
 
-// Load environment variables from .env.local for Jest
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+// Environment variables are loaded in jest.env.js, executed via setupFiles.
 
 // Gracefully close open handles after all tests are done
 afterAll(() => {

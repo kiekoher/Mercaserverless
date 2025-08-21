@@ -83,7 +83,8 @@ export default async function handler(req, res) {
             timeout: GEOCODE_TIMEOUT_MS,
           };
           const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
-          if (geocodeResponse.data.results.length > 0) {
+          // Defensive check to prevent crash on undefined response
+          if (geocodeResponse && geocodeResponse.data && geocodeResponse.data.results && geocodeResponse.data.results.length > 0) {
             const location = geocodeResponse.data.results[0].geometry.location;
             latitud = location.lat;
             longitud = location.lng;
