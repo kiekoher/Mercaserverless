@@ -34,32 +34,39 @@ export default async function handler(req, res) {
 }
 
 async function getWeeklyWorkload() {
-    // In a real implementation, this would:
-    // 1. Get the start and end of the current week.
-    // 2. Fetch all `rutas` within this week.
-    // 3. For each `ruta`, get the `puntos_de_venta_ids`.
-    // 4. Fetch the `minutos_servicio` for each of those points.
-    // 5. Sum the minutes per mercaderista and convert to hours.
+    const { data, error } = await supabaseAdmin.rpc('get_weekly_workload');
 
-    // Placeholder data:
-    return [
-        { mercaderista: 'John Doe (mock)', hours: 38 },
-        { mercaderista: 'Jane Smith (mock)', hours: 42 },
-        { mercaderista: 'Peter Jones (mock)', hours: 25 },
-    ];
+    if (error) {
+        logger.error({ err: error }, 'Error calling get_weekly_workload function');
+        throw new Error('Error al calcular la carga de trabajo semanal.');
+    }
+    // The RPC function is expected to return { mercaderista_id, mercaderista_nombre, total_horas }
+    return data.map(item => ({
+        mercaderista: item.mercaderista_nombre || `ID: ${item.mercaderista_id}`,
+        hours: item.total_horas || 0,
+    }));
 }
 
 async function getFrequencyCompliance() {
-    // In a real implementation, this would:
-    // 1. Get the start and end of the current month.
-    // 2. Fetch all `puntos_de_venta` with `frecuencia_mensual` > 0.
-    // 3. For each of those points, count the number of `visitas` in the current month.
-    // 4. Calculate the overall percentage of planned vs required visits.
+    const { data, error } = await supabaseAdmin.rpc('get_frequency_compliance');
 
-    // Placeholder data:
+    if (error) {
+        logger.error({ err: error }, 'Error calling get_frequency_compliance function');
+        throw new Error('Error al calcular el cumplimiento de frecuencia.');
+    }
+
+    if (!data || data.length === 0) {
+        return { planned: 0, required: 0, percentage: '0.0' };
+    }
+
+    const { total_required_visits, total_planned_visits } = data[0];
+    const percentage = total_required_visits > 0
+        ? ((total_planned_visits / total_required_visits) * 100).toFixed(1)
+        : '0.0';
+
     return {
-        planned: 650,
-        required: 800,
-        percentage: ((650 / 800) * 100).toFixed(1),
+        planned: total_planned_visits,
+        required: total_required_visits,
+        percentage,
     };
 }
