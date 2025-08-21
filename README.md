@@ -35,129 +35,67 @@ Durante el diseño del esquema de la base de datos, se tomó la decisión de alm
 
 ## Cómo Empezar
 
-Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local.
+Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local para desarrollo.
 
 ### Prerrequisitos
 
 Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o superior).
 
-### Instalación
+### Configuración Local
 
-1.  **Clona el repositorio** (o descarga los archivos).
+1.  **Clona el repositorio**.
 
 2.  **Crea el archivo de variables de entorno:**
     Copia el archivo de ejemplo `.env.example` y renómbralo a `.env`.
     ```bash
     cp .env.example .env
     ```
-    Luego, rellena las variables con tus propias credenciales de Supabase y Google AI:
-    ```
-    NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-    SUPABASE_SERVICE_KEY=YOUR_SUPABASE_SERVICE_KEY # Clave de servicio (solo servidor)
-    GEMINI_API_KEY=YOUR_GEMINI_API_KEY
-    GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
-    REDIS_URL=redis://localhost:6379 # Requerido para el rate limiter
-    RATE_LIMIT_FAIL_OPEN=true # Permite que el rate limiter falle abierto en desarrollo
-    LOG_LEVEL=info # Nivel de logs
-    LOG_FILE_PATH=./logs/app.log # Ruta del archivo de logs
-    LOG_MAX_SIZE=10485760 # Tamaño máximo antes de rotar (bytes)
-    LOG_MAX_FILES=5 # Número máximo de archivos de log
-    CYPRESS_ADMIN_ID=<uuid>
-    CYPRESS_SUPERVISOR_ID=<uuid>
-    CYPRESS_MERCADERISTA_ID=<uuid>
-    ```
-    *Nota: Aunque la aplicación actual simula las respuestas de estas APIs, el código está estructurado para usarlas, por lo que el archivo `.env` es necesario.*
-    Asegúrate de definir `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY` y `GOOGLE_MAPS_API_KEY`; los endpoints correspondientes retornarán error si faltan. `REDIS_URL` es obligatorio para el rate limiter en producción, de lo contrario las solicitudes serán bloqueadas. Usa `RATE_LIMIT_FAIL_OPEN=true` solo en desarrollo para evitar bloqueos cuando Redis no esté disponible.
-
-    Este archivo `.env` es solo para desarrollo local. Está incluido en `.gitignore` y no debe subirse al repositorio ni copiarse a servidores.
+    Luego, rellena las variables con tus propias credenciales de desarrollo. Este archivo es solo para desarrollo local y no debe subirse al repositorio.
 
 3.  **Instala las dependencias del proyecto:**
-    Abre una terminal en la raíz del proyecto y ejecuta:
     ```bash
     npm install
     ```
-4.  **Audita las dependencias:**
-    ```bash
-    npm audit --omit=dev
-    ```
-    El comando fallará si se detectan vulnerabilidades altas o críticas.
 
-### Gestión de secretos en producción
-
-En producción **no** copies el archivo `.env` al servidor. En su lugar, crea un archivo exclusivo para el servidor (no versionado) que Docker Compose cargará automáticamente.
-
-Ejemplo en un servidor Ubuntu, creando `/etc/mercaderista.env` con los secretos:
-
-```bash
-sudo tee /etc/mercaderista.env <<'EOF'
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_KEY=...
-GEMINI_API_KEY=...
-GOOGLE_MAPS_API_KEY=...
-REDIS_URL=redis://localhost:6379
-LOG_LEVEL=info
-LOG_FILE_PATH=/var/log/mercaderista/app.log
-LOG_MAX_SIZE=10485760
-EOF
-sudo chmod 600 /etc/mercaderista.env
-```
-
-El archivo debe ser administrado únicamente en el servidor. El repositorio incluye la plantilla `.env.example` para referencia, pero **todos** los archivos que coincidan con `.env*` están ignorados por Git.
-
-Una vez creado el archivo, levanta la aplicación con:
-
-```bash
-docker compose up -d
-```
-
-### Ejecución
-
-#### Modo Local (Sin Docker)
-
-1.  **Iniciar el servidor de desarrollo:**
+4.  **Ejecuta el servidor de desarrollo:**
     ```bash
     npm run dev
     ```
     Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
 
-2.  **Ejecutar las pruebas:**
-    Para correr las pruebas unitarias y de componentes, ejecuta:
-    ```bash
-    npm test
-    ```
+### Ejecución de Pruebas
 
-#### Modo Dockerizado (Recomendado)
-
-Asegúrate de tener [Docker](https://www.docker.com/get-started) y Docker Compose instalados. El archivo `docker-compose.yml` levanta los servicios de la aplicación junto con PostgreSQL y Redis, necesarios para la base de datos y el rate limiter.
-
-1.  **Construir y levantar los contenedores:**
-    Desde la raíz del proyecto, ejecuta:
-    ```bash
-    docker-compose up --build
-    ```
-    La primera vez tomará un tiempo mientras se construye la imagen. Las siguientes veces será mucho más rápido. La aplicación estará disponible en [http://localhost:3000](http://localhost:3000).
-
-    El contenedor de PostgreSQL se inicia vacío; aplica tus migraciones de Supabase (`supabase db push` o restaurando un dump) antes de usar la aplicación.
-
-2.  **Detener el contenedor:**
-    Presiona `Ctrl + C` en la terminal. Para eliminar el contenedor y la red, puedes ejecutar:
-    ```bash
-    docker-compose down
-    ```
-
-### Logs
-
-Los registros se generan con [pino](https://github.com/pinojs/pino). En producción se utiliza el transporte [`pino-roll`](https://github.com/mcollina/pino-roll#readme), que rota el archivo indicado por `LOG_FILE_PATH` cuando supera `LOG_MAX_SIZE` (en bytes) y mantiene hasta `LOG_MAX_FILES` archivos. En desarrollo se utiliza un formato legible en la terminal.
-
-Si se define la variable `LOG_REMOTE_URL`, los logs se enviarán también a ese endpoint HTTP para agregación centralizada.
-
-Para evitar que los registros ocupen espacio indefinidamente, se recomienda programar un `cron` que elimine archivos antiguos, por ejemplo:
-
+Para correr las pruebas unitarias y de componentes, ejecuta:
 ```bash
-find /var/log/mercaderista -type f -mtime +30 -delete
+npm test
 ```
+Para las pruebas de extremo a extremo (E2E), utiliza Cypress:
+```bash
+npm run cypress:open
+```
+
+## Despliegue y Arquitectura Serverless
+
+Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube.
+
+### Despliegue en Vercel
+
+La aplicación se despliega automáticamente en Vercel con cada `push` a la rama `main`. Vercel se encarga de la compilación, el despliegue y la escalabilidad de la aplicación Next.js.
+
+### Gestión de Variables de Entorno en Producción
+
+Todas las variables de entorno requeridas por la aplicación (ver `.env.example`) deben ser configuradas directamente en el **panel de control de Vercel** para el proyecto correspondiente. Esto incluye:
+- Credenciales de Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`).
+- Claves de API para servicios externos (`GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`).
+- URL del servicio de Redis (`UPSTASH_REDIS_URL`).
+- Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
+
+No se debe utilizar el archivo `.env` en el entorno de producción.
+
+### Servicios en la Nube
+
+- **Rate Limiting:** Se utiliza un servicio de Redis serverless como [Upstash](https://upstash.com/) para gestionar el límite de peticiones a la API.
+- **Logging:** Los logs de la aplicación son enviados a un servicio de logging externo como [Logtail](https://logtail.com/) para su centralización y análisis.
 
 ### Seguridad y sanitización
 
