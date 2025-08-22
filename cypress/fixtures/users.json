@@ -1,0 +1,17 @@
+[
+  {
+    "id": "11111111-1111-1111-1111-111111111111",
+    "full_name": "Test Admin User",
+    "role": "admin"
+  },
+  {
+    "id": "22222222-2222-2222-2222-222222222222",
+    "full_name": "Test Supervisor User",
+    "role": "supervisor"
+  },
+  {
+    "id": "33333333-3333-3333-3333-333333333333",
+    "full_name": "Test Mercaderista User",
+    "role": "mercaderista"
+  }
+]

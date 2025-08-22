@@ -1,15 +1,10 @@
-Cypress.Commands.add('login', (role) => {
-  cy.task('e2eLogin', { role }).then((session) => {
-    if (!session) {
-      throw new Error('Failed to obtain test session');
-    }
-    const supabaseProjectId = Cypress.env('supabaseProjectId');
-    if (!supabaseProjectId) {
-      throw new Error('Cypress.env.supabaseProjectId is not set');
-    }
-    const supabaseLocalStorageKey = `sb-${supabaseProjectId}-auth-token`;
-    window.localStorage.setItem(supabaseLocalStorageKey, JSON.stringify(session));
-    window.localStorage.setItem('cypress-role', role);
+Cypress.Commands.add('login', (role, url) => {
+  // Use cy.visit's onBeforeLoad callback to set localStorage on the correct origin
+  // before any of the app's code runs. This prevents race conditions.
+  cy.visit(url, {
+    onBeforeLoad(win) {
+      win.localStorage.setItem('cypress-role', role);
+    },
   });
 });
 

@@ -34,9 +34,15 @@ export const AuthProvider = ({ children }) => {
           mercaderista: process.env.CYPRESS_MERCADERISTA_ID,
         };
         const id = idMap[role] || 'cypress-user';
+        const mockProfile = {
+          id,
+          role,
+          full_name: `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+          updated_at: new Date().toISOString(),
+        };
         setSession(null);
         setUser({ id });
-        setProfile({ id, role });
+        setProfile(mockProfile);
         setLoading(false);
         return;
       }

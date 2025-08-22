@@ -1,0 +1,16 @@
+{
+  "id": "ruta-123",
+  "nombre": "Ruta de Mercaderista de Prueba",
+  "puntos": [
+    {
+      "id": "pdv-1",
+      "nombre": "Supermercado La Esquina",
+      "direccion": "Calle Falsa 123, Bogotá"
+    },
+    {
+      "id": "pdv-2",
+      "nombre": "Tienda El Ahorro",
+      "direccion": "Avenida Siempre Viva 456, Medellín"
+    }
+  ]
+}

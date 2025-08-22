@@ -1,0 +1,8 @@
+[
+  {
+    "id": "visita-1",
+    "ruta_id": "ruta-123",
+    "punto_de_venta_id": "pdv-1",
+    "estado": "En Progreso"
+  }
+]
