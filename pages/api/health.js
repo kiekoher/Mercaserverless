@@ -11,15 +11,15 @@ export default async function handler(req, res) {
     if (supaError) throw supaError;
 
     let redisStatus = 'ok';
-    if (process.env.REDIS_URL) {
+    if (process.env.UPSTASH_REDIS_URL) {
       if (!redis) {
-        redis = new Redis(process.env.REDIS_URL);
+        redis = new Redis(process.env.UPSTASH_REDIS_URL);
         redis.on('error', (e) => logger.error({ err: e }, 'Redis error'));
       }
       await redis.ping();
     } else {
       redisStatus = 'unavailable';
-      logger.warn('REDIS_URL not configured for health check');
+      logger.warn('UPSTASH_REDIS_URL not configured for health check');
     }
 
     res.status(200).json({ status: redisStatus === 'ok' ? 'ok' : 'degraded', redis: redisStatus });

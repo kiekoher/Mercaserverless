@@ -1,6 +1,7 @@
 import { requireUser } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import logger from '../../lib/logger.server';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
@@ -12,9 +13,13 @@ export default async function handler(req, res) {
         return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
 
-    const { error: authError } = await requireUser(req, res, ['supervisor', 'admin']);
+    const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
     if (authError) {
         return res.status(authError.status).json({ error: authError.message });
+    }
+
+    if (!await checkRateLimit(req, { userId: user.id })) {
+        return res.status(429).json({ error: 'Too many requests' });
     }
 
     try {

@@ -17,7 +17,8 @@ jest.mock('../../lib/supabaseServer', () => ({
 }));
 
 jest.mock('../../lib/logger.server', () => ({
-  error: jest.fn()
+  error: jest.fn(),
+  warn: jest.fn(),
 }));
 
 const mockPing = jest.fn().mockResolvedValue('PONG');
@@ -31,7 +32,7 @@ jest.mock('ioredis', () => {
 describe('health API', () => {
   beforeEach(() => {
     jest.resetModules();
-    process.env.REDIS_URL = 'redis://localhost:6379';
+    process.env.UPSTASH_REDIS_URL = 'redis://localhost:6379';
     const { getSupabaseServerClient } = require('../../lib/supabaseServer');
     getSupabaseServerClient.mockReturnValue({
       auth: { getSession: jest.fn().mockResolvedValue({}) }
