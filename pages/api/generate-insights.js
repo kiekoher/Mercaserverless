@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
   const parsed = insightsSchema.safeParse(req.body);
   if (!parsed.success) {
-    const errorMessages = parsed.error.errors.map(e => e.message).join(', ');
+    const errorMessages = parsed.error.issues.map(e => e.message).join(', ');
     logger.warn({ errors: parsed.error.format() }, `Invalid request to generate-insights: ${errorMessages}`);
     return res.status(400).json({ error: `Datos de entrada inválidos: ${errorMessages}` });
   }

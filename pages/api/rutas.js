@@ -16,9 +16,13 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
-    const { page = 1, search = '' } = req.query;
+    const { page = '1', search = '' } = req.query;
+    const pageNumber = parseInt(page, 10);
+    if (Number.isNaN(pageNumber) || pageNumber < 1) {
+      return res.status(400).json({ error: 'Parámetro page inválido' });
+    }
     const pageSize = 10;
-    const from = (page - 1) * pageSize;
+    const from = (pageNumber - 1) * pageSize;
     const to = from + pageSize - 1;
 
     let query = supabase

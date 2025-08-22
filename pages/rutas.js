@@ -15,6 +15,7 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import dynamic from 'next/dynamic';
 import { useAuthorization } from '../hooks/useAuthorization';
 import { useCsrfFetcher } from '../lib/fetchWithCsrf';
+import logger from '../lib/logger.client';
 
 const RutaMap = dynamic(() => import('../components/RutaMap'), { ssr: false });
 
@@ -89,7 +90,7 @@ export default function RutasPage() {
         setVisitas(prev => ({ ...prev, [rutaId]: data }));
     } catch (err) {
         // Do not show snackbar for this background fetch
-        console.error(`Failed to fetch visits for route ${rutaId}`, err);
+        logger.error({ err }, `Failed to fetch visits for route ${rutaId}`);
     }
   }, []);
 

@@ -158,6 +158,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Punto de venta eliminado' });
 
   } else if (req.method === 'GET') {
+    if (!await checkRateLimit(req, { userId: user.id })) {
+      return res.status(429).json({ error: 'Too many requests' });
+    }
+
     const { page = '1', search = '', all } = req.query;
     const safeSearch = sanitizeInput(search).slice(0, 50);
 
