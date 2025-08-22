@@ -12,6 +12,7 @@ import { useSnackbar } from 'notistack';
 import { useAuthorization } from '../hooks/useAuthorization';
 import { useCsrfFetcher } from '../lib/fetchWithCsrf';
 import Papa from 'papaparse';
+import logger from '../lib/logger.client';
 
 const CSVImport = ({ onImport, isImporting }) => {
   const { enqueueSnackbar } = useSnackbar();
@@ -31,7 +32,7 @@ const CSVImport = ({ onImport, isImporting }) => {
           onImport(results.data);
         },
         error: (error) => {
-          console.error('Error parsing CSV:', error);
+          logger.error({ err: error }, 'Error parsing CSV');
         }
       });
     }

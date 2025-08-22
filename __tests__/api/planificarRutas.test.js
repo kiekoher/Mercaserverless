@@ -224,4 +224,26 @@ describe('/api/planificar-rutas', () => {
     expect(plan.summary.totalVisitsPlanned).toBe(0);
     expect(plan.dailyRoutes.length).toBe(0);
   });
+
+  it('should return 500 if saving planned routes fails', async () => {
+    const mockPuntos = [
+      { id: 1, nombre: 'Punto A', frecuencia_mensual: 1, minutos_servicio: 30 },
+    ];
+    mockGt.mockImplementationOnce(() => ({
+      gt: jest.fn().mockResolvedValue({ data: mockPuntos, error: null })
+    }));
+    mockRpc.mockResolvedValueOnce({ error: { message: 'rpc failed' } });
+
+    const { req, res } = createMocks({
+      method: 'POST',
+      body: {
+        mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        startDate: '2024-01-01',
+        endDate: '2024-01-31',
+      },
+    });
+
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(500);
+  });
 });
