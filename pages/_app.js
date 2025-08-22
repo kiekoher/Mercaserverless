@@ -27,7 +27,10 @@ function CsrfInitializer({ children }) {
     }
     const initCsrf = async () => {
       try {
-        const res = await fetch('/api/csrf');
+        const res = await fetch('/api/csrf', {
+          credentials: 'same-origin',
+          cache: 'no-store',
+        });
         if (!res.ok) {
           throw new Error('Network response was not ok');
         }
