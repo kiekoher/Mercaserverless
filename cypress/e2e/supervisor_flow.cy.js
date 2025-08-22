@@ -1,38 +1,46 @@
 describe('Supervisor Main Workflow', () => {
-  // For E2E tests, it's better to have a clean state.
-  // We can't easily reset a real DB, but we can ensure our test data is unique.
   const newPointName = `Test Point ${Date.now()}`;
   const newMercaderistaId = `test-mercaderista-${Date.now()}`;
-
-  beforeEach(() => {
-    // Log in as a supervisor before each test
-    cy.login('supervisor');
-  });
+  const newPoint = { id: 'pdv-test', nombre: newPointName, direccion: '123 Test St', ciudad: 'Test City' };
+  const newRoute = { id: 'ruta-test', mercaderista_id: newMercaderistaId, puntos_de_venta_ids: [newPoint.id], fecha: new Date().toISOString().split('T')[0] };
 
   it('should allow a supervisor to create a point of sale and then a route', () => {
-    // To test the flow, we'll visit pages directly.
+    // --- Mocking for /puntos-de-venta page ---
+    cy.intercept('GET', '/api/puntos-de-venta*', { body: [], headers: { 'X-Total-Count': '0' } }).as('getPuntosInitial');
+    cy.intercept('POST', '/api/puntos-de-venta', { statusCode: 201, body: newPoint }).as('createPunto');
 
     // 1. Visit Points of Sale page and add a new one
-    cy.visit('/puntos-de-venta');
-    cy.get('input[id="nombre"]').type(newPointName);
-    cy.get('input[id="direccion"]').type('123 Test St');
-    cy.get('input[id="ciudad"]').type('Test City');
-    cy.contains('button', 'Guardar Punto').click();
+    cy.login('supervisor', '/puntos-de-venta');
+    cy.reload();
+    cy.wait('@getPuntosInitial');
 
-    // 2. Verify the new point is in the table
-    cy.contains('td', newPointName).should('be.visible');
+    cy.get('input[name="nombre"]').type(newPoint.nombre);
+    cy.get('input[name="direccion"]').type(newPoint.direccion);
+    cy.get('input[name="ciudad"]').type(newPoint.ciudad);
+    cy.contains('button', 'Guardar Punto').click();
+    cy.wait('@createPunto');
+
+    // 2. Verify the success message
+    cy.contains('Punto de venta creado con éxito!').should('be.visible');
+
+    // --- Mocking for /rutas page ---
+    cy.intercept('GET', '/api/puntos-de-venta*', { body: [newPoint], headers: { 'X-Total-Count': '1' } }).as('getPuntosForRuta');
+    cy.intercept('GET', '/api/rutas*', { body: [], headers: { 'X-Total-Count': '0' } }).as('getRutasInitial');
+    cy.intercept('POST', '/api/rutas', { statusCode: 201, body: newRoute }).as('createRuta');
 
     // 3. Visit Routes page
-    cy.visit('/rutas');
+    cy.login('supervisor', '/rutas');
+    cy.reload();
+    cy.wait('@getRutasInitial');
+    cy.wait('@getPuntosForRuta');
 
     // 4. Create a new route with the new point of sale
-    cy.get('input[id="mercaderistaId"]').type(newMercaderistaId);
-    // Find the checkbox corresponding to our new point and check it
-    cy.contains('label', newPointName).parent().find('input[type="checkbox"]').check();
-    cy.contains('button', 'Guardar Ruta').click();
+    cy.get('input[name="mercaderistaId"]').type(newMercaderistaId);
+    cy.contains('label', newPoint.nombre).parent().find('input[type="checkbox"]').check();
+    cy.contains('button', 'Crear Ruta').click();
+    cy.wait('@createRuta');
 
-    // 5. Verify the new route is in the table
-    cy.contains('td', newMercaderistaId).should('be.visible');
-    cy.contains('td', newPointName).should('be.visible');
+    // 5. Verify the success message
+    cy.contains('Ruta creada con éxito').should('be.visible');
   });
 });

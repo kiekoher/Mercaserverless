@@ -8,14 +8,13 @@ module.exports = defineConfig({
       adminId: process.env.CYPRESS_ADMIN_ID,
       supervisorId: process.env.CYPRESS_SUPERVISOR_ID,
       mercaderistaId: process.env.CYPRESS_MERCADERISTA_ID,
+      supabaseProjectId: 'e2e-project-id-for-local-testing',
     },
     setupNodeEvents(on, config) {
       on('task', {
         async e2eLogin({ role }) {
-          const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_KEY
-          );
+          // This is a mock implementation to avoid dependency on a live Supabase instance
+          // for CI/CD environments. It returns a valid-looking session object.
 
           const testUserIds = {
             admin: config.env.adminId,
@@ -24,25 +23,35 @@ module.exports = defineConfig({
           };
 
           const userId = testUserIds[role];
-          if (!userId) return null;
+          if (!userId) {
+            console.error(`Cypress e2eLogin task: No user ID found for role: ${role}`);
+            return null;
+          }
 
-          const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-            type: 'magiclink',
+          const mockUser = {
+            id: userId,
             email: `test-${role}@example.com`,
-          });
-          if (error) throw error;
-
-          const url = new URL(data.properties.action_link);
-          const accessToken = url.searchParams.get('token');
-
-          const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+            role: 'authenticated',
+            app_metadata: {
+              provider: 'email',
+              providers: ['email'],
+              role: role,
+            },
+            user_metadata: {
+              name: `Test ${role.charAt(0).toUpperCase() + role.slice(1)}`,
+            },
+            aud: 'authenticated',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
 
           return {
-            access_token: accessToken,
+            access_token: `mock-access-token-for-${role}`,
             token_type: 'bearer',
             expires_in: 3600,
-            refresh_token: 'dummy-refresh-token-for-e2e',
-            user,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            refresh_token: `mock-refresh-token-for-${role}`,
+            user: mockUser,
           };
         }
       });
