@@ -15,6 +15,7 @@ jest.mock('@supabase/supabase-js', () => ({
 
 // Mock logger
 jest.mock('../../lib/logger.server');
+jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 describe('/api/dashboard-projections', () => {
   beforeEach(() => {

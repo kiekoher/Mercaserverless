@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 
-require('dotenv').config({ path: './.env' });
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: './.env' });
+}
 require('./lib/env');
 
 const nextConfig = {
