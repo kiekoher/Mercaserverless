@@ -2,10 +2,7 @@ import { requireUser } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import logger from '../../lib/logger.server';
 import { checkRateLimit } from '../../lib/rateLimiter';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+import env from '../../lib/env';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -23,9 +20,10 @@ export default async function handler(req, res) {
     }
 
     try {
+        const supabaseAdmin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
         // Placeholder for complex data fetching and calculation
-        const workload = await getWeeklyWorkload();
-        const frequency = await getFrequencyCompliance();
+        const workload = await getWeeklyWorkload(supabaseAdmin);
+        const frequency = await getFrequencyCompliance(supabaseAdmin);
 
         res.status(200).json({
             workload,
@@ -38,7 +36,7 @@ export default async function handler(req, res) {
     }
 }
 
-async function getWeeklyWorkload() {
+async function getWeeklyWorkload(supabaseAdmin) {
     const { data, error } = await supabaseAdmin.rpc('get_weekly_workload');
 
     if (error) {
@@ -52,7 +50,7 @@ async function getWeeklyWorkload() {
     }));
 }
 
-async function getFrequencyCompliance() {
+async function getFrequencyCompliance(supabaseAdmin) {
     const { data, error } = await supabaseAdmin.rpc('get_frequency_compliance');
 
     if (error) {

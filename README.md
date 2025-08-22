@@ -101,3 +101,7 @@ No se debe utilizar el archivo `.env` en el entorno de producción.
 ### Seguridad y sanitización
 
 Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
+
+### Operaciones
+
+Para procedimientos de monitoreo, rotación de secretos y planes de contingencia consulta el archivo [`OPERATIONS.md`](./OPERATIONS.md).
