@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
       }
       return null;
     }
-  }, []);
+  }, [isCypress]);
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null); // New state for profile
