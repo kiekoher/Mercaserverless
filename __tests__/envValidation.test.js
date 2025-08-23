@@ -21,4 +21,12 @@ describe('environment variable validation', () => {
     delete process.env.GEMINI_API_KEY;
     expect(() => require(envServerPath)).toThrow('Invalid environment variables');
   });
+
+  it('throws when Redis configuration is missing', () => {
+    const envServerPath = path.resolve(__dirname, '../lib/env.server.js');
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.UPSTASH_REDIS_URL;
+    expect(() => require(envServerPath)).toThrow('Invalid environment variables');
+  });
 });

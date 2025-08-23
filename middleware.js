@@ -64,6 +64,8 @@ export async function middleware(req) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '';
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const upstashHost = upstashUrl ? new URL(upstashUrl).host : '';
 
   // Hardened CSP with specific Supabase host instead of wildcard
   const cspHeader = `
@@ -76,7 +78,7 @@ export async function middleware(req) {
     object-src 'none';
     base-uri 'none';
     font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' wss://${supabaseHost} https://${supabaseHost} https://*.googleapis.com;
+    connect-src 'self' wss://${supabaseHost} https://${supabaseHost} https://*.googleapis.com https://in.logtail.com${upstashHost ? ` https://${upstashHost}` : ''};
     frame-ancestors 'none';
     report-to csp-endpoint;
     report-uri /api/csp-report;
@@ -91,6 +93,7 @@ export async function middleware(req) {
     })
   );
   res.headers.set('Content-Security-Policy', cspHeader);
+  // Update connect-src if integrating new external services.
   setSecurityHeaders(res);
 
   // Return the response object, which now has the cookies and headers set.

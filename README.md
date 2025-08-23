@@ -39,7 +39,7 @@ Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local pa
 
 ### Prerrequisitos
 
-Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o superior).
+Asegúrate de tener instalado [Node.js](https://nodejs.org/) en su versión 20.x.
 
 ### Configuración Local
 
@@ -89,7 +89,7 @@ Este comando utiliza variables de entorno de `.env.test`.
 
 ## Despliegue y Arquitectura Serverless
 
-Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube.
+Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube. Para escenarios de VPS también se incluye un `Dockerfile` de producción.
 
 ### Despliegue en Vercel
 
@@ -103,7 +103,7 @@ Todas las variables de entorno requeridas por la aplicación (ver `.env.example`
 - URL del servicio de Redis. Se soporta la conexión REST de Upstash mediante `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` o el URL clásico `UPSTASH_REDIS_URL`.
 - Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
 - Tiempo máximo de espera para la API de IA (`AI_TIMEOUT_MS`).
-- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, mantener en `false` en producción, de lo contrario se permitirán todas las solicitudes si Redis no está disponible).
+- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, por defecto `true`; establecer en `false` en producción para forzar bloqueo si Redis falla).
 - Bypass de autenticación para pruebas (`NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS`, mantener en `false` en producción).
 
 No se debe utilizar el archivo `.env` en el entorno de producción.
@@ -116,6 +116,23 @@ No se debe utilizar el archivo `.env` en el entorno de producción.
 ### Seguridad y sanitización
 
 Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
+
+## Despliegue en VPS Ubuntu
+
+El repositorio incluye un `Dockerfile` listo para generar una imagen de producción con Node.js 20. Para compilar y ejecutar:
+
+```bash
+docker build -t mercaderista .
+docker run --env-file .env.production -p 3000:3000 mercaderista
+```
+
+Si prefieres un despliegue tradicional con PM2 o systemd:
+
+```bash
+npm ci
+npm run build
+pm2 start npm --name mercaderista -- start
+```
 
 ### Operaciones
 

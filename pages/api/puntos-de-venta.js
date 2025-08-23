@@ -119,6 +119,8 @@ export default async function handler(req, res) {
       logger.error({ err: error }, 'Error inserting point of sale');
       return res.status(500).json({ error: 'Internal Server Error' });
     }
+    const cache = getCacheClient();
+    if (cache) await cache.del('pdv:all');
     return res.status(201).json(data);
 
   } else if (req.method === 'PUT') {
@@ -179,6 +181,8 @@ export default async function handler(req, res) {
       logger.error({ err: error }, 'Error updating point of sale');
       return res.status(500).json({ error: 'Internal Server Error' });
     }
+    const cache = getCacheClient();
+    if (cache) await cache.del('pdv:all');
     return res.status(200).json(data);
 
   } else if (req.method === 'DELETE') {
@@ -204,6 +208,8 @@ export default async function handler(req, res) {
       logger.error({ err: error }, 'Error deleting point of sale');
       return res.status(500).json({ error: 'Internal Server Error' });
     }
+    const cache = getCacheClient();
+    if (cache) await cache.del('pdv:all');
     return res.status(200).json({ message: 'Punto de venta eliminado' });
 
   } else if (req.method === 'GET') {
@@ -225,11 +231,20 @@ export default async function handler(req, res) {
     const safeSearch = sanitizeInput(search).slice(0, 50);
 
     if (all === 'true') {
+      const cache = getCacheClient();
+      const cacheKey = 'pdv:all';
+      if (cache) {
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+          return res.status(200).json(JSON.parse(cached));
+        }
+      }
       const { data, error } = await supabase.from('puntos_de_venta').select(PDV_FIELDS);
       if (error) {
         logger.error({ err: error }, 'Error fetching all points of sale');
         return res.status(500).json({ error: 'Internal Server Error' });
       }
+      if (cache) await cache.set(cacheKey, JSON.stringify(data), { ex: 60 });
       return res.status(200).json(data);
     }
 
