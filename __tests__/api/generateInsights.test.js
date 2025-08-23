@@ -23,6 +23,10 @@ describe('/api/generate-insights', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     process.env.GEMINI_API_KEY = 'test';
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon';
+    process.env.SUPABASE_SERVICE_KEY = 'service';
+    process.env.AI_TIMEOUT_MS = '10000';
     ({ default: handler } = await import('../../pages/api/generate-insights'));
   });
 

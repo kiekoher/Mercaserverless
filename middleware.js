@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+function setSecurityHeaders(res) {
+  res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  res.headers.set('Referrer-Policy', 'no-referrer');
+  res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
+}
+
 export async function middleware(req) {
   const requestHeaders = new Headers(req.headers);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
@@ -31,14 +39,18 @@ export async function middleware(req) {
     if (!session && pathname !== '/login' && !pathname.startsWith('/api')) {
       const url = req.nextUrl.clone();
       url.pathname = '/login';
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      setSecurityHeaders(redirectRes);
+      return redirectRes;
     }
 
     // Redirect authenticated users from the login page to the dashboard.
     if (session && pathname === '/login') {
       const url = req.nextUrl.clone();
       url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
+      const redirectRes = NextResponse.redirect(url);
+      setSecurityHeaders(redirectRes);
+      return redirectRes;
     }
   }
 
@@ -67,11 +79,7 @@ export async function middleware(req) {
   `.replace(/\s{2,}/g, ' ').trim();
 
   res.headers.set('Content-Security-Policy', cspHeader);
-  res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  res.headers.set('Referrer-Policy', 'no-referrer');
-  res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-  res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  setSecurityHeaders(res);
 
   // Return the response object, which now has the cookies and headers set.
   return res;

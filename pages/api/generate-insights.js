@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
 import { requireUser } from '../../lib/auth';
+import env from '../../lib/env';
 
 const insightsSchema = z.object({
   rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }).max(1_000_000),
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), parseInt(process.env.AI_TIMEOUT_MS || '10000', 10));
+    const timeout = setTimeout(() => controller.abort(), Number(env.AI_TIMEOUT_MS ?? 10000));
 
     // 3. Call the Gemini API with timeout
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
