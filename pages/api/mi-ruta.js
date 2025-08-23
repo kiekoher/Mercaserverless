@@ -1,8 +1,8 @@
-import logger from '../../lib/logger.server';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import { requireUser } from '../../lib/auth';
+const { withLogging } = require('../../lib/api-logger');
+const { requireUser } = require('../../lib/auth');
+const { checkRateLimit } = require('../../lib/rateLimiter');
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed');
   }
 
-  if (!await checkRateLimit(req, { userId: user.id })) {
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 
@@ -23,8 +23,7 @@ export default async function handler(req, res) {
   });
 
   if (error) {
-    logger.error({ err: error }, 'Error calling RPC function');
-    return res.status(500).json({ error: 'Error al obtener la ruta.' });
+    throw error;
   }
 
   if (!data) {
@@ -33,3 +32,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json(data);
 }
+
+module.exports = withLogging(handler);;

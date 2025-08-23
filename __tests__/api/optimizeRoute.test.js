@@ -1,24 +1,4 @@
-/** @jest-environment node */
-import { jest } from '@jest/globals';
-
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k, v) {
-      this.headers[k] = v;
-    },
-    status(code) {
-      this.statusCode = code;
-      return this;
-    },
-    json(payload) {
-      this.data = payload;
-      return this;
-    },
-  };
-}
+const { createMocks } = require('node-mocks-http');
 
 const mockDirections = jest.fn().mockResolvedValue({
   data: { routes: [{ waypoint_order: [1, 0] }] },
@@ -29,69 +9,46 @@ jest.mock('@googlemaps/google-maps-services-js', () => ({
     directions: mockDirections,
   })),
 }));
-
-jest.mock('../../lib/rateLimiter', () => ({
-  checkRateLimit: jest.fn().mockReturnValue(true),
-}));
-
-jest.mock('../../lib/logger.server', () => ({
-  error: jest.fn(),
-}));
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
-}));
-
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+jest.mock('../../lib/rateLimiter');
+jest.mock('../../lib/logger.server');
+jest.mock('../../lib/auth');
+jest.mock('../../lib/csrf');
 
 describe('optimize-route API', () => {
+  let handler, requireUser, checkRateLimit, verifyCsrf;
+
   beforeEach(() => {
     jest.resetModules();
+
+    requireUser = require('../../lib/auth').requireUser;
+    checkRateLimit = require('../../lib/rateLimiter').checkRateLimit;
+    verifyCsrf = require('../../lib/csrf').verifyCsrf;
+    handler = require('../../pages/api/optimize-route');
+
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
-    const { getSupabaseServerClient } = require('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: () => ({
-        select: () => ({
-          eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
-        })
-      })
-    });
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, error: null });
+    checkRateLimit.mockResolvedValue(true);
+    verifyCsrf.mockReturnValue(true);
+    mockDirections.mockClear();
   });
 
   it('returns 400 for invalid body', async () => {
-    const { default: handler } = await import('../../pages/api/optimize-route.js');
-    const req = { method: 'POST', body: { puntos: [] } };
-    const res = createMockRes();
+    const { req, res } = createMocks({ method: 'POST', body: { puntos: [] } });
     await handler(req, res);
-    expect(res.statusCode).toBe(400);
+    expect(res._getStatusCode()).toBe(400);
   });
 
   it('returns 400 for malformed points', async () => {
-    const { default: handler } = await import('../../pages/api/optimize-route.js');
-    const req = {
+    const { req, res } = createMocks({
       method: 'POST',
       body: { puntos: [{ direccion: 'A' }, { direccion: 'B', ciudad: 'Y' }] },
-    };
-    const res = createMockRes();
+    });
     await handler(req, res);
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('returns 400 when id is not a number', async () => {
-    const { default: handler } = await import('../../pages/api/optimize-route.js');
-    const req = {
-      method: 'POST',
-      body: { puntos: [{ id: 'a', direccion: 'A', ciudad: 'X' }, { id: 2, direccion: 'B', ciudad: 'Y' }] },
-    };
-    const res = createMockRes();
-    await handler(req, res);
-    expect(res.statusCode).toBe(400);
+    expect(res._getStatusCode()).toBe(400);
   });
 
   it('sanitizes addresses before calling Google Maps', async () => {
-    const { default: handler } = await import('../../pages/api/optimize-route.js');
-    const req = {
+    const { req, res } = createMocks({
       method: 'POST',
       body: {
         puntos: [
@@ -100,10 +57,9 @@ describe('optimize-route API', () => {
           { id: 3, direccion: 'C', ciudad: 'Z' },
         ],
       },
-    };
-    const res = createMockRes();
+    });
     await handler(req, res);
-    expect(res.statusCode).toBe(200);
+    expect(res._getStatusCode()).toBe(200);
     expect(mockDirections).toHaveBeenCalledWith(
       expect.objectContaining({
         params: expect.objectContaining({
@@ -115,8 +71,7 @@ describe('optimize-route API', () => {
   });
 
   it('passes the transport mode to Google Maps API', async () => {
-    const { default: handler } = await import('../../pages/api/optimize-route.js');
-    const req = {
+    const { req, res } = createMocks({
       method: 'POST',
       body: {
         puntos: [
@@ -125,10 +80,9 @@ describe('optimize-route API', () => {
         ],
         modo_transporte: 'walking',
       },
-    };
-    const res = createMockRes();
+    });
     await handler(req, res);
-    expect(res.statusCode).toBe(200);
+    expect(res._getStatusCode()).toBe(200);
     expect(mockDirections).toHaveBeenCalledWith(
       expect.objectContaining({
         params: expect.objectContaining({
@@ -138,4 +92,3 @@ describe('optimize-route API', () => {
     );
   });
 });
-

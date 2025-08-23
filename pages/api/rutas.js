@@ -1,11 +1,11 @@
-import logger from '../../lib/logger.server';
-import { z } from 'zod';
-import { verifyCsrf } from '../../lib/csrf';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import { sanitizeInput } from '../../lib/sanitize';
-import { requireUser } from '../../lib/auth';
+const { z } = require('zod');
+const { withLogging } = require('../../lib/api-logger');
+const { requireUser } = require('../../lib/auth');
+const { verifyCsrf } = require('../../lib/csrf');
+const { checkRateLimit } = require('../../lib/rateLimiter');
+const { sanitizeInput } = require('../../lib/sanitize');
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
@@ -44,15 +44,14 @@ export default async function handler(req, res) {
       .range(from, to);
 
     if (error) {
-      logger.error({ err: error }, 'Error fetching routes');
-      return res.status(500).json({ error: 'Internal Server Error' });
+      throw error;
     }
 
     res.setHeader('X-Total-Count', count);
     const transformedData = data.map(r => ({
-        ...r,
-        mercaderistaId: r.mercaderista_id,
-        puntosDeVentaIds: r.puntos_de_venta_ids,
+      ...r,
+      mercaderistaId: r.mercaderista_id,
+      puntosDeVentaIds: r.puntos_de_venta_ids,
     }));
     return res.status(200).json(transformedData);
 
@@ -81,8 +80,7 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      logger.error({ err: error }, 'Error inserting route');
-      return res.status(500).json({ error: 'Internal Server Error' });
+      throw error;
     }
     return res.status(201).json(data);
 
@@ -117,8 +115,7 @@ export default async function handler(req, res) {
       .single();
 
     if (error) {
-      logger.error({ err: error }, 'Error updating route');
-      return res.status(500).json({ error: 'Internal Server Error' });
+      throw error;
     }
     return res.status(200).json(data);
 
@@ -142,8 +139,7 @@ export default async function handler(req, res) {
       .eq('id', id);
 
     if (error) {
-      logger.error({ err: error }, 'Error deleting route');
-      return res.status(500).json({ error: 'Internal Server Error' });
+      throw error;
     }
     return res.status(200).json({ message: 'Ruta eliminada' });
 
@@ -152,3 +148,5 @@ export default async function handler(req, res) {
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }
+
+module.exports = withLogging(handler);

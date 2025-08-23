@@ -1,166 +1,85 @@
-/** @jest-environment node */
-import { jest } from '@jest/globals';
+const { createMocks } = require('node-mocks-http');
+const fs = require('fs');
 
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k, v) { this.headers[k] = v; },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.data = payload; return this; },
-    end(payload){ this.data = payload; return this; }
-  };
-}
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
+// Mock dependencies
+jest.mock('../../lib/auth');
+jest.mock('../../lib/logger.server');
+jest.mock('papaparse');
+jest.mock('@googlemaps/google-maps-services-js');
+jest.mock('formidable');
+jest.mock('../../lib/redisCache', () => ({
+    getCacheClient: jest.fn().mockReturnValue(null), // Default to no cache
 }));
 
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
-
-const mockGeocode = jest.fn();
-jest.mock('@googlemaps/google-maps-services-js', () => ({
-  Client: jest.fn().mockImplementation(() => ({ geocode: mockGeocode })),
+const mockRpc = jest.fn();
+jest.mock('@supabase/supabase-js', () => ({
+  createClient: jest.fn(() => ({
+    rpc: mockRpc,
+  })),
 }));
 
-jest.mock('p-limit', () => jest.fn(() => (fn) => fn()));
+const { requireUser } = require('../../lib/auth');
+const Papa = require('papaparse');
+const { Client } = require('@googlemaps/google-maps-services-js');
+const formidable = require('formidable');
 
-describe('import-pdv API', () => {
+describe('/api/import-pdv', () => {
+  let handler;
+
   beforeEach(() => {
+    jest.clearAllMocks();
     jest.resetModules();
-    process.env.GOOGLE_MAPS_API_KEY = 'key';
+    handler = require('../../pages/api/import-pdv');
+
+    requireUser.mockResolvedValue({
+      user: { id: 'test-user' },
+      role: 'admin',
+      supabase: { rpc: mockRpc },
+      error: null,
+    });
+    mockRpc.mockResolvedValue({ data: { success: true }, error: null });
   });
 
-  it('returns 401 when unauthenticated', async () => {
-      const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-      getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
+  it('should return 403 for non-admin/supervisor roles', async () => {
+    requireUser.mockResolvedValue({
+        user: { id: 'test-mercaderista' },
+        role: 'mercaderista',
+        error: { status: 403, message: 'Forbidden' }
     });
-    const { default: handler } = await import('../../pages/api/import-pdv.js');
-    const req = { method: 'POST', body: { puntos: [] } };
-    const res = createMockRes();
+    const { req, res } = createMocks({ method: 'POST' });
     await handler(req, res);
-    expect(res.statusCode).toBe(401);
+    expect(res._getStatusCode()).toBe(403);
   });
 
-  it('sanitizes each imported point', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    let inserted;
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
-            })
-          };
-        }
-        if (table === 'puntos_de_venta') {
-          return {
-            insert: (arr) => {
-              inserted = arr;
-              return { error: null };
-            }
-          };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/import-pdv.js');
-    const req = { method: 'POST', body: { puntos: [{ nombre: '<b>N</b>', direccion: '<i>D</i>', ciudad: 'C' }] } };
-    const res = createMockRes();
+  it('should return 400 if no CSV file is provided', async () => {
+    formidable.mockImplementation(() => ({
+      parse: (req, cb) => cb(null, {}, {}),
+    }));
+    const { req, res } = createMocks({ method: 'POST' });
     await handler(req, res);
-    expect(res.statusCode).toBe(200);
-    expect(inserted[0].nombre).toBe('N');
-    expect(inserted[0].direccion).toBe('D');
+    expect(res._getStatusCode()).toBe(400);
   });
 
-  it('sanitizes address before geocoding', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    mockGeocode.mockResolvedValue({ data: { results: [] } });
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) })
-            })
-          };
-        }
-        if (table === 'puntos_de_venta') {
-          return { insert: () => ({ error: null }) };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/import-pdv.js');
-    const req = { method: 'POST', body: { puntos: [{ nombre: 'N', direccion: '<b>D</b>', ciudad: '<i>C</i>' }] } };
-    const res = createMockRes();
-    await handler(req, res);
-    expect(mockGeocode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        params: expect.objectContaining({ address: 'D, C, Colombia' })
-      })
-    );
-  });
+  it('should process a valid CSV', async () => {
+    const mockFile = { filepath: 'test.csv', mimetype: 'text/csv' };
+    formidable.mockImplementation(() => ({
+      parse: (req, cb) => cb(null, {}, { csvfile: [mockFile] }),
+    }));
 
-  it('handles undefined geocode response gracefully without crashing', async () => {
-    const { default: logger } = await import('../../lib/logger.server');
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    let insertedData = [];
-
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return { select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: { role: 'supervisor' } }) }) }) };
-        }
-        if (table === 'puntos_de_venta') {
-          return {
-            insert: (arr) => {
-              insertedData = arr;
-              return { error: null };
-            }
-          };
-        }
-      }
+    const validPdvs = [{ nombre: 'Store A', direccion: '123 Main St', ciudad: 'Anytown' }];
+    Papa.parse.mockImplementation((stream, config) => {
+      validPdvs.forEach(pdv => config.step({ data: pdv }));
+      config.complete();
     });
 
-    mockGeocode.mockResolvedValue(undefined);
+    Client.mockImplementation(() => ({
+      geocode: jest.fn().mockResolvedValue({ data: { results: [] } }),
+    }));
 
-    // Spy on logger.error. This is the key.
-    const loggerErrorSpy = jest.spyOn(logger, 'error');
-
-    const { default: handler } = await import('../../pages/api/import-pdv.js');
-    const req = {
-      method: 'POST',
-      body: {
-        puntos: [
-          { nombre: 'Store A', direccion: '123 Main St', ciudad: 'Anytown' }
-        ]
-      }
-    };
-    const res = createMockRes();
-
+    const { req, res } = createMocks({ method: 'POST' });
     await handler(req, res);
 
-    // This is the crucial assertion.
-    // The buggy code logs a TypeError. The test should fail if it does.
-    expect(loggerErrorSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        err: expect.any(TypeError)
-      }),
-      expect.any(String)
-    );
-
-    // The rest of the assertions remain the same.
-    expect(res.statusCode).toBe(200);
-    expect(insertedData[0]).toBeDefined();
-    expect(insertedData[0].latitud).toBeNull();
-    expect(insertedData[0].longitud).toBeNull();
-
-    loggerErrorSpy.mockRestore();
+    expect(res._getStatusCode()).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith('bulk_upsert_pdv', expect.any(Object));
   });
 });
-

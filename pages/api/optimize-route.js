@@ -1,13 +1,14 @@
-import { Client } from '@googlemaps/google-maps-services-js';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import logger from '../../lib/logger.server';
-import { z } from 'zod';
-import { verifyCsrf } from '../../lib/csrf';
-import { sanitizeInput } from '../../lib/sanitize';
-import { requireUser } from '../../lib/auth';
-import { getCacheClient } from '../../lib/redisCache';
+const { Client } = require('@googlemaps/google-maps-services-js');
+const { z } = require('zod');
+const { withLogging } = require('../../lib/api-logger');
+const { requireUser } = require('../../lib/auth');
+const { verifyCsrf } = require('../../lib/csrf');
+const logger = require('../../lib/logger.server');
+const { checkRateLimit } = require('../../lib/rateLimiter');
+const { getCacheClient } = require('../../lib/redisCache');
+const { sanitizeInput } = require('../../lib/sanitize');
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -16,10 +17,10 @@ export default async function handler(req, res) {
   if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GOOGLE_MAPS_API_KEY) {
-    return res.status(500).json({ error: 'GOOGLE_MAPS_API_KEY no configurada' });
+    throw new Error('GOOGLE_MAPS_API_KEY no configurada');
   }
 
-  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
   }
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
   if (hasCache && cacheKey) {
     const cached = await cache.get(cacheKey);
     if (cached) {
+      res.setHeader('X-Cache', 'HIT');
       return res.status(200).json(JSON.parse(cached));
     }
   }
@@ -76,12 +78,18 @@ export default async function handler(req, res) {
     const order = directions.data.routes[0].waypoint_order || [];
     const optimizedPuntos = [puntos[0], ...order.map(i => puntos[i + 1])];
     const payload = { optimizedPuntos };
-    res.status(200).json(payload);
+
     if (hasCache && cacheKey) {
+      res.setHeader('X-Cache', 'MISS');
       await cache.set(cacheKey, JSON.stringify(payload), { ex: 60 * 60 });
     }
+    res.status(200).json(payload);
+
   } catch (error) {
-    logger.error({ err: error }, 'Optimization error');
-    res.status(500).json({ error: 'No se pudo optimizar la ruta.' });
+    logger.error({ err: error, userId: user.id }, 'Directions API optimization error');
+    // Re-throw for the HOF to catch and log centrally
+    throw new Error('No se pudo optimizar la ruta.');
   }
 }
+
+module.exports = withLogging(handler);;

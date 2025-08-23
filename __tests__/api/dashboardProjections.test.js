@@ -74,6 +74,7 @@ describe('/api/dashboard-projections', () => {
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(500);
-    expect(res._getJSONData().error).toBe('Failed to fetch projection data');
+    // After refactoring with the logging HOF, unhandled errors now return a generic message.
+    expect(res._getJSONData().error).toBe('Internal Server Error');
   });
 });
