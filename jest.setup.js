@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom';
 import logger, { flushLogger } from './lib/logger.server';
 import { closeRedis } from './lib/rateLimiter';
+jest.mock('@upstash/redis');
 
 // Environment variables are loaded in jest.env.js, executed via setupFiles.
 
