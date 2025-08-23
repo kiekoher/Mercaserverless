@@ -170,15 +170,18 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
-    const { id } = req.query;
-    if (!id) {
-      return res.status(400).json({ error: 'ID requerido' });
+    const schema = z.object({ id: z.coerce.number().int().positive() });
+    const parsed = schema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'ID de punto de venta inválido.' });
     }
+    const { id } = parsed.data;
 
     const { error } = await supabase
       .from('puntos_de_venta')
       .delete()
-      .eq('id', Number(id));
+      .eq('id', id);
 
     if (error) {
       logger.error({ err: error }, 'Error deleting point of sale');
@@ -191,7 +194,17 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
-    const { page = '1', search = '', all } = req.query;
+    const schema = z.object({
+      page: z.coerce.number().int().positive().default(1),
+      search: z.string().optional().default(''),
+      all: z.enum(['true', 'false']).optional().default('false'),
+    });
+
+    const parsed = schema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Parámetros de consulta inválidos.' });
+    }
+    const { page, search, all } = parsed.data;
     const safeSearch = sanitizeInput(search).slice(0, 50);
 
     if (all === 'true') {
@@ -203,13 +216,8 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    const pageNumber = parseInt(page, 10);
-    if (Number.isNaN(pageNumber) || pageNumber < 1) {
-      return res.status(400).json({ error: 'Parámetro page inválido' });
-    }
-
     const limit = 10;
-    const offset = (pageNumber - 1) * limit;
+    const offset = (page - 1) * limit;
 
     const query = supabase.from('puntos_de_venta').select(PDV_FIELDS, { count: 'exact' });
 

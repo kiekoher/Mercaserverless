@@ -7,3 +7,5 @@ const dotenv = require('dotenv');
 dotenv.config({ path: '.env.test' });
 
 process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS = 'true';
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'dummy-anon-key';
