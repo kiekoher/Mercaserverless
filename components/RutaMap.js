@@ -1,14 +1,17 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Fix for default icon issue with Webpack
 delete L.Icon.Default.prototype._getIconUrl;
 
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-  iconUrl: '/leaflet/marker-icon.png',
-  shadowUrl: '/leaflet/marker-shadow.png',
+  iconRetinaUrl: markerIcon2x.src || markerIcon2x,
+  iconUrl: markerIcon.src || markerIcon,
+  shadowUrl: markerShadow.src || markerShadow,
 });
 
 const RutaMap = ({ puntos, center }) => {

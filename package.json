@@ -24,6 +24,7 @@
     "@mui/material": "^5.15.20",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.56.0",
+    "@upstash/redis": "^1.29.0",
     "chart.js": "^4.5.0",
     "date-fns": "^4.1.0",
     "ioredis": "^5.7.0",

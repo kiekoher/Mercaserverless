@@ -6,13 +6,16 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
+import geocodeConfig from '../../lib/geocodeConfig';
 
 const googleMapsClient = new Client({});
 
-const GEOCODE_TIMEOUT_MS = parseInt(process.env.GEOCODE_TIMEOUT_MS || '1000', 10);
-const GEOCODE_RETRIES = parseInt(process.env.GEOCODE_RETRIES || '3', 10);
-const GEOCODE_CONCURRENCY = parseInt(process.env.GEOCODE_CONCURRENCY || '5', 10);
-const GEOCODE_RETRY_BASE_MS = parseInt(process.env.GEOCODE_RETRY_BASE_MS || '100', 10);
+const {
+  GEOCODE_TIMEOUT_MS,
+  GEOCODE_RETRIES,
+  GEOCODE_CONCURRENCY,
+  GEOCODE_RETRY_BASE_MS,
+} = geocodeConfig;
 
 // Importación masiva con geocodificación paralela y manejo de errores por punto
 export default async function handler(req, res) {
