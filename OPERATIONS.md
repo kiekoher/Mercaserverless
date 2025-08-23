@@ -10,6 +10,7 @@ Este documento resume procedimientos claves para mantener el sistema Mercaderist
 ## Rotación de secretos
 - Mantenga todos los tokens y claves en los valores de entorno de Vercel.
 - Programe rotaciones trimestrales de `SUPABASE_SERVICE_KEY`, `LOGTAIL_SOURCE_TOKEN` y `UPSTASH_REDIS_URL`.
+- Mantenga en secreto el `HEALTHCHECK_TOKEN` utilizado para el endpoint `/api/health` y cámbielo si se sospecha de filtración.
 - Documente cualquier cambio y revoque credenciales antiguas inmediatamente.
 
 ## Respaldo y recuperación

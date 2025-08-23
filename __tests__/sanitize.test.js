@@ -15,4 +15,9 @@ describe('sanitizeInput', () => {
     const result = sanitizeInput('hola$%');
     expect(result).toBe('');
   });
+
+  it('accepts unicode letters', () => {
+    const result = sanitizeInput('camión número ñandú');
+    expect(result).toBe('camión número ñandú');
+  });
 });

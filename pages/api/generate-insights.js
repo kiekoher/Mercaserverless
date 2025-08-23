@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
 import { requireUser } from '../../lib/auth';
-import env from '../../lib/env';
+import env from '../../lib/env.server';
 
 const insightsSchema = z.object({
   rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }).max(1_000_000),

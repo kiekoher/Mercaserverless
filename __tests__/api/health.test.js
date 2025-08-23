@@ -37,6 +37,7 @@ describe('health API', () => {
   beforeEach(() => {
     jest.resetModules();
     process.env.UPSTASH_REDIS_URL = 'redis://localhost:6379';
+    process.env.HEALTHCHECK_TOKEN = 'secret';
     const { getSupabaseServerClient } = require('../../lib/supabaseServer');
     getSupabaseServerClient.mockReturnValue({
       auth: { getSession: jest.fn().mockResolvedValue({}) }
@@ -45,7 +46,7 @@ describe('health API', () => {
 
   it('reuses redis connection across calls', async () => {
     const { default: handler } = await import('../../pages/api/health.js');
-    const req = {};
+    const req = { headers: { 'x-health-token': 'secret' } };
     const res = createMockRes();
     await handler(req, res);
     await handler(req, res);
@@ -58,10 +59,18 @@ describe('health API', () => {
     const { checkRateLimit } = require('../../lib/rateLimiter');
     checkRateLimit.mockResolvedValueOnce(false);
     const { default: handler } = await import('../../pages/api/health.js');
-    const req = {};
+    const req = { headers: { 'x-health-token': 'secret' } };
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(429);
+  });
+
+  it('returns 401 without valid token', async () => {
+    const { default: handler } = await import('../../pages/api/health.js');
+    const req = { headers: {} };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
   });
 });
 

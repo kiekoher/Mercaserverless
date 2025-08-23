@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
         if (session?.user) {
           const { data: userProfile, error } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, role, full_name, updated_at')
             .eq('id', session.user.id)
             .single();
           if (error) {
@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }) => {
           if (session?.user) {
             const { data: userProfile, error } = await supabase
               .from('profiles')
-              .select('*')
+              .select('id, role, full_name, updated_at')
               .eq('id', session.user.id)
               .single();
             if (error) {

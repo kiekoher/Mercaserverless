@@ -6,6 +6,10 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 let redis;
 
 export default async function handler(req, res) {
+  const token = req.headers['x-health-token'];
+  if (!process.env.HEALTHCHECK_TOKEN || token !== process.env.HEALTHCHECK_TOKEN) {
+    return res.status(401).json({ status: 'unauthorized' });
+  }
   if (!(await checkRateLimit(req))) {
     return res.status(429).json({ status: 'rate-limit' });
   }

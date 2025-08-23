@@ -11,6 +11,8 @@ const googleMapsClient = new Client({});
 
 const GEOCODE_TIMEOUT_MS = parseInt(process.env.GEOCODE_TIMEOUT_MS || '1000', 10);
 const GEOCODE_RETRIES = parseInt(process.env.GEOCODE_RETRIES || '3', 10);
+const GEOCODE_CONCURRENCY = parseInt(process.env.GEOCODE_CONCURRENCY || '5', 10);
+const GEOCODE_RETRY_BASE_MS = parseInt(process.env.GEOCODE_RETRY_BASE_MS || '100', 10);
 
 // Importación masiva con geocodificación paralela y manejo de errores por punto
 export default async function handler(req, res) {
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
 
   try {
     // Procesar geocodificación en paralelo con un límite de concurrencia
-    const limit = pLimit(5);
+    const limit = pLimit(GEOCODE_CONCURRENCY);
     const puntosToInsert = [];
 
     const tasks = puntos.map(punto => limit(async () => {
@@ -94,8 +96,11 @@ export default async function handler(req, res) {
           if (attempt === GEOCODE_RETRIES) {
             logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
           } else {
-            const delay = 100 * Math.pow(2, attempt - 1);
+            const delay = GEOCODE_RETRY_BASE_MS * Math.pow(2, attempt - 1);
             await new Promise((r) => setTimeout(r, delay));
+          }
+          if (e.response?.data?.status === 'OVER_QUERY_LIMIT') {
+            throw new Error('Geocoding quota exceeded');
           }
         }
       }
@@ -134,6 +139,10 @@ export default async function handler(req, res) {
 
     res.status(200).json({ message: `${puntosToInsert.length} puntos de venta importados con éxito.` });
   } catch (error) {
+    if (error.message === 'Geocoding quota exceeded') {
+      logger.error('Geocoding quota exceeded during import');
+      return res.status(429).json({ error: 'Límite de geocodificación alcanzado. Intenta más tarde.' });
+    }
     logger.error({ err: error }, 'Error during bulk import');
     res.status(500).json({ error: 'Ocurrió un error durante la importación masiva.' });
   }

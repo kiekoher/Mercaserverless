@@ -2,7 +2,7 @@ import { requireUser } from '../../lib/auth';
 import { createClient } from '@supabase/supabase-js';
 import logger from '../../lib/logger.server';
 import { checkRateLimit } from '../../lib/rateLimiter';
-import env from '../../lib/env';
+import env from '../../lib/env.server';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {

@@ -71,7 +71,7 @@ npm test
 ```
 Para las pruebas de extremo a extremo (E2E), utiliza Cypress:
 ```bash
-npm run cypress:open
+npm run cy:run
 ```
 
 ## Despliegue y Arquitectura Serverless
