@@ -15,11 +15,9 @@ export async function middleware(req) {
   const requestHeaders = new Headers(req.headers);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
 
-  // Bypass authentication logic for Cypress tests
-  const userAgent = req.headers.get('user-agent') || '';
-  const isCypress = userAgent.includes('Cypress');
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true';
 
-  if (!isCypress) {
+  if (!bypassAuth) {
     // Create the Supabase client for production logic
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,

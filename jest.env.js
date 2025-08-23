@@ -5,3 +5,5 @@
 
 const dotenv = require('dotenv');
 dotenv.config({ path: '.env.test' });
+
+process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS = 'true';

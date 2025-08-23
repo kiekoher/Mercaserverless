@@ -21,9 +21,13 @@ jest.mock('../../lib/logger.server', () => ({
   warn: jest.fn(),
 }));
 
-jest.mock('../../lib/rateLimiter', () => ({
-  checkRateLimit: jest.fn().mockResolvedValue(true),
-}));
+jest.mock('../../lib/rateLimiter', () => {
+  const actual = jest.requireActual('../../lib/rateLimiter');
+  return {
+    ...actual,
+    checkRateLimit: jest.fn().mockResolvedValue(true),
+  };
+});
 
 const mockPing = jest.fn().mockResolvedValue('PONG');
 jest.mock('ioredis', () => {

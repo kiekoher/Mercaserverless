@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "cy:run": "xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test start http://localhost:3000 \"cypress run\""
+    "cy:run": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test start http://localhost:3000 \"cypress run\""
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",

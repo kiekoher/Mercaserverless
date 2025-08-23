@@ -5,19 +5,18 @@ import logger from '../lib/logger.client';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const isCypress =
-    typeof navigator !== 'undefined' && navigator.userAgent.includes('Cypress');
+  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true';
   const supabase = useMemo(() => {
-    if (isCypress) return null;
+    if (bypassAuth) return null;
     try {
       return getSupabaseClient();
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(e.message);
+        logger.warn({ err: e }, 'Failed to initialize Supabase client');
       }
       return null;
     }
-  }, [isCypress]);
+  }, [bypassAuth]);
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null); // New state for profile
@@ -25,7 +24,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const setupSession = async () => {
-      if (isCypress) {
+      if (bypassAuth) {
         const role =
           window.localStorage.getItem('cypress-role') || 'admin';
         const idMap = {
@@ -120,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     user,
     profile, // Expose profile
     signOut: () => {
-      if (isCypress) {
+      if (bypassAuth) {
         setSession(null);
         setUser(null);
         setProfile(null);

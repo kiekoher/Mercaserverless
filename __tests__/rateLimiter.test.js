@@ -18,11 +18,15 @@ describe('checkRateLimit', () => {
     jest.doMock('ioredis', () => {
       return jest.fn().mockImplementation(() => ({
         status: 'ready',
-        multi: () => ({
-          incr: () => this,
-          pexpire: () => this,
-          exec: () => { throw new Error('fail'); },
-        }),
+        multi() {
+          return {
+            incr() { return this; },
+            pexpire() { return this; },
+            exec() { throw new Error('fail'); },
+          };
+        },
+        on: jest.fn(),
+        quit: jest.fn(),
       }));
     });
     const { checkRateLimit } = await import('../lib/rateLimiter');
