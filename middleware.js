@@ -9,6 +9,8 @@ function setSecurityHeaders(res) {
   res.headers.set('X-Frame-Options', 'SAMEORIGIN');
   res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  res.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+  res.headers.set('X-DNS-Prefetch-Control', 'off');
 }
 
 export async function middleware(req) {

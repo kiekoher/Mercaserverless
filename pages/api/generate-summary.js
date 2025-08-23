@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import logger from '../../lib/logger.server';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
+import { getCacheClient } from '../../lib/redisCache';
 import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { requireUser } from '../../lib/auth';
@@ -15,6 +16,8 @@ const summarySchema = z.object({
     })
   ).min(1, { message: "Debe haber al menos un punto de venta" }),
 });
+
+const UNSAFE_PROMPT_PATTERN = /(\bSYSTEM\b|http(s)?:)/i;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -55,7 +58,7 @@ export default async function handler(req, res) {
   const safeMercaderista = sanitizeInput(mercaderistaId);
   const safePuntos = puntos.map(p => sanitizeInput(p.nombre));
 
-    const prompt = `
+  const prompt = `
       Genera un resumen corto y amigable para una ruta de mercaderista.
       Responde exclusivamente en formato JSON con la clave \"summary\":
       {"summary":"..."}
@@ -66,6 +69,21 @@ export default async function handler(req, res) {
       - Número de paradas: ${puntos.length}
       - Puntos de venta: ${safePuntos.join(', ')}
     `; // Sanitización básica; no garantiza protección total contra prompt injection
+
+  if (UNSAFE_PROMPT_PATTERN.test(prompt)) {
+    logger.warn({ mercaderistaId }, 'Prompt contains unsafe content');
+    return res.status(400).json({ error: 'Prompt no permitido' });
+  }
+
+  const cache = getCacheClient();
+  const hasCache = cache && typeof cache.get === 'function';
+  const cacheKey = `ai:summary:${fecha}:${mercaderistaId}`;
+  if (hasCache) {
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
+    }
+  }
 
   try {
       const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
@@ -84,6 +102,10 @@ export default async function handler(req, res) {
       }
 
       res.status(200).json(parsed);
+
+      if (hasCache) {
+        await cache.set(cacheKey, JSON.stringify(parsed), { ex: 60 * 60 });
+      }
 
   } catch (error) {
     logger.error({ err: error }, 'Error calling Gemini API');

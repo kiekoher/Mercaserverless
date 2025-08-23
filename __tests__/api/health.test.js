@@ -59,16 +59,6 @@ describe('health API', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('returns 429 when rate limit exceeded', async () => {
-    const { checkRateLimit } = require('../../lib/rateLimiter');
-    checkRateLimit.mockResolvedValueOnce(false);
-    const { default: handler } = await import('../../pages/api/health.js');
-    const req = { headers: { 'x-health-token': 'secret' } };
-    const res = createMockRes();
-    await handler(req, res);
-    expect(res.statusCode).toBe(429);
-  });
-
   it('returns 401 without valid token', async () => {
     const { default: handler } = await import('../../pages/api/health.js');
     const req = { headers: {} };

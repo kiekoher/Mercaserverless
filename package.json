@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
+    "build": "next build",
+    "build:local": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",

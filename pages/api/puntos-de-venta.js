@@ -6,6 +6,7 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
 import geocodeConfig from '../../lib/geocodeConfig';
+import { getCacheClient } from '../../lib/redisCache';
 
 const PDV_FIELDS =
   'id,nombre,direccion,ciudad,latitud,longitud,cuota,tipologia,frecuencia_mensual,minutos_servicio';
@@ -62,21 +63,36 @@ export default async function handler(req, res) {
     let longitud = null;
 
     try {
-      const geocodeRequest = {
-        params: {
-          address: `${direccion}, ${ciudad}, Colombia`,
-          key: process.env.GOOGLE_MAPS_API_KEY,
-        },
-        timeout: geocodeConfig.GEOCODE_TIMEOUT_MS,
-      };
+      const cache = getCacheClient();
+      const hasCache = cache && typeof cache.get === 'function';
+      const cacheKey = hasCache ? `geo:${sanitizeInput(direccion)}:${sanitizeInput(ciudad)}` : null;
+      if (hasCache && cacheKey) {
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+          [latitud, longitud] = JSON.parse(cached);
+        }
+      }
 
-      const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
-      if (geocodeResponse.data.results.length > 0) {
-        const location = geocodeResponse.data.results[0].geometry.location;
-        latitud = location.lat;
-        longitud = location.lng;
-      } else {
-        logger.warn({ direccion, ciudad }, 'Geocoding failed for address');
+      if (latitud === null || longitud === null) {
+        const geocodeRequest = {
+          params: {
+            address: `${direccion}, ${ciudad}, Colombia`,
+            key: process.env.GOOGLE_MAPS_API_KEY,
+          },
+          timeout: geocodeConfig.GEOCODE_TIMEOUT_MS,
+        };
+
+        const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
+        if (geocodeResponse.data.results.length > 0) {
+          const location = geocodeResponse.data.results[0].geometry.location;
+          latitud = location.lat;
+          longitud = location.lng;
+          if (hasCache && cacheKey) {
+            await cache.set(cacheKey, JSON.stringify([latitud, longitud]), { ex: 60 * 60 * 24 * 30 });
+          }
+        } else {
+          logger.warn({ direccion, ciudad }, 'Geocoding failed for address');
+        }
       }
     } catch (e) {
       logger.error({ err: e }, 'Geocoding API error');

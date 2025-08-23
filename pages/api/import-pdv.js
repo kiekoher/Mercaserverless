@@ -7,6 +7,7 @@ import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
 import geocodeConfig from '../../lib/geocodeConfig';
+import { getCacheClient } from '../../lib/redisCache';
 
 const googleMapsClient = new Client({});
 
@@ -78,33 +79,51 @@ export default async function handler(req, res) {
       let latitud = null;
       let longitud = null;
 
-      for (let attempt = 1; attempt <= GEOCODE_RETRIES; attempt++) {
-        try {
-          const geocodeRequest = {
-            params: {
-              address: `${sanitizeInput(punto.direccion)}, ${sanitizeInput(punto.ciudad)}, Colombia`,
-              key: process.env.GOOGLE_MAPS_API_KEY,
-            },
-            timeout: GEOCODE_TIMEOUT_MS,
-          };
-          const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
-          // Defensive check to prevent crash on undefined response
-          if (geocodeResponse && geocodeResponse.data && geocodeResponse.data.results && geocodeResponse.data.results.length > 0) {
-            const location = geocodeResponse.data.results[0].geometry.location;
-            latitud = location.lat;
-            longitud = location.lng;
+      const cache = getCacheClient();
+      const hasCache = cache && typeof cache.get === 'function';
+      const cacheKey = hasCache
+        ? `geo:${sanitizeInput(punto.direccion)}:${sanitizeInput(punto.ciudad)}`
+        : null;
+      if (hasCache && cacheKey) {
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+          [latitud, longitud] = JSON.parse(cached);
+        }
+      }
+
+      if (latitud === null || longitud === null) {
+        for (let attempt = 1; attempt <= GEOCODE_RETRIES; attempt++) {
+          try {
+            const geocodeRequest = {
+              params: {
+                address: `${sanitizeInput(punto.direccion)}, ${sanitizeInput(punto.ciudad)}, Colombia`,
+                key: process.env.GOOGLE_MAPS_API_KEY,
+              },
+              timeout: GEOCODE_TIMEOUT_MS,
+            };
+            const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
+            // Defensive check to prevent crash on undefined response
+            if (geocodeResponse && geocodeResponse.data && geocodeResponse.data.results && geocodeResponse.data.results.length > 0) {
+              const location = geocodeResponse.data.results[0].geometry.location;
+              latitud = location.lat;
+              longitud = location.lng;
+            }
+            break;
+          } catch (e) {
+            if (attempt === GEOCODE_RETRIES) {
+              logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
+            } else {
+              const delay = GEOCODE_RETRY_BASE_MS * Math.pow(2, attempt - 1);
+              await new Promise((r) => setTimeout(r, delay));
+            }
+            if (e.response?.data?.status === 'OVER_QUERY_LIMIT') {
+              throw new Error('Geocoding quota exceeded');
+            }
           }
-          break;
-        } catch (e) {
-          if (attempt === GEOCODE_RETRIES) {
-            logger.error({ err: e, direccion: punto.direccion }, 'Geocoding failed for address');
-          } else {
-            const delay = GEOCODE_RETRY_BASE_MS * Math.pow(2, attempt - 1);
-            await new Promise((r) => setTimeout(r, delay));
-          }
-          if (e.response?.data?.status === 'OVER_QUERY_LIMIT') {
-            throw new Error('Geocoding quota exceeded');
-          }
+        }
+
+        if (hasCache && cacheKey && latitud !== null && longitud !== null) {
+          await cache.set(cacheKey, JSON.stringify([latitud, longitud]), { ex: 60 * 60 * 24 * 30 });
         }
       }
 

@@ -1,14 +1,11 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import logger from '../../lib/logger.server';
-import { checkRateLimit, getRedisClient } from '../../lib/rateLimiter';
+import { getRedisClient } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   const token = req.headers['x-health-token'];
   if (!process.env.HEALTHCHECK_TOKEN || token !== process.env.HEALTHCHECK_TOKEN) {
     return res.status(401).json({ status: 'unauthorized' });
-  }
-  if (!(await checkRateLimit(req))) {
-    return res.status(429).json({ status: 'rate-limit' });
   }
   try {
     const supabase = getSupabaseServerClient(req, res);

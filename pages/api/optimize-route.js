@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { verifyCsrf } from '../../lib/csrf';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
+import { getCacheClient } from '../../lib/redisCache';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -47,6 +48,18 @@ export default async function handler(req, res) {
   const client = new Client({});
   const addresses = puntos.map(p => `${sanitizeInput(p.direccion)}, ${sanitizeInput(p.ciudad)}, Colombia`);
 
+  const cache = getCacheClient();
+  const hasCache = cache && typeof cache.get === 'function';
+  const cacheKey = hasCache
+    ? `optimize:${modo_transporte}:${addresses.join('|')}`
+    : null;
+  if (hasCache && cacheKey) {
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
+    }
+  }
+
   try {
     const origin = addresses[0];
     const waypoints = addresses.slice(1);
@@ -62,7 +75,11 @@ export default async function handler(req, res) {
 
     const order = directions.data.routes[0].waypoint_order || [];
     const optimizedPuntos = [puntos[0], ...order.map(i => puntos[i + 1])];
-    res.status(200).json({ optimizedPuntos });
+    const payload = { optimizedPuntos };
+    res.status(200).json(payload);
+    if (hasCache && cacheKey) {
+      await cache.set(cacheKey, JSON.stringify(payload), { ex: 60 * 60 });
+    }
   } catch (error) {
     logger.error({ err: error }, 'Optimization error');
     res.status(500).json({ error: 'No se pudo optimizar la ruta.' });

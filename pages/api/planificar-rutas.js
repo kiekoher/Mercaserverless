@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     });
 
     if (rpcError) {
-      logger.error({ err: rpcError, body: req.body }, 'Error saving planned routes via RPC');
+      logger.error({ err: rpcError, mercaderistaId }, 'Error saving planned routes via RPC');
       throw new Error('Error al guardar la planificación en la base de datos.');
     }
 
@@ -95,7 +95,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    logger.error({ err: error, body: req.body }, 'Error in route planning');
+    logger.error({ err: error, mercaderistaId }, 'Error in route planning');
     res.status(500).json({ error: error.message || 'Ocurrió un error en la planificación.' });
   }
 }
