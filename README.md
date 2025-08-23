@@ -2,25 +2,26 @@
 
 ## Descripción
 
-Este proyecto es un Prototipo Funcional (MVP) de una aplicación web diseñada para digitalizar y optimizar el proceso de ruteo de mercaderistas. La solución permite a los supervisores crear y asignar rutas manualmente, y a los mercaderistas ver sus rutas asignadas para el día.
+Esta aplicación web está diseñada para digitalizar y optimizar el proceso de planificación de rutas para equipos de mercaderistas. La solución permite a los supervisores crear, asignar y gestionar rutas, mientras que los mercaderistas pueden visualizar sus rutas diarias y registrar sus visitas en tiempo real.
 
 Este proyecto fue desarrollado como parte de una iniciativa para Kimberly-Clark y Manpower.
 
-## Funcionalidades Implementadas
+## Funcionalidades Principales
 
-- **Autenticación de Usuarios:** Sistema de inicio y cierre de sesión para supervisores y mercaderistas (simulado con Supabase).
-- **Gestión de Puntos de Venta:** Interfaz para que los supervisores puedan crear y ver los puntos de venta.
-- **Gestión de Rutas (Manual):** Interfaz para que los supervisores creen rutas diarias, asignando un mercaderista y una selección de puntos de venta.
-- **Vista de Ruta del Mercaderista:** Una página simple y optimizada para móviles donde el mercaderista puede ver su ruta asignada para el día actual.
-- **Integración con IA (LLM):** Funcionalidad controlada que permite a los supervisores generar un resumen de texto amigable y motivador de una ruta utilizando un modelo de lenguaje grande (simulado con Google Gemini).
+- **Autenticación de Usuarios:** Sistema de inicio y cierre de sesión para supervisores y mercaderistas, gestionado con Supabase Auth.
+- **Gestión de Puntos de Venta (PDV):** Interfaz para la creación, visualización y gestión de puntos de venta, incluyendo la importación masiva desde archivos CSV.
+- **Planificación y Gestión de Rutas:** Herramientas para que los supervisores creen rutas diarias, asignando un mercaderista y una selección de puntos de venta.
+- **Vista de Ruta del Mercaderista:** Interfaz optimizada para móviles donde el mercaderista puede ver su ruta del día, registrar check-in/check-out y añadir observaciones.
+- **Asistente de IA:** Funcionalidades que utilizan modelos de lenguaje (Google Gemini) para generar resúmenes y análisis de las rutas, ayudando a los supervisores a obtener insights sobre la operación.
 
 ## Stack Tecnológico
 
 - **Framework:** [Next.js](https://nextjs.org/)
 - **Lenguaje:** JavaScript con React
-- **Backend y Base de Datos:** [Supabase](https://supabase.io/) (simulado en los endpoints de la API)
-- **IA / LLM:** [Google Gemini API](https://ai.google.dev/) (simulada en el endpoint de resumen)
-- **Testing:** [Jest](https://jestjs.io/) con [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- **Backend y Base de Datos:** [Supabase](https://supabase.io/)
+- **IA / LLM:** [Google Gemini API](https://ai.google.dev/)
+- **Cache y Rate Limiting:** [Upstash Redis](https://upstash.com/)
+- **Testing:** [Jest](https://jestjs.io/) para pruebas unitarias y [Cypress](https://www.cypress.io/) para E2E.
 - **Estilos:** CSS plano (inline y global)
 
 ## Decisiones Arquitectónicas
@@ -89,7 +90,7 @@ Este comando utiliza variables de entorno de `.env.test`.
 
 ## Despliegue y Arquitectura Serverless
 
-Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube. Para escenarios de VPS también se incluye un `Dockerfile` de producción.
+Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube.
 
 ### Despliegue en Vercel
 
@@ -117,23 +118,6 @@ No se debe utilizar el archivo `.env` en el entorno de producción.
 
 Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
 
-## Despliegue en VPS Ubuntu
-
-El repositorio incluye un `Dockerfile` listo para generar una imagen de producción con Node.js 20. Para compilar y ejecutar:
-
-```bash
-docker build -t mercaderista .
-docker run --env-file .env.production -p 3000:3000 mercaderista
-```
-
-Si prefieres un despliegue tradicional con PM2 o systemd:
-
-```bash
-npm ci
-npm run build
-pm2 start npm --name mercaderista -- start
-```
-
 ### Operaciones
 
-Para procedimientos de monitoreo, rotación de secretos y planes de contingencia consulta el archivo [`OPERATIONS.md`](./OPERATIONS.md).
+Para procedimientos de monitoreo, rotación de secretos y planes de contingencia consulta el archivo `OPERATIONS.md`.

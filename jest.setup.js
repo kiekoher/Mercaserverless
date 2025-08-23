@@ -1,3 +1,9 @@
+// Polyfill for TextEncoder, which is not available in the default JSDOM environment.
+// Required by dependencies of 'formidable'.
+import { TextEncoder, TextDecoder } from 'util';
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 import logger, { flushLogger } from './lib/logger.server';

@@ -1,7 +1,8 @@
-import { randomBytes } from 'crypto';
-import { checkRateLimit } from '../../lib/rateLimiter';
+const { randomBytes } = require('crypto');
+const { withLogging } = require('../../lib/api-logger');
+const { checkRateLimit } = require('../../lib/rateLimiter');
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).end('Method Not Allowed');
@@ -29,3 +30,5 @@ export default async function handler(req, res) {
   res.setHeader('Set-Cookie', cookie);
   res.status(200).json({ csrfToken: token });
 }
+
+module.exports = withLogging(handler);;

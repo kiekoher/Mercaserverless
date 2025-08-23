@@ -13,4 +13,5 @@ const pino = jest.fn(() => ({
 pino.destination = jest.fn();
 pino.transport = jest.fn(() => ({}));
 
-export default pino;
+// Use CJS exports to match the rest of the codebase for Jest
+module.exports = pino;

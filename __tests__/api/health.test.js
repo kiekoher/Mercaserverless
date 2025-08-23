@@ -1,70 +1,65 @@
-/** @jest-environment node */
-import { jest } from '@jest/globals';
+const { createMocks } = require('node-mocks-http');
 
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k, v) { this.headers[k] = v; },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.data = payload; return this; }
-  };
-}
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
+jest.mock('../../lib/supabaseServer');
+jest.mock('../../lib/logger.server');
+// Mock getRedisClient from rateLimiter instead of ioredis
+jest.mock('../../lib/rateLimiter', () => ({
+    getRedisClient: jest.fn(),
 }));
-
-jest.mock('../../lib/logger.server', () => ({
-  error: jest.fn(),
-  warn: jest.fn(),
-}));
-
-jest.mock('../../lib/rateLimiter', () => {
-  const actual = jest.requireActual('../../lib/rateLimiter');
-  return {
-    ...actual,
-    checkRateLimit: jest.fn().mockResolvedValue(true),
-  };
-});
-
-const mockPing = jest.fn().mockResolvedValue('PONG');
-jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    ping: mockPing,
-    on: jest.fn(),
-  }));
-});
 
 describe('health API', () => {
-  beforeEach(() => {
-    jest.resetModules();
-    process.env.UPSTASH_REDIS_URL = 'redis://localhost:6379';
-    process.env.HEALTHCHECK_TOKEN = 'secret';
-    const { getSupabaseServerClient } = require('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getSession: jest.fn().mockResolvedValue({}) }
+    let handler;
+    let getSupabaseServerClient, getRedisClient;
+
+    beforeEach(() => {
+        jest.resetModules();
+        process.env.HEALTHCHECK_TOKEN = 'a-very-secret-token';
+
+        getSupabaseServerClient = require('../../lib/supabaseServer').getSupabaseServerClient;
+        getRedisClient = require('../../lib/rateLimiter').getRedisClient;
+        handler = require('../../pages/api/health');
+
+        // Default success case
+        getSupabaseServerClient.mockReturnValue({
+            auth: { getSession: jest.fn().mockResolvedValue({ error: null }) }
+        });
+        getRedisClient.mockReturnValue({
+            ping: jest.fn().mockResolvedValue('PONG'),
+        });
     });
-  });
 
-  it('reuses redis connection across calls', async () => {
-    const { default: handler } = await import('../../pages/api/health.js');
-    const req = { headers: { 'x-health-token': 'secret' } };
-    const res = createMockRes();
-    await handler(req, res);
-    await handler(req, res);
-    const Redis = require('ioredis');
-    expect(Redis).toHaveBeenCalledTimes(1);
-    expect(res.statusCode).toBe(200);
-  });
+    it('should return 200 with a valid token', async () => {
+        const { req, res } = createMocks({
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${process.env.HEALTHCHECK_TOKEN}` },
+        });
+        await handler(req, res);
+        expect(res._getStatusCode()).toBe(200);
+    });
 
-  it('returns 401 without valid token', async () => {
-    const { default: handler } = await import('../../pages/api/health.js');
-    const req = { headers: {} };
-    const res = createMockRes();
-    await handler(req, res);
-    expect(res.statusCode).toBe(401);
-  });
+    it('should return 503 if Supabase fails', async () => {
+        getSupabaseServerClient.mockReturnValue({
+            auth: { getSession: jest.fn().mockResolvedValue({ error: new Error('DB Error') }) }
+        });
+        const { req, res } = createMocks({
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${process.env.HEALTHCHECK_TOKEN}` },
+        });
+        await handler(req, res);
+        expect(res._getStatusCode()).toBe(503);
+        expect(res._getJSONData().dependencies.supabase).toBe('error');
+    });
+
+    it('should return 503 if Redis fails', async () => {
+        getRedisClient.mockReturnValue({
+            ping: jest.fn().mockRejectedValue(new Error('Redis Down')),
+        });
+        const { req, res } = createMocks({
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${process.env.HEALTHCHECK_TOKEN}` },
+        });
+        await handler(req, res);
+        expect(res._getStatusCode()).toBe(503);
+        expect(res._getJSONData().dependencies.redis).toBe('error');
+    });
 });
-

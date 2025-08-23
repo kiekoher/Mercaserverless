@@ -1,11 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import logger from '../../lib/logger.server';
-import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
-import { getCacheClient } from '../../lib/redisCache';
-import { z } from 'zod';
-import { verifyCsrf } from '../../lib/csrf';
-import { requireUser } from '../../lib/auth';
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { z } = require('zod');
+const { withLogging } = require('../../lib/api-logger');
+const { requireUser } = require('../../lib/auth');
+const { verifyCsrf } = require('../../lib/csrf');
+const logger = require('../../lib/logger.server');
+const { checkRateLimit } = require('../../lib/rateLimiter');
+const { getCacheClient } = require('../../lib/redisCache');
+const { sanitizeInput } = require('../../lib/sanitize');
 
 const summarySchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }).length(10),
@@ -19,20 +20,20 @@ const summarySchema = z.object({
 
 const UNSAFE_PROMPT_PATTERN = /(\bSYSTEM\b|http(s)?:)/i;
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
-    return res.status(405).end('Method Not Allowed');
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GEMINI_API_KEY) {
     logger.error('GEMINI_API_KEY is not configured');
-    return res.status(500).json({ error: 'GEMINI_API_KEY no configurada' });
+    throw new Error('GEMINI_API_KEY no configurada');
   }
 
-  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
   }
@@ -46,9 +47,8 @@ export default async function handler(req, res) {
   const parsed = summarySchema.safeParse(req.body);
 
   if (!parsed.success) {
-    // Collect all error messages
     const errorMessages = parsed.error.errors.map(e => e.message).join(', ');
-    logger.warn({ errors: parsed.error.format() }, `Invalid request to generate-summary: ${errorMessages}`);
+    logger.warn({ userId: user.id, errors: parsed.error.format() }, `Invalid request to generate-summary: ${errorMessages}`);
     return res.status(400).json({ error: `Datos de entrada inválidos: ${errorMessages}` });
   }
 
@@ -68,10 +68,10 @@ export default async function handler(req, res) {
       - Mercaderista: ${safeMercaderista}
       - Número de paradas: ${puntos.length}
       - Puntos de venta: ${safePuntos.join(', ')}
-    `; // Sanitización básica; no garantiza protección total contra prompt injection
+    `;
 
   if (UNSAFE_PROMPT_PATTERN.test(prompt)) {
-    logger.warn({ mercaderistaId }, 'Prompt contains unsafe content');
+    logger.warn({ userId: user.id, mercaderistaId }, 'Prompt contains unsafe content');
     return res.status(400).json({ error: 'Prompt no permitido' });
   }
 
@@ -81,41 +81,42 @@ export default async function handler(req, res) {
   if (hasCache) {
     const cached = await cache.get(cacheKey);
     if (cached) {
+      res.setHeader('X-Cache', 'HIT');
       return res.status(200).json(JSON.parse(cached));
     }
   }
 
   try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = (await response.text()).replace(/```json|```/g, '');
+    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = (await response.text()).replace(/```json|```/g, '');
 
-      const outputSchema = z.object({ summary: z.string() });
+    const outputSchema = z.object({ summary: z.string() });
 
-      let parsed;
-      try {
-        parsed = outputSchema.parse(JSON.parse(text));
-      } catch (e) {
-        logger.error({ err: e, text }, 'Failed to parse summary response');
-        return res.status(500).json({ error: 'Respuesta de IA inválida' });
-      }
+    let parsedOutput;
+    try {
+      parsedOutput = outputSchema.parse(JSON.parse(text));
+    } catch (e) {
+      logger.error({ err: e, text, userId: user.id }, 'Failed to parse summary response');
+      throw new Error('Respuesta de IA inválida');
+    }
 
-      res.status(200).json(parsed);
+    if (hasCache) {
+      res.setHeader('X-Cache', 'MISS');
+      await cache.set(cacheKey, JSON.stringify(parsedOutput), { ex: 60 * 60 });
+    }
 
-      if (hasCache) {
-        await cache.set(cacheKey, JSON.stringify(parsed), { ex: 60 * 60 });
-      }
+    res.status(200).json(parsedOutput);
 
   } catch (error) {
-    logger.error({ err: error }, 'Error calling Gemini API');
+    logger.error({ err: error, userId: user.id }, 'Error calling Gemini API');
     const status = error?.response?.status;
-    if (status === 401) {
-      return res.status(401).json({ error: 'Token inválido para Gemini API.' });
+    if (status === 401 || status === 403) {
+      throw new Error('Error de autenticación o cuota con la API de IA.');
     }
-    if (status === 403) {
-      return res.status(403).json({ error: 'Límite de cuota de Gemini API excedido.' });
-    }
-    res.status(500).json({ error: 'No se pudo generar el resumen con Gemini.' });
+    throw error;
   }
 }
+
+module.exports = withLogging(handler);;
