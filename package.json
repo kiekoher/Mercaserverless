@@ -7,10 +7,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "dotenv -e .env.ci -- next build",
+    "build": "next build",
     "build:local": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
     "start": "next start",
-    "lint": "dotenv -e .env.test -- next lint",
+    "lint": "next lint",
     "test": "jest",
     "cy:run": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test start http://localhost:3000 \"cypress run\""
   },
@@ -50,7 +50,6 @@
     "@testing-library/user-event": "^14.5.2",
     "cypress": "^15.0.0",
     "dotenv": "^17.2.1",
-    "dotenv-cli": "^7.4.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.4",
     "jest": "^29.7.0",

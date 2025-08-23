@@ -104,3 +104,68 @@ jobs:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+  deploy-vps:
+    name: "Build and Deploy to VPS"
+    runs-on: ubuntu-latest
+    # Only run this job on pushes to the main branch, not on pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [jest-tests, cypress-tests] # Deploy only if all tests pass
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # We will tag with the short SHA for easy reference
+          tags: type=sha,prefix=,format=short
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e # Exit immediately if a command exits with a non-zero status.
+
+            # Login to GHCR on the VPS using a Personal Access Token (PAT)
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+
+            # Pull the new image
+            docker pull ${{ steps.meta.outputs.tags }}
+
+            # Stop and remove the old container if it exists to avoid conflicts
+            docker stop mercaderista-app || true
+            docker rm mercaderista-app || true
+
+            # Run the new container from the new image
+            # It's assumed that a .env.production file exists on the VPS in the user's home directory
+            # This file should contain all necessary environment variables for the app.
+            docker run -d --restart always \
+              --name mercaderista-app \
+              -p 3000:3000 \
+              --env-file ~/.env.production \
+              ${{ steps.meta.outputs.tags }}
+
+            # Clean up old, unused Docker images to save space
+            docker image prune -af

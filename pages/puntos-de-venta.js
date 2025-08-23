@@ -11,49 +11,77 @@ import { useDebounce } from '../hooks/useDebounce';
 import { useSnackbar } from 'notistack';
 import { useAuthorization } from '../hooks/useAuthorization';
 import { useCsrfFetcher } from '../lib/fetchWithCsrf';
-import Papa from 'papaparse';
-import logger from '../lib/logger.client';
 
-const CSVImport = ({ onImport, isImporting }) => {
+// This component is self-contained for handling the file import UI and logic.
+const CSVImport = ({ onImportSuccess, isImporting, setIsImporting }) => {
   const { enqueueSnackbar } = useSnackbar();
-  const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  const fetchWithCsrf = useCsrfFetcher();
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-  const handleFileChange = (event) => {
+  const handleFileImport = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      if (file.size > MAX_FILE_SIZE) {
-        enqueueSnackbar('El archivo excede el tamaño máximo de 2MB', { variant: 'error' });
-        return;
-      }
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          onImport(results.data);
-        },
-        error: (error) => {
-          logger.error({ err: error }, 'Error parsing CSV');
-        }
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE) {
+      enqueueSnackbar('El archivo excede el tamaño máximo de 5MB', { variant: 'error' });
+      event.target.value = null;
+      return;
+    }
+
+    setIsImporting(true);
+    const formData = new FormData();
+    formData.append('csvfile', file);
+
+    try {
+      // We don't set Content-Type; the browser does it for FormData.
+      const res = await fetchWithCsrf('/api/import-pdv', {
+        method: 'POST',
+        body: formData,
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.errors) {
+          const errorMessages = data.errors.map(e => `Fila ${e.row}: ${Object.values(e.errors).flat().join(', ')}`).join('\n');
+          enqueueSnackbar(`Errores de validación en el archivo. Por favor, corríjalos y vuelva a intentarlo.`, {
+            variant: 'error',
+            style: { whiteSpace: 'pre-line' },
+            autoHideDuration: 10000,
+          });
+          console.error("Validation errors:", errorMessages);
+        } else {
+          throw new Error(data.error || 'Error en la importación.');
+        }
+      } else {
+        enqueueSnackbar(data.message, { variant: 'success' });
+        onImportSuccess();
+      }
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsImporting(false);
+      event.target.value = null;
     }
   };
 
   return (
     <Paper sx={{ p: 2, mb: 2 }}>
       <Typography variant="h6" gutterBottom>Importar desde CSV</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
-        Columnas requeridas: `nombre`, `direccion`, `ciudad`.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Sube un archivo CSV para crear o actualizar puntos de venta en bloque.
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
-        Columnas opcionales: `CUOTA`, `TIPOLOGIA`, `FRECUENCIA`, `MINUTOS SERVICIO`.
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Columnas requeridas: `nombre`, `direccion`, `ciudad`.
       </Typography>
       <Button
         variant="contained"
         component="label"
         disabled={isImporting}
+        fullWidth
       >
-        {isImporting ? <CircularProgress size={24} /> : 'Seleccionar Archivo'}
-        <input type="file" accept=".csv" hidden onChange={handleFileChange} />
+        {isImporting ? <CircularProgress size={24} color="inherit" /> : 'Seleccionar Archivo CSV'}
+        <input type="file" accept=".csv, text/csv" hidden onChange={handleFileImport} />
       </Button>
     </Paper>
   );
@@ -156,26 +184,6 @@ export default function PuntosDeVentaPage() {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleImport = async (puntos) => {
-    setIsImporting(true);
-    try {
-      const res = await fetchWithCsrf('/api/import-pdv', {
-        method: 'POST',
-        body: JSON.stringify({ puntos }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Error en la importación masiva.');
-      }
-      enqueueSnackbar(data.message, { variant: 'success' });
-      fetchPuntos(); // Refresh the list
-    } catch (err) {
-      enqueueSnackbar(err.message, { variant: 'error' });
-    } finally {
-      setIsImporting(false);
     }
   };
 
