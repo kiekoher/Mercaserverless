@@ -1,4 +1,4 @@
-import { sanitizeInput } from '../lib/sanitize';
+import { sanitizeInput, PATTERNS } from '../lib/sanitize';
 
 describe('sanitizeInput', () => {
   it('removes HTML tags and newlines', () => {
@@ -19,5 +19,15 @@ describe('sanitizeInput', () => {
   it('accepts unicode letters', () => {
     const result = sanitizeInput('camión número ñandú');
     expect(result).toBe('camión número ñandú');
+  });
+
+  it('allows addresses with ADDRESS pattern', () => {
+    const result = sanitizeInput('Calle 123 #4-56', { pattern: 'ADDRESS' });
+    expect(result).toBe('Calle 123 #4-56');
+  });
+
+  it('rejects numbers in NAME pattern', () => {
+    const result = sanitizeInput('John123', { pattern: 'NAME' });
+    expect(result).toBe('');
   });
 });
