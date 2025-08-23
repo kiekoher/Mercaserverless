@@ -18,6 +18,7 @@ describe('environment variable validation', () => {
   it('throws when server env vars are missing', () => {
     const envServerPath = path.resolve(__dirname, '../lib/env.server.js');
     delete process.env.SUPABASE_SERVICE_KEY;
+    delete process.env.GEMINI_API_KEY;
     expect(() => require(envServerPath)).toThrow('Invalid environment variables');
   });
 });
