@@ -87,10 +87,10 @@ La aplicación se despliega automáticamente en Vercel con cada `push` a la rama
 Todas las variables de entorno requeridas por la aplicación (ver `.env.example`) deben ser configuradas directamente en el **panel de control de Vercel** para el proyecto correspondiente. Esto incluye:
 - Credenciales de Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`).
 - Claves de API para servicios externos (`GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`).
-- URL del servicio de Redis (`UPSTASH_REDIS_URL`).
+- URL del servicio de Redis. Se soporta la conexión REST de Upstash mediante `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` o el URL clásico `UPSTASH_REDIS_URL`.
 - Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
 - Tiempo máximo de espera para la API de IA (`AI_TIMEOUT_MS`).
-- Control de fail-open para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, mantener en `false` en producción).
+- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, mantener en `false` en producción, de lo contrario se permitirán todas las solicitudes si Redis no está disponible).
 - Bypass de autenticación para pruebas (`NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS`, mantener en `false` en producción).
 
 No se debe utilizar el archivo `.env` en el entorno de producción.

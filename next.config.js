@@ -3,7 +3,13 @@
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config({ path: './.env' });
 }
-require('./lib/env.server');
+
+try {
+  require('./lib/env.server');
+} catch (err) {
+  console.error('Environment validation failed:', err.message);
+  throw err;
+}
 
 const nextConfig = {
   reactStrictMode: true,

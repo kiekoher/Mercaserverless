@@ -5,6 +5,7 @@ import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
+import geocodeConfig from '../../lib/geocodeConfig';
 
 const PDV_FIELDS =
   'id,nombre,direccion,ciudad,latitud,longitud,cuota,tipologia,frecuencia_mensual,minutos_servicio';
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
           address: `${direccion}, ${ciudad}, Colombia`,
           key: process.env.GOOGLE_MAPS_API_KEY,
         },
-        timeout: 1000, // optional
+        timeout: geocodeConfig.GEOCODE_TIMEOUT_MS,
       };
 
       const geocodeResponse = await googleMapsClient.geocode(geocodeRequest);
