@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import logger from '../../lib/logger.server';
 import { sanitizeInput } from '../../lib/sanitize'; // Mitiga intentos básicos de prompt injection
+import { getCacheClient } from '../../lib/redisCache';
 import { z } from 'zod';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { verifyCsrf } from '../../lib/csrf';
@@ -10,6 +11,8 @@ import env from '../../lib/env.server';
 const insightsSchema = z.object({
   rutaId: z.number().int().positive({ message: "El ID de la ruta debe ser un número entero positivo" }).max(1_000_000),
 });
+
+const UNSAFE_PROMPT_PATTERN = /(\bSYSTEM\b|http(s)?:)/i;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -61,6 +64,21 @@ export default async function handler(req, res) {
     const promptData = visitas.map(v =>
       `- Punto: ${sanitizeInput(v.puntos_de_venta.nombre)}, Estado: ${sanitizeInput(v.estado)}, Check-in: ${sanitizeInput(v.check_in_at)}, Check-out: ${sanitizeInput(v.check_out_at)}, Observaciones: ${sanitizeInput(v.observaciones || 'N/A')}`
     ).join('\n'); // Sanitización básica; no garantiza protección total contra prompt injection
+
+    if (UNSAFE_PROMPT_PATTERN.test(promptData)) {
+      logger.warn({ rutaId }, 'Prompt contains unsafe content');
+      return res.status(400).json({ error: 'Prompt no permitido' });
+    }
+
+    const cache = getCacheClient();
+    const hasCache = cache && typeof cache.get === 'function';
+    const cacheKey = `ai:insights:${rutaId}`;
+    if (hasCache) {
+      const cached = await cache.get(cacheKey);
+      if (cached) {
+        return res.status(200).json(JSON.parse(cached));
+      }
+    }
 
     const prompt = `
         Eres un asistente de análisis de operaciones para una fuerza de ventas.
@@ -119,6 +137,10 @@ export default async function handler(req, res) {
       }
 
       res.status(200).json(parsedOutput);
+
+      if (hasCache) {
+        await cache.set(cacheKey, JSON.stringify(parsedOutput), { ex: 60 * 60 });
+      }
 
   } catch (error) {
     logger.error({ err: error }, 'Error generating insights');
