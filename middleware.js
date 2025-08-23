@@ -17,6 +17,13 @@ export async function middleware(req) {
   const requestHeaders = new Headers(req.headers);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
 
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true'
+  ) {
+    throw new Error('BYPASS_AUTH must be false in production');
+  }
+
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true';
 
   if (!bypassAuth) {

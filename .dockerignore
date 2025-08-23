@@ -1,0 +1,7 @@
+.env*
+node_modules
+.git
+cypress/
+__tests__/
+README.md
+*.md
