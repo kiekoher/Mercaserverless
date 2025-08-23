@@ -13,6 +13,8 @@
 # Local environment variables
 .env*
 !.env.example
+!.env.ci
+!.env.test
 
 # Test results
 /coverage
