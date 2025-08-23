@@ -7,6 +7,8 @@ function setSecurityHeaders(res) {
   res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.headers.set('X-Content-Type-Options', 'nosniff');
   res.headers.set('X-Frame-Options', 'SAMEORIGIN');
+  res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
 }
 
 export async function middleware(req) {

@@ -60,7 +60,7 @@ export default async function handler(req, res) {
       .from('profiles')
       .update({ role: newRole })
       .eq('id', userId)
-      .select()
+      .select('id, full_name, role')
       .single();
 
     if (error) {

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
     let query = supabase
       .from('rutas')
-      .select('*', { count: 'exact' });
+      .select('id,fecha,mercaderista_id,puntos_de_venta_ids', { count: 'exact' });
 
     if (search) {
       const safeSearch = sanitizeInput(search);
@@ -71,12 +71,8 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('rutas')
-      .insert([{
-         fecha: safeFecha,
-         mercaderista_id: mercaderistaId,
-         puntos_de_venta_ids: puntosDeVentaIds
-      }])
-      .select()
+      .insert([{ fecha: safeFecha, mercaderista_id: mercaderistaId, puntos_de_venta_ids: puntosDeVentaIds }])
+      .select('id,fecha,mercaderista_id,puntos_de_venta_ids')
       .single();
 
     if (error) {
@@ -112,7 +108,7 @@ export default async function handler(req, res) {
         puntos_de_venta_ids: puntosDeVentaIds,
       })
       .eq('id', id)
-      .select()
+      .select('id,fecha,mercaderista_id,puntos_de_venta_ids')
       .single();
 
     if (error) {

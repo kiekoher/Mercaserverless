@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
         .from('visitas')
-        .select('*')
+        .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
         .eq('ruta_id', ruta_id);
 
     if (error) {
@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         check_in_at: new Date().toISOString(),
         estado: 'En Progreso',
       })
-      .select()
+      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
       .single();
 
     if (error) {
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
       })
       .eq('id', visita_id)
       .eq('mercaderista_id', user.id)
-      .select()
+      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
       .single();
 
     if (error) {

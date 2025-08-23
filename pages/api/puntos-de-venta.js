@@ -6,6 +6,9 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 import { requireUser } from '../../lib/auth';
 
+const PDV_FIELDS =
+  'id,nombre,direccion,ciudad,latitud,longitud,cuota,tipologia,frecuencia_mensual,minutos_servicio';
+
 const googleMapsClient = new Client({});
 
 export default async function handler(req, res) {
@@ -66,7 +69,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from('puntos_de_venta')
       .insert({ nombre: safeNombre, direccion: safeDireccion, ciudad: safeCiudad, latitud, longitud })
-      .select()
+      .select(PDV_FIELDS)
       .single();
 
     if (error) {
@@ -126,7 +129,7 @@ export default async function handler(req, res) {
       .from('puntos_de_venta')
       .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select(PDV_FIELDS)
       .single();
 
     if (error) {
@@ -166,7 +169,7 @@ export default async function handler(req, res) {
     const safeSearch = sanitizeInput(search).slice(0, 50);
 
     if (all === 'true') {
-      const { data, error } = await supabase.from('puntos_de_venta').select('*');
+      const { data, error } = await supabase.from('puntos_de_venta').select(PDV_FIELDS);
       if (error) {
         logger.error({ err: error }, 'Error fetching all points of sale');
         return res.status(500).json({ error: 'Internal Server Error' });
@@ -182,7 +185,7 @@ export default async function handler(req, res) {
     const limit = 10;
     const offset = (pageNumber - 1) * limit;
 
-    const query = supabase.from('puntos_de_venta').select('*', { count: 'exact' });
+    const query = supabase.from('puntos_de_venta').select(PDV_FIELDS, { count: 'exact' });
 
     if (safeSearch) {
       query.ilike('nombre', `%${safeSearch}%`);
