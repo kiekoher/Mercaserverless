@@ -6,11 +6,6 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import { getISOWeek, getISOWeekYear } from 'date-fns';
 import { z } from 'zod';
 
-// This would typically be in a shared config
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-
 const planSchema = z.object({
   mercaderistaId: z.string().uuid(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
@@ -43,6 +38,11 @@ export default async function handler(req, res) {
   const { mercaderistaId, startDate, endDate } = parsed.data;
 
   try {
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+
     // 1. Fetch all points of sale with planning data
     const { data: puntos, error: puntosError } = await supabaseAdmin
       .from('puntos_de_venta')
@@ -107,7 +107,7 @@ export default async function handler(req, res) {
  * @param {string} endDateStr - End date of the planning period (YYYY-MM-DD).
  * @returns {Object} - A structured plan with daily routes and a summary.
  */
-function generateMonthlyPlan(puntos, startDateStr, endDateStr) {
+export function generateMonthlyPlan(puntos, startDateStr, endDateStr) {
   const WEEKLY_WORK_MINUTES = 40 * 60;
   const DAILY_WORK_MINUTES = 8 * 60;
 

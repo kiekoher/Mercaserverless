@@ -1,10 +1,14 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
 import Redis from 'ioredis';
 import logger from '../../lib/logger.server';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 let redis;
 
 export default async function handler(req, res) {
+  if (!(await checkRateLimit(req))) {
+    return res.status(429).json({ status: 'rate-limit' });
+  }
   try {
     const supabase = getSupabaseServerClient(req, res);
     const { error: supaError } = await supabase.auth.getSession();

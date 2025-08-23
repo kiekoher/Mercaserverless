@@ -89,6 +89,7 @@ Todas las variables de entorno requeridas por la aplicación (ver `.env.example`
 - Claves de API para servicios externos (`GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`).
 - URL del servicio de Redis (`UPSTASH_REDIS_URL`).
 - Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
+- Tiempo máximo de espera para la API de IA (`AI_TIMEOUT_MS`).
 - Control de fail-open para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, mantener en `false` en producción).
 
 No se debe utilizar el archivo `.env` en el entorno de producción.

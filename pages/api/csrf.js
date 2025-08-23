@@ -1,6 +1,11 @@
 import { randomBytes } from 'crypto';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  if (!(await checkRateLimit(req))) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
   const token = randomBytes(32).toString('hex');
   const isProd = process.env.NODE_ENV === 'production';
 

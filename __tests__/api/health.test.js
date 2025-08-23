@@ -21,6 +21,10 @@ jest.mock('../../lib/logger.server', () => ({
   warn: jest.fn(),
 }));
 
+jest.mock('../../lib/rateLimiter', () => ({
+  checkRateLimit: jest.fn().mockResolvedValue(true),
+}));
+
 const mockPing = jest.fn().mockResolvedValue('PONG');
 jest.mock('ioredis', () => {
   return jest.fn().mockImplementation(() => ({
@@ -48,6 +52,16 @@ describe('health API', () => {
     const Redis = require('ioredis');
     expect(Redis).toHaveBeenCalledTimes(1);
     expect(res.statusCode).toBe(200);
+  });
+
+  it('returns 429 when rate limit exceeded', async () => {
+    const { checkRateLimit } = require('../../lib/rateLimiter');
+    checkRateLimit.mockResolvedValueOnce(false);
+    const { default: handler } = await import('../../pages/api/health.js');
+    const req = {};
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(429);
   });
 });
 

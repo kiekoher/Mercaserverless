@@ -10,4 +10,9 @@ describe('sanitizeInput', () => {
   it('returns empty string for undefined', () => {
     expect(sanitizeInput(undefined)).toBe('');
   });
+
+  it('rejects values with disallowed characters', () => {
+    const result = sanitizeInput('hola$%');
+    expect(result).toBe('');
+  });
 });
