@@ -21,7 +21,7 @@ function CsrfInitializer({ children }) {
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Cypress')) {
+    if (process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true') {
       setCsrfToken('cypress-token');
       return;
     }

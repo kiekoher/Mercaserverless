@@ -1,5 +1,4 @@
 const { defineConfig } = require('cypress');
-const { createClient } = require('@supabase/supabase-js');
 
 module.exports = defineConfig({
   e2e: {

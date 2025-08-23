@@ -1,9 +1,6 @@
 import { getSupabaseServerClient } from '../../lib/supabaseServer';
-import Redis from 'ioredis';
 import logger from '../../lib/logger.server';
-import { checkRateLimit } from '../../lib/rateLimiter';
-
-let redis;
+import { checkRateLimit, getRedisClient } from '../../lib/rateLimiter';
 
 export default async function handler(req, res) {
   const token = req.headers['x-health-token'];
@@ -20,11 +17,17 @@ export default async function handler(req, res) {
 
     let redisStatus = 'ok';
     if (process.env.UPSTASH_REDIS_URL) {
-      if (!redis) {
-        redis = new Redis(process.env.UPSTASH_REDIS_URL);
-        redis.on('error', (e) => logger.error({ err: e }, 'Redis error'));
+      const redis = getRedisClient();
+      if (redis) {
+        try {
+          await redis.ping();
+        } catch (e) {
+          redisStatus = 'error';
+          logger.error({ err: e }, 'Redis ping failed');
+        }
+      } else {
+        redisStatus = 'degraded';
       }
-      await redis.ping();
     } else {
       redisStatus = 'unavailable';
       logger.warn('UPSTASH_REDIS_URL not configured for health check');
