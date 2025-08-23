@@ -54,12 +54,13 @@ export default async function handler(req, res) {
     const postSchema = z.object({
       ruta_id: z.number(),
       punto_de_venta_id: z.number(),
+      url_foto: z.string().url().optional(),
     });
     const parsed = postSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Datos de visita inválidos.' });
     }
-    const { ruta_id, punto_de_venta_id } = parsed.data;
+    const { ruta_id, punto_de_venta_id, url_foto } = parsed.data;
 
     // Validación: comprobar que el punto de venta pertenezca a la ruta y que la ruta corresponda al mercaderista
     const { data: rutaData, error: rutaError } = await supabase
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
         mercaderista_id: user.id,
         check_in_at: new Date().toISOString(),
         estado: 'En Progreso',
+        url_foto,
       })
       .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
       .single();
