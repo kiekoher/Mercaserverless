@@ -78,8 +78,18 @@ export async function middleware(req) {
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' wss://${supabaseHost} https://${supabaseHost} https://*.googleapis.com;
     frame-ancestors 'none';
+    report-to csp-endpoint;
+    report-uri /api/csp-report;
   `.replace(/\s{2,}/g, ' ').trim();
 
+  res.headers.set(
+    'Report-To',
+    JSON.stringify({
+      group: 'csp-endpoint',
+      max_age: 10886400,
+      endpoints: [{ url: '/api/csp-report' }],
+    })
+  );
   res.headers.set('Content-Security-Policy', cspHeader);
   setSecurityHeaders(res);
 

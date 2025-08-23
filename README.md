@@ -63,6 +63,14 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) (versión 18.x o su
     ```
     Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
 
+### Compilación Local de Producción
+
+Para reproducir el proceso de compilación con variables de entorno ficticias, ejecuta:
+```bash
+npm run build:local
+```
+Esto permite validar el build antes de desplegar.
+
 ### Ejecución de Pruebas
 
 Para correr las pruebas unitarias y de componentes, ejecuta:
@@ -73,6 +81,11 @@ Para las pruebas de extremo a extremo (E2E), utiliza Cypress:
 ```bash
 npm run cy:run
 ```
+Para verificar el estilo del código, puedes ejecutar:
+```bash
+npm run lint
+```
+Este comando utiliza variables de entorno de `.env.test`.
 
 ## Despliegue y Arquitectura Serverless
 
