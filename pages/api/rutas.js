@@ -16,13 +16,18 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
-    const { page = '1', search = '' } = req.query;
-    const pageNumber = parseInt(page, 10);
-    if (Number.isNaN(pageNumber) || pageNumber < 1) {
-      return res.status(400).json({ error: 'Parámetro page inválido' });
+    const schema = z.object({
+      page: z.coerce.number().int().positive().default(1),
+      search: z.string().optional().default(''),
+    });
+    const parsed = schema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Parámetros de consulta inválidos.' });
     }
+
+    const { page, search } = parsed.data;
     const pageSize = 10;
-    const from = (pageNumber - 1) * pageSize;
+    const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
     let query = supabase
@@ -123,15 +128,18 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
-    const { id } = req.query;
-    if (!id) {
-      return res.status(400).json({ error: 'ID requerido' });
+    const schema = z.object({ id: z.coerce.number().int().positive() });
+    const parsed = schema.safeParse(req.query);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'ID de ruta inválido.' });
     }
+    const { id } = parsed.data;
 
     const { error } = await supabase
       .from('rutas')
       .delete()
-      .eq('id', Number(id));
+      .eq('id', id);
 
     if (error) {
       logger.error({ err: error }, 'Error deleting route');
