@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import { createMocks } from 'node-mocks-http';
 import { checkRateLimit } from '../../lib/rateLimiter';
+import { fetchWithCsrf } from '../../lib/fetchWithCsrf';
 
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn() }));
 
@@ -30,5 +31,22 @@ describe('/api/csrf', () => {
     await handler(req, res);
     expect(res._getStatusCode()).toBe(405);
     expect(res.getHeader('Allow')).toBe('GET');
+  });
+
+  it('refreshes token on 403 response', async () => {
+    const setToken = jest.fn();
+    let called = 0;
+    global.fetch = jest.fn((url) => {
+      called += 1;
+      if (url === '/api/csrf') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ csrfToken: 'new' }) });
+      }
+      if (called === 1) {
+        return Promise.resolve({ status: 403, clone: () => ({ json: () => Promise.resolve({ error: 'csrf' }) }) });
+      }
+      return Promise.resolve({ ok: true, status: 200 });
+    });
+    await fetchWithCsrf('/test', { method: 'POST' }, 'old', setToken);
+    expect(setToken).toHaveBeenCalledWith('new');
   });
 });

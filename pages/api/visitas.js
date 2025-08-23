@@ -83,6 +83,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'El punto de venta no pertenece a la ruta especificada.' });
     }
 
+    const { data: existingVisit } = await supabase
+      .from('visitas')
+      .select('id')
+      .eq('ruta_id', ruta_id)
+      .eq('punto_de_venta_id', punto_de_venta_id)
+      .is('check_out_at', null)
+      .single();
+    if (existingVisit) {
+      return res.status(409).json({ error: 'Visita ya iniciada para este punto' });
+    }
+
     const { data, error } = await supabase
       .from('visitas')
       .insert({
@@ -115,7 +126,7 @@ export default async function handler(req, res) {
 
     const putSchema = z.object({
       visita_id: z.number(),
-      estado: z.string().min(1),
+      estado: z.enum(['En Progreso', 'Completada', 'Incidencia']),
       observaciones: z.string().optional(),
       url_foto: z.string().url().optional(),
     });
@@ -125,6 +136,20 @@ export default async function handler(req, res) {
     }
     const { visita_id, estado, observaciones, url_foto } = parsed.data;
     const sanitizedObs = observaciones ? sanitizeInput(observaciones) : undefined;
+
+    const { data: existingVisit, error: fetchError } = await supabase
+      .from('visitas')
+      .select('check_out_at')
+      .eq('id', visita_id)
+      .eq('mercaderista_id', user.id)
+      .single();
+    if (fetchError || !existingVisit) {
+      logger.error({ err: fetchError, visita_id }, 'Error fetching visit before update');
+      return res.status(404).json({ error: 'Visita no encontrada' });
+    }
+    if (existingVisit.check_out_at) {
+      return res.status(400).json({ error: 'Visita ya finalizada' });
+    }
 
     const { data, error } = await supabase
       .from('visitas')

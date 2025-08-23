@@ -34,4 +34,26 @@ describe('checkRateLimit', () => {
     expect(await checkRateLimit(req, { limit: 1 })).toBe(true);
     expect(await checkRateLimit(req, { limit: 1 })).toBe(false);
   });
+
+  it('degrades when Redis returns null', async () => {
+    process.env.UPSTASH_REDIS_URL = 'redis://localhost:6379';
+    jest.doMock('ioredis', () => {
+      return jest.fn().mockImplementation(() => ({
+        status: 'ready',
+        multi() {
+          return {
+            incr() { return this; },
+            exec() { return null; },
+          };
+        },
+        on: jest.fn(),
+        quit: jest.fn(),
+        pexpire: jest.fn(),
+      }));
+    });
+    const { checkRateLimit } = await import('../lib/rateLimiter');
+    const req = { headers: {}, socket: { remoteAddress: '3.3.3.3' } };
+    expect(await checkRateLimit(req, { limit: 1 })).toBe(true);
+    expect(await checkRateLimit(req, { limit: 1 })).toBe(false);
+  });
 });

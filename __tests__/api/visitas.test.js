@@ -62,6 +62,13 @@ describe('visitas API', () => {
         }
         if (table === 'visitas') {
           return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  is: () => ({ single: () => Promise.resolve({ data: null }) })
+                })
+              })
+            }),
             insert: () => ({
               select: () => ({
                 single: () => Promise.resolve({ data: { id: 1 } })
@@ -79,7 +86,60 @@ describe('visitas API', () => {
     expect(res.data.id).toBe(1);
   });
 
+  it('prevents duplicate check-in for same point', async () => {
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
+              })
+            })
+          };
+        }
+        if (table === 'rutas') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] } })
+              })
+            })
+          };
+        }
+        if (table === 'visitas') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  is: () => ({ single: () => Promise.resolve({ data: { id: 1 } }) })
+                })
+              })
+            }),
+            insert: () => ({
+              select: () => ({
+                single: () => Promise.resolve({ data: { id: 1 } })
+              })
+            })
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/visitas.js');
+    const req = { method: 'POST', body: { ruta_id: 1, punto_de_venta_id: 2 } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(409);
+  });
+
   it('sanitizes observaciones on update', async () => {
+    const selectBeforeUpdate = jest.fn().mockReturnValue({
+      eq: () => ({
+        eq: () => ({ single: () => Promise.resolve({ data: { check_out_at: null } }) })
+      })
+    });
     const updateMock = jest.fn().mockReturnValue({
       eq: () => ({
         eq: () => ({
@@ -103,7 +163,7 @@ describe('visitas API', () => {
           };
         }
         if (table === 'visitas') {
-          return { update: updateMock };
+          return { select: selectBeforeUpdate, update: updateMock };
         }
       }
     });
@@ -117,5 +177,40 @@ describe('visitas API', () => {
     expect(updateMock).toHaveBeenCalled();
     const sent = updateMock.mock.calls[0][0];
     expect(sent.observaciones).toBe('');
+  });
+
+  it('prevents double check-out', async () => {
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    const updateMock = jest.fn();
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
+              })
+            })
+          };
+        }
+        if (table === 'visitas') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({ single: () => Promise.resolve({ data: { check_out_at: 'now' } }) })
+              })
+            }),
+            update: updateMock,
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/visitas.js');
+    const req = { method: 'PUT', body: { visita_id: 1, estado: 'Completada' } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

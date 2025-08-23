@@ -77,6 +77,43 @@ describe('puntos-de-venta API', () => {
     expect(res.data.id).toBe(1);
   });
 
+  it('allows optional fields on create', async () => {
+    process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
+    let insertedPayload;
+    getSupabaseServerClient.mockReturnValue({
+      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
+      from: (table) => {
+        if (table === 'profiles') {
+          return {
+            select: () => ({
+              eq: () => ({
+                single: () => Promise.resolve({ data: { role: 'supervisor' } })
+              })
+            })
+          };
+        }
+        if (table === 'puntos_de_venta') {
+          return {
+            insert: (payload) => {
+              insertedPayload = payload;
+              return { select: () => ({ single: () => Promise.resolve({ data: { id: 2 } }) }) };
+            }
+          };
+        }
+      }
+    });
+    const { default: handler } = await import('../../pages/api/puntos-de-venta.js');
+    const req = { method: 'POST', body: { nombre: 'P', direccion: 'D', ciudad: 'C', cuota: 1.2, tipologia: 'A', frecuencia_mensual: 3, minutos_servicio: 5 } };
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(201);
+    expect(insertedPayload.cuota).toBe(1.2);
+    expect(insertedPayload.tipologia).toBe('A');
+    expect(insertedPayload.frecuencia_mensual).toBe(3);
+    expect(insertedPayload.minutos_servicio).toBe(5);
+  });
+
   it('sanitizes input before inserting', async () => {
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
     const { getSupabaseServerClient } = await import('../../lib/supabaseServer');

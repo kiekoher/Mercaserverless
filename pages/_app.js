@@ -25,7 +25,7 @@ function CsrfInitializer({ children }) {
       setCsrfToken('cypress-token');
       return;
     }
-    const initCsrf = async () => {
+    const initCsrf = async (retries = 1) => {
       try {
         const res = await fetch('/api/csrf', {
           credentials: 'same-origin',
@@ -38,13 +38,17 @@ function CsrfInitializer({ children }) {
         setCsrfToken(data.csrfToken);
       } catch (err) {
         logger.error({ err }, 'Failed to fetch CSRF token');
-        enqueueSnackbar('Error de seguridad. No se pueden procesar formularios. Por favor, recargue la página.', {
-          variant: 'error',
-          persist: true,
-        });
+        if (retries > 0) {
+          setTimeout(() => initCsrf(retries - 1), 1000);
+        } else {
+          enqueueSnackbar('Error de seguridad. No se pueden procesar formularios. Por favor, recargue la página.', {
+            variant: 'error',
+            persist: true,
+          });
+        }
       }
     };
-    initCsrf();
+    initCsrf(2);
   }, [setCsrfToken, enqueueSnackbar]);
 
   return <>{children}</>;
