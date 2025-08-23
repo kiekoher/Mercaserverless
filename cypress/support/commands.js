@@ -1,10 +1,5 @@
-Cypress.Commands.add('login', (role, url) => {
-  // Use cy.visit's onBeforeLoad callback to set localStorage on the correct origin
-  // before any of the app's code runs. This prevents race conditions.
-  cy.visit(url, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('cypress-role', role);
-    },
-  });
+Cypress.Commands.add('login', (role) => {
+  // Establece la única clave que el AuthProvider necesita en modo de prueba.
+  // Esto se hace de forma síncrona antes de que la página cargue.
+  window.localStorage.setItem('cypress-role', role);
 });
-
