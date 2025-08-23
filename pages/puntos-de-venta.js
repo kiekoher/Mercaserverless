@@ -72,6 +72,10 @@ export default function PuntosDeVentaPage() {
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
   const [ciudad, setCiudad] = useState('');
+  const [cuota, setCuota] = useState('');
+  const [tipologia, setTipologia] = useState('');
+  const [frecuencia, setFrecuencia] = useState('');
+  const [minutos, setMinutos] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
@@ -123,7 +127,15 @@ export default function PuntosDeVentaPage() {
     try {
       const res = await fetchWithCsrf('/api/puntos-de-venta', {
         method: 'POST',
-        body: JSON.stringify({ nombre, direccion, ciudad }),
+        body: JSON.stringify({
+          nombre,
+          direccion,
+          ciudad,
+          cuota,
+          tipologia,
+          frecuencia_mensual: frecuencia,
+          minutos_servicio: minutos,
+        }),
       });
       if (!res.ok) {
         const errorData = await res.json();
@@ -132,6 +144,10 @@ export default function PuntosDeVentaPage() {
       setNombre('');
       setDireccion('');
       setCiudad('');
+      setCuota('');
+      setTipologia('');
+      setFrecuencia('');
+      setMinutos('');
       enqueueSnackbar('Punto de venta creado con éxito!', { variant: 'success' });
       // Reset to page 1 to see the new entry if not searching
       if (page !== 1) setPage(1); 
@@ -310,6 +326,10 @@ export default function PuntosDeVentaPage() {
               <TextField label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
               <TextField label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
               <TextField label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField label="Tipología" value={tipologia} onChange={(e) => setTipologia(e.target.value)} fullWidth sx={{ mb: 2 }} />
+              <TextField label="Cuota" value={cuota} onChange={(e) => setCuota(e.target.value)} type="number" fullWidth sx={{ mb: 2 }} />
+              <TextField label="Frecuencia Mensual" value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)} type="number" fullWidth sx={{ mb: 2 }} />
+              <TextField label="Minutos de Servicio" value={minutos} onChange={(e) => setMinutos(e.target.value)} type="number" fullWidth sx={{ mb: 2 }} />
               <Button type="submit" variant="contained" fullWidth disabled={isSubmitting}>
                 {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
               </Button>

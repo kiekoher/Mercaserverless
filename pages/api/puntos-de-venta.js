@@ -31,12 +31,28 @@ export default async function handler(req, res) {
       nombre: z.string().min(1),
       direccion: z.string().min(1),
       ciudad: z.string().min(1),
+      cuota: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? null : parseFloat(val)),
+        z.number().nullable().optional()
+      ),
+      tipologia: z.preprocess(
+        (val) => (val === '' || val === undefined ? null : val),
+        z.string().nullable().optional()
+      ),
+      frecuencia_mensual: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? null : parseInt(val, 10)),
+        z.number().int().nullable().optional()
+      ),
+      minutos_servicio: z.preprocess(
+        (val) => (val === '' || val === null || val === undefined ? null : parseInt(val, 10)),
+        z.number().int().nullable().optional()
+      ),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.format() });
     }
-    const { nombre, direccion, ciudad } = parsed.data;
+    const { nombre, direccion, ciudad, cuota, tipologia, frecuencia_mensual, minutos_servicio } = parsed.data;
     const safeNombre = sanitizeInput(nombre);
     const safeDireccion = sanitizeInput(direccion);
     const safeCiudad = sanitizeInput(ciudad);
@@ -68,7 +84,17 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('puntos_de_venta')
-      .insert({ nombre: safeNombre, direccion: safeDireccion, ciudad: safeCiudad, latitud, longitud })
+      .insert({
+        nombre: safeNombre,
+        direccion: safeDireccion,
+        ciudad: safeCiudad,
+        latitud,
+        longitud,
+        cuota,
+        tipologia: tipologia ? sanitizeInput(tipologia) : null,
+        frecuencia_mensual,
+        minutos_servicio,
+      })
       .select(PDV_FIELDS)
       .single();
 
