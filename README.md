@@ -34,6 +34,14 @@ Durante el diseño del esquema de la base de datos, se tomó la decisión de alm
 - **Desventaja:** Complica las consultas inversas (p. ej., encontrar todas las rutas que incluyen un punto de venta específico).
 - **Conclusión:** Para la fase actual del proyecto, la eficiencia en la lectura de rutas se consideró prioritaria. Si en el futuro surgen necesidades de consulta más complejas, se podría considerar una refactorización a un esquema normalizado con una tabla de unión (`ruta_puntos_de_venta`).
 
+## Seguridad y Operaciones
+
+El proyecto ha sido desarrollado con un fuerte enfoque en la seguridad y la operabilidad, siguiendo las mejores prácticas para aplicaciones web modernas.
+
+- **Seguridad a Nivel de Aplicación:** Se implementa una estricta Política de Seguridad de Contenido (CSP) y protección contra CSRF a través de middleware para mitigar ataques comunes.
+- **Seguridad de Datos:** El acceso a los datos está controlado por políticas de Row Level Security (RLS) en Supabase, asegurando que los usuarios solo puedan acceder a la información que les corresponde.
+- **Guía de Operaciones:** Para procedimientos detallados sobre monitoreo, configuración de alertas, rotación de secretos y planes de recuperación ante desastres, consulte la [**Guía Operacional (OPERATIONS.md)**](./OPERATIONS.md).
+
 ## Cómo Empezar
 
 Sigue estos pasos para configurar y ejecutar el proyecto en tu máquina local para desarrollo.
@@ -118,6 +126,3 @@ No se debe utilizar el archivo `.env` en el entorno de producción.
 
 Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
 
-### Operaciones
-
-Para procedimientos de monitoreo, rotación de secretos y planes de contingencia consulta el archivo `OPERATIONS.md`.

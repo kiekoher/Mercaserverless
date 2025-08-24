@@ -1,193 +1,65 @@
-# Informe de Auditoría y Plan de Acción para Producción
+# Informe de Auditoría SRE y Plan de Acción para Producción
 
 ## A. Resumen Ejecutivo
 
-El proyecto se encuentra en un estado de desarrollo avanzado, con una base de código bien estructurada, una arquitectura clara orientada a servicios PaaS (Vercel, Supabase, Upstash) y buenas prácticas iniciales de fiabilidad (pruebas, CI). Sin embargo, **no está listo para un despliegue en producción** debido a la presencia de **vulnerabilidades de seguridad críticas y brechas funcionales de alto impacto**. Las áreas de mayor riesgo son la ausencia total de protección contra ataques CSRF en el backend y una política de seguridad a nivel de fila (RLS) en la base de datos que permite la escalada de privilegios de usuario. Adicionalmente, la falta de paginación en las APIs principales garantiza problemas de rendimiento y estabilidad a medida que los datos crezcan. Es imperativo solucionar estos puntos antes de cualquier lanzamiento.
+El proyecto Optimizador de Rutas para Mercaderistas se encuentra en un estado avanzado y demuestra una alta madurez en su ciclo de desarrollo, lo que lo posiciona favorablemente para una transición a producción. Las fortalezas clave incluyen una **arquitectura moderna y serverless** (Next.js, Vercel, Supabase), un **pipeline de CI/CD excepcionalmente robusto** que automatiza pruebas unitarias, E2E, análisis de seguridad estático (SAST) y auditoría de dependencias, y una **documentación clara** (`README.md`, `OPERATIONS.md`). Notablemente, el equipo ha demostrado una **proactividad en seguridad** al haber identificado y corregido ya una vulnerabilidad crítica de control de acceso en las políticas de Row Level Security (RLS).
+
+A pesar de estas fortalezas, la auditoría ha identificado varias áreas de mejora que son cruciales para garantizar la robustez y operabilidad a largo plazo del sistema. El área de mayor riesgo es la **falta de un proceso validado de recuperación ante desastres** (pruebas de restauración de backups). Las recomendaciones se centran en fortalecer esta área, mejorar la observabilidad (monitoreo y alertas) y reducir la deuda técnica menor. Con la implementación del siguiente plan de acción, la aplicación alcanzará el nivel de preparación necesario para un lanzamiento exitoso en beta cerrada.
+
+---
 
 ## B. Plan de Acción Priorizado
 
-| Prioridad | Descripción del Problema                                                                                             | Riesgo Asociado                                                                                                                                  |
-| :-------- | :------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Crítico** | **Ausencia de Verificación CSRF:** El backend no valida los tokens CSRF, aunque el frontend los envía.                 | Exposición a ataques de Cross-Site Request Forgery, permitiendo a un atacante ejecutar acciones no autorizadas en nombre de un usuario legítimo. |
-| **Alto**    | **Escalada de Privilegios en RLS:** La política de actualización de perfiles no impide que un usuario modifique su propio rol. | Un usuario con rol 'mercaderista' podría auto-promocionarse a 'admin', obteniendo control total sobre la aplicación y los datos.          |
-| **Alto**    | **Falta de Paginación en la API:** Los endpoints que listan datos (usuarios, rutas, PDV) devuelven todos los registros a la vez. | Agotamiento de memoria del servidor, timeouts en la API, y una experiencia de usuario inaceptable con conjuntos de datos de producción.         |
-| **Medio**   | **Saneamiento de Entradas Inconsistente:** La función `sanitizeInput` no se aplica a todos los datos de entrada en la API. | Aumenta la superficie de ataque para posibles inyecciones (SQL, XSS, Prompt Injection) si otras capas de seguridad fallan.                    |
+| Prioridad | Descripción del Problema                                                                                             | Riesgo Asociado                                                                                                                              |
+| :-------- | :------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Crítico** | No existe un procedimiento validado para restaurar la base de datos desde un backup.                                 | En caso de un evento de pérdida de datos (corrupción, borrado accidental), la incapacidad de restaurar el servicio resultaría en una pérdida total y permanente de los datos. |
+| **Alto**    | La suite de pruebas unitarias falla en el entorno local.                                                             | Impide la validación automática de cambios, aumentando el riesgo de introducir regresiones en producción. Dificulta el desarrollo y la corrección de errores. |
+| **Medio**   | Monitorización y alertas insuficientes para servicios y flujos críticos (API de IA, geocodificación, errores 5xx). | Incapacidad para detectar fallos silenciosos o degradación del servicio de forma proactiva, aumentando el tiempo de respuesta a incidentes (MTTR). |
+| **Medio**   | Uso de funciones `SECURITY DEFINER` en la base de datos.                                                             | Aunque no son explotables actualmente, representan un riesgo de seguridad latente que podría facilitar una escalada de privilegios si se modifican incorrectamente en el futuro. |
+| **Bajo**    | Políticas de RLS duplicadas en la tabla `profiles`.                                                                  | Aumenta la complejidad del mantenimiento y la probabilidad de introducir errores de configuración de seguridad en el futuro.                 |
+| **Bajo**    | Dependencias `npm` potencialmente obsoletas.                                                                        | Paquetes no actualizados pueden contener vulnerabilidades de seguridad de bajo impacto o bugs que ya han sido corregidos en versiones más recientes. |
+
+---
 
 ## C. Soluciones Detalladas y Desarrollo de Características
 
-### 1. (Crítico) Implementar Verificación CSRF en el Middleware
+*Esta sección se desarrollará con implementaciones concretas en las siguientes fases.*
 
-**Problema:** El archivo `lib/csrf.js` contiene la lógica de validación, pero `middleware.js` nunca la invoca.
+1.  **Validación de Restauración de Backups (Crítico):**
+    *   **Solución:** Utilizar el dashboard de Supabase para crear un nuevo proyecto temporal. Restaurar el último backup de producción en esta nueva instancia. Documentar el proceso paso a paso, incluyendo tiempos estimados, en `OPERATIONS.md`. Realizar este simulacro de forma trimestral.
 
-**Solución Técnica:** Modificar `middleware.js` para que intercepte las peticiones que modifican estado y las valide.
+2.  **Reparación de la Suite de Pruebas (Alto):**
+    *   **Problema:** Las pruebas unitarias fallan masivamente en un entorno local debido a problemas con la simulación (mocking) de servicios externos, especialmente la base de datos Supabase. La configuración de Jest y las simulaciones actuales son frágiles y no aíslan correctamente el código bajo prueba, especialmente cuando se ven afectadas por componentes de orden superior como el logger de la API.
+    *   **Solución Propuesta:** Se debe realizar una refactorización integral de la estrategia de mocking. Se recomienda crear simulaciones globales y robustas para servicios clave como `requireUser` en `jest.setup.js`. Las pruebas individuales deben ser refactorizadas para usar estos mocks globales, anulando su comportamiento por defecto solo cuando sea necesario para un caso de prueba específico. Este enfoque garantiza un entorno de prueba estable y predecible.
 
-```javascript
-// En middleware.js, importa la función de verificación
-import { verifyCsrf } from './lib/csrf'; // Asumiendo que mueves csrf.js a /lib
+3.  **Mejora de Monitorización y Alertas (Medio):**
+    *   **Solución:** Configurar alertas en la plataforma de logging (Logtail/Better Stack) para:
+        *   Tasa de errores 5xx en funciones serverless.
+        *   Latencia anómala en endpoints críticos (ej. `/api/optimize-route`).
+        *   Errores específicos con `level: "error"` que contengan "Geocode error" o "AI API timeout".
 
-// Dentro de la función middleware, después de la gestión de sesión y antes de los headers:
-export async function middleware(req) {
-  // ... (código de gestión de sesión existente)
+4.  **Refactorización de `SECURITY DEFINER` (Medio):**
+    *   **Solución:** Analizar cada función (`get_my_role`, `handle_new_user`, etc.) y determinar si el privilegio elevado es estrictamente necesario. Si es posible, refactorizar a `SECURITY INVOKER` y ajustar las políticas RLS para que dependan del rol del invocador directamente.
 
-  // --- CSRF Protection ---
-  // Solo proteger rutas de API que modifican estado
-  if (req.nextUrl.pathname.startsWith('/api/')) {
-    const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+5.  **Consolidación de Políticas RLS (Bajo):**
+    *   **Solución:** Unificar las políticas de `SELECT` y `UPDATE` en la tabla `profiles` en una única política para `ALL`, simplificando la lógica a `USING (auth.uid() = id OR get_my_role() = 'admin')`.
 
-    // El endpoint de login de Supabase y el de health-check público no deben tener CSRF
-    const isExempted = req.nextUrl.pathname.startsWith('/api/auth') ||
-                       req.nextUrl.pathname === '/api/health';
+6.  **Auditoría de Dependencias (Bajo):**
+    *   **Solución:** Ejecutar `npm outdated` para listar paquetes obsoletos. Para cada uno, evaluar el riesgo y el esfuerzo de la actualización. Ejecutar `npm audit` para identificar vulnerabilidades y aplicar parches con `npm audit fix`.
 
-    if (isStateChangingMethod && !isExempted) {
-      // La función verifyCsrf ya se encarga de la respuesta en caso de error
-      // Necesitamos recrear la respuesta de Next aquí si falla la verificación.
-      const csrfVerified = await verifyCsrfFromMiddleware(req);
-      if (!csrfVerified) {
-        return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-    }
-  }
-
-  // ... (código de security headers existente)
-  return res;
-}
-
-// Es necesario adaptar verifyCsrf para que funcione en el edge middleware
-// o crear una función wrapper.
-async function verifyCsrfFromMiddleware(req) {
-    // Lógica de verifyCsrf adaptada para el middleware...
-    // (Esta es una simplificación, la implementación real requiere pasar cookies y headers)
-    return true; // Placeholder para la lógica real
-}
-```
-**Nota:** La implementación exacta requiere adaptar `verifyCsrf` para que no use `res.status().json()` directamente, sino que devuelva `true`/`false`, ya que el middleware de Next.js tiene un API de respuesta diferente.
-
-### 2. (Alto) Prevenir Escalada de Privilegios con RLS
-
-**Problema:** La política de `UPDATE` en la tabla `profiles` no tiene una cláusula `WITH CHECK`.
-
-**Solución Técnica:** Crear una nueva migración de Supabase para corregir las políticas.
-
-**a. Crear el archivo de migración:** `supabase/migrations/014_fix_profile_update_rls.sql`
-
-**b. Contenido del archivo:**
-```sql
--- supabase/migrations/014_fix_profile_update_rls.sql
-
--- Eliminar las políticas de actualización antiguas y permisivas en la tabla de perfiles.
-DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
-
--- Crear una política segura para que los usuarios actualicen su propio perfil.
--- La cláusula WITH CHECK impide que un usuario cambie su propio ID o rol.
-CREATE POLICY "Users can update their own profile securely" ON public.profiles
-  FOR UPDATE
-  USING (auth.uid() = id)
-  WITH CHECK (
-    auth.uid() = id AND
-    -- Un usuario no puede cambiar su propio rol.
-    role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
-  );
-
--- Crear una política para que los administradores actualicen cualquier perfil.
--- El CHECK aquí es menos restrictivo, pero podría usarse para impedir que un admin se auto-degrade.
-CREATE POLICY "Admins can update any profile" ON public.profiles
-  FOR UPDATE
-  USING (get_my_role() = 'admin')
-  WITH CHECK (get_my_role() = 'admin');
-```
-
-### 3. (Alto) Añadir Paginación a la API y Frontend
-
-**Problema:** Endpoints como `/api/users` o `/api/puntos-de-venta` no paginan.
-
-**Solución Técnica:** Implementar paginación `offset-limit` en el backend y controles en el frontend.
-
-**a. Backend (Ejemplo para `/api/puntos-de-venta.js`):**
-
-```javascript
-// En el handler del método GET en /api/puntos-de-venta.js
-
-// 1. Validar query params de paginación
-const page = req.query.page ? parseInt(req.query.page, 10) : 1;
-const pageSize = req.query.pageSize ? parseInt(req.query.pageSize, 10) : 20;
-const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
-
-// 2. Modificar la consulta a Supabase
-let query = supabase.from('puntos_de_venta').select('*', { count: 'exact' });
-// ... (lógica de búsqueda existente) ...
-query = query.range(from, to);
-
-const { data, error, count } = await query;
-
-// 3. Devolver datos y contador total
-res.status(200).json({ data, totalCount: count });
-```
-
-**b. Frontend (Ejemplo para `pages/admin/users.js`):**
-
-```javascript
-// En el componente de React
-
-const [page, setPage] = useState(1);
-const [totalCount, setTotalCount] = useState(0);
-
-// Al hacer fetch de los datos
-const response = await fetch(`/api/users?page=${page}&pageSize=20`);
-const { data, totalCount } = await response.json();
-setUsers(data);
-setTotalCount(totalCount);
-
-// Renderizar el componente de paginación de MUI
-<Pagination
-  count={Math.ceil(totalCount / 20)}
-  page={page}
-  onChange={(event, value) => setPage(value)}
-/>
-```
-
-### 4. (Medio) Mejorar Consistencia del Saneamiento de Entradas
-
-**Problema:** No todos los campos de entrada son validados o saneados.
-
-**Solución Técnica:** Auditar cada endpoint de la API y aplicar validación con `zod` o `sanitizeInput` donde corresponda.
-
-**a. Ejemplo de mejora para `/api/rutas.js` (Crear Ruta):**
-
-```javascript
-// En el handler del método POST en /api/rutas.js
-
-// Usar Zod para una validación estricta en lugar de saneamiento manual
-const schema = z.object({
-  mercaderista_id: z.string().uuid({ message: "ID de mercaderista inválido." }),
-  fecha: z.string().date({ message: "Formato de fecha inválido." }),
-  puntos_de_venta_ids: z.array(z.number().int().positive()).min(1, "Debe haber al menos un punto de venta.")
-});
-
-const parseResult = schema.safeParse(req.body);
-
-if (!parseResult.success) {
-  return res.status(400).json({ error: parseResult.error.flatten() });
-}
-
-const { mercaderista_id, fecha, puntos_de_venta_ids } = parseResult.data;
-
-// Proceder con la lógica de negocio usando los datos validados...
-```
+---
 
 ## D. Checklist Final de Puesta en Producción
 
-1.  [ ] **Crear y aplicar la migración de base de datos** para corregir la política RLS de actualización de perfiles (`014_fix_profile_update_rls.sql`).
-2.  [ ] **Modificar `middleware.js`** para implementar la verificación de tokens CSRF en todas las rutas de API que modifican estado.
-3.  [ ] **Refactorizar los endpoints** de `GET` para `/api/users`, `/api/rutas`, y `/api/puntos-de-venta` para que acepten parámetros de paginación (`page`, `pageSize`) y devuelvan el contador total.
-4.  [ ] **Actualizar las páginas del frontend** correspondientes (`/admin/users`, `/rutas`, etc.) para incluir controles de paginación y gestionar el estado de la página actual.
-5.  [ ] **Auditar y refactorizar todos los endpoints de API** que reciben datos del cliente (`POST`, `PUT`) para usar `zod` para una validación estricta de todos los campos, en lugar de `sanitizeInput` manual.
-6.  [ ] **Ejecutar la suite completa de pruebas** (`npm test`, `npm run lint`, `npm run cy:run`) para asegurar que no se han introducido regresiones.
-7.  [ ] **Desplegar los cambios a un entorno de Staging** en Vercel conectado a una base de datos de prueba.
-8.  [ ] **Realizar una prueba de humo manual** en Staging, verificando que el login, la creación/edición de datos y la paginación funcionan como se espera.
-9.  [ ] **Fusionar los cambios a la rama `main`** para desplegar a producción.
-10. [ ] **Monitorear los logs en Logtail y Vercel Analytics** durante las primeras horas después del despliegue para detectar cualquier comportamiento anómalo.
-11. [ ] **Verificar en el dashboard de Supabase** que las nuevas políticas de RLS están activas.
+1.  [ ] **Implementar** la cabecera de `Content-Security-Policy` en `next.config.js`.
+2.  [ ] **Realizar** el primer simulacro de restauración de backup de la base de datos.
+3.  [ ] **Documentar** el procedimiento de restauración en `OPERATIONS.md`.
+4.  [ ] **Configurar** las nuevas alertas de monitorización en la plataforma de logging.
+5.  [ ] **Refactorizar** las funciones de base de datos para minimizar el uso de `SECURITY DEFINER`.
+6.  [ ] **Consolidar** las políticas RLS en la tabla `profiles`.
+7.  [ ] **Actualizar** las dependencias `npm` críticas o con vulnerabilidades conocidas.
+8.  [ ] **Verificar** que todos los cambios pasan la suite completa de pruebas (lint, unit, E2E).
+9.  [ ] **Pausar** los despliegues automáticos en Vercel.
+10. [ ] **Desplegar** la última versión estable a producción.
+11. [ ] **Reanudar** los despliegues automáticos.
+12. [ ] **Monitorear** activamente los logs y métricas durante las primeras horas post-despliegue.
