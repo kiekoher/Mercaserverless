@@ -9,7 +9,7 @@ jest.mock('formidable', () => {
   return jest.fn(() => ({
     parse: mockParse,
   }));
-});
+}, { virtual: true });
 
 jest.mock('../../lib/auth');
 jest.mock('../../lib/logger.server');
@@ -18,6 +18,8 @@ jest.mock('@googlemaps/google-maps-services-js');
 jest.mock('../../lib/redisCache', () => ({
   getCacheClient: jest.fn().mockReturnValue(null),
 }));
+jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
+jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 const mockRpc = jest.fn();
 jest.mock('@supabase/supabase-js', () => ({

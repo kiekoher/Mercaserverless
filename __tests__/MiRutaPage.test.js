@@ -48,8 +48,8 @@ describe('MiRutaPage', () => {
           json: async () => ({ id: 1, puntos: [{ id: 101, nombre: 'Punto A', direccion: 'Dir A' }] }),
         });
       }
-      if (url === '/api/visitas?ruta_id=1') {
-        return Promise.resolve({ ok: true, json: async () => [] });
+      if (url === '/api/visitas?ruta_id=1&page=1&pageSize=50') {
+        return Promise.resolve({ ok: true, json: async () => ({ data: [] }) });
       }
       if (url === '/api/visitas' && opts?.method === 'POST') {
         return Promise.resolve({ ok: true, json: async () => ({}) });
@@ -87,10 +87,10 @@ describe('MiRutaPage', () => {
           json: async () => ({ id: 1, puntos: [{ id: 101, nombre: 'Punto A', direccion: 'Dir A' }] }),
         });
       }
-      if (url === '/api/visitas?ruta_id=1') {
+      if (url === '/api/visitas?ruta_id=1&page=1&pageSize=50') {
         return Promise.resolve({
           ok: true,
-          json: async () => ([{ id: 55, punto_de_venta_id: 101, estado: 'En Progreso' }]),
+          json: async () => ({ data: [{ id: 55, punto_de_venta_id: 101, estado: 'En Progreso' }] }),
         });
       }
       if (url === '/api/visitas' && opts?.method === 'PUT') {

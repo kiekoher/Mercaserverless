@@ -84,9 +84,9 @@ export default function RutasPage() {
 
   const fetchVisitasForRuta = useCallback(async (rutaId) => {
     try {
-        const res = await fetch(`/api/visitas?ruta_id=${rutaId}`);
+        const res = await fetch(`/api/visitas?ruta_id=${rutaId}&page=1&pageSize=50`);
         if (!res.ok) return; // Fail silently
-        const data = await res.json();
+        const { data } = await res.json();
         setVisitas(prev => ({ ...prev, [rutaId]: data }));
     } catch (err) {
         // Do not show snackbar for this background fetch

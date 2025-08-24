@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { tokensMatch } from './lib/tokensMatch';
 
 function setSecurityHeaders(res) {
   res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
@@ -41,7 +42,7 @@ export async function middleware(req) {
       const cookieName = process.env.NODE_ENV === 'production' ? '__Host-csrf-secret' : 'csrf-secret';
       const cookieToken = req.cookies.get(cookieName)?.value;
 
-      if (!headerToken || !cookieToken || headerToken !== cookieToken) {
+      if (!headerToken || !cookieToken || !tokensMatch(headerToken, cookieToken)) {
          return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
           status: 403,
           headers: { 'Content-Type': 'application/json' },

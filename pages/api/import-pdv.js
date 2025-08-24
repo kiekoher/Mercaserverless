@@ -9,6 +9,9 @@ const { requireUser } = require('../../lib/auth');
 const { getCacheClient } = require('../../lib/redisCache');
 const geocodeConfig = require('../../lib/geocodeConfig');
 const { withLogging } = require('../../lib/api-logger');
+const { verifyCsrf } = require('../../lib/csrf');
+const { checkRateLimit } = require('../../lib/rateLimiter');
+const { sanitizeInput } = require('../../lib/sanitize');
 
 const PdvSchema = z.object({
   nombre: z.string({ required_error: "La columna 'nombre' es requerida." }).min(1),
@@ -80,9 +83,14 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { error: authError, supabase } = await requireUser(req, res, ['admin', 'supervisor']);
+  const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
+  }
+
+  if (!verifyCsrf(req, res)) return;
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too Many Requests' });
   }
 
   if (!process.env.GOOGLE_MAPS_API_KEY) {
@@ -98,6 +106,13 @@ async function handler(req, res) {
   let pdvsToProcess;
   try {
     pdvsToProcess = await parseCsv(csvFile.filepath);
+    pdvsToProcess = pdvsToProcess.map(pdv => ({
+      ...pdv,
+      nombre: sanitizeInput(pdv.nombre, { maxLength: 100, pattern: 'NAME' }),
+      direccion: sanitizeInput(pdv.direccion, { maxLength: 200, pattern: 'ADDRESS' }),
+      ciudad: sanitizeInput(pdv.ciudad, { maxLength: 100, pattern: 'NAME' }),
+      tipologia: pdv.tipologia ? sanitizeInput(pdv.tipologia) : undefined,
+    }));
   } catch (error) {
     if (error.validationDetails) {
       return res.status(400).json({ message: error.message, errors: error.validationDetails });

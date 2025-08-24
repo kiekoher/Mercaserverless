@@ -3,6 +3,9 @@ const { promises: fs } = require('fs');
 const path = require('path');
 const { withLogging } = require('../../lib/api-logger');
 const { getSupabaseServerClient } = require('../../lib/supabaseServer');
+const { requireUser } = require('../../lib/auth');
+const { verifyCsrf } = require('../../lib/csrf');
+const { checkRateLimit } = require('../../lib/rateLimiter');
 
 export const config = {
   api: {
@@ -14,6 +17,15 @@ async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  const { error: authError, user } = await requireUser(req, res, ['mercaderista']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
+  }
+  if (!verifyCsrf(req, res)) return;
+  if (!(await checkRateLimit(req, { userId: user.id }))) {
+    return res.status(429).json({ error: 'Too Many Requests' });
   }
 
   const form = formidable({ maxFiles: 1, keepExtensions: true, maxFileSize: 5 * 1024 * 1024 });
@@ -32,8 +44,12 @@ async function handler(req, res) {
   if (!file) {
     return res.status(400).json({ error: 'File is required' });
   }
+  if (!file.mimetype.startsWith('image/')) {
+    await fs.unlink(file.filepath).catch(() => {});
+    return res.status(400).json({ error: 'Invalid file type' });
+  }
 
-  const supabase = getSupabaseServerClient(req, res, { admin: true });
+  const supabase = getSupabaseServerClient(req, res);
   const fileBuffer = await fs.readFile(file.filepath);
   const ext = path.extname(file.originalFilename || '');
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
@@ -41,6 +57,8 @@ async function handler(req, res) {
   const { error: uploadError } = await supabase.storage
     .from('visitas')
     .upload(fileName, fileBuffer, { contentType: file.mimetype });
+
+  await fs.unlink(file.filepath).catch(() => {});
 
   if (uploadError) {
     // Let the HOF log the error
