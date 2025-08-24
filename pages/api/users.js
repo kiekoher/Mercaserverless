@@ -1,8 +1,8 @@
-const { z } = require('zod');
-const { withLogging } = require('../../lib/api-logger');
-const { requireUser } = require('../../lib/auth');
-const { checkRateLimit } = require('../../lib/rateLimiter');
-const { sanitizeInput } = require('../../lib/sanitize');
+import { z } from 'zod';
+import { withLogging } from '../../lib/api-logger';
+import { requireUser } from '../../lib/auth';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { sanitizeInput } from '../../lib/sanitize';
 
 async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res, ['admin']);
@@ -77,4 +77,4 @@ async function handler(req, res) {
   res.status(405).end('Method Not Allowed');
 }
 
-module.exports = withLogging(handler);
+export default withLogging(handler);

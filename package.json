@@ -7,12 +7,13 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:test": "NODE_ENV=test RATE_LIMIT_FAIL_OPEN=true NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true next dev",
     "build": "next build",
     "build:local": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "cy:run": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev http://localhost:3000 \"cypress run\""
+    "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev:test http://localhost:3000 \"cypress run\""
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",

@@ -127,16 +127,16 @@ export default function PuntosDeVentaPage() {
 
   const fetchPuntos = useCallback(async () => {
     setLoading(true);
+    const pageSize = 20;
     try {
-      const params = new URLSearchParams({ page, search: debouncedSearchTerm });
+      const params = new URLSearchParams({ page, pageSize, search: debouncedSearchTerm });
       const res = await fetch(`/api/puntos-de-venta?${params.toString()}`);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to fetch');
       }
-      const data = await res.json();
-      const totalCount = res.headers.get('X-Total-Count');
-      setTotalPages(Math.ceil(totalCount / 10));
+      const { data, totalCount } = await res.json();
+      setTotalPages(Math.ceil(totalCount / pageSize));
       setPuntos(data);
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });

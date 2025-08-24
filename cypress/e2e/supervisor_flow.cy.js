@@ -11,10 +11,11 @@ describe('Supervisor Main Workflow', () => {
 
   it('should allow a supervisor to create a point of sale and then a route', () => {
     // --- Part 1: Create a Point of Sale ---
-    cy.intercept('GET', '/api/puntos-de-venta*', { body: [], headers: { 'X-Total-Count': '0' } }).as('getPuntosInitial');
+    cy.intercept('GET', '/api/puntos-de-venta*', { body: { data: [], totalCount: 0 } }).as('getPuntosInitial');
     cy.intercept('POST', '/api/puntos-de-venta', { statusCode: 201, body: newPoint }).as('createPunto');
 
     cy.visit('/puntos-de-venta');
+    cy.wait('@getPuntosInitial'); // Wait for the initial fetch
     cy.contains('h4', 'Gestión de Puntos de Venta').should('be.visible');
 
     cy.get('input[name="nombre"]').type(newPoint.nombre);
@@ -25,8 +26,8 @@ describe('Supervisor Main Workflow', () => {
     cy.contains('Punto de venta creado con éxito!').should('be.visible');
 
     // --- Part 2: Create a Route ---
-    cy.intercept('GET', '/api/puntos-de-venta*', { body: [newPoint], headers: { 'X-Total-Count': '1' } }).as('getPuntosForRuta');
-    cy.intercept('GET', '/api/rutas*', { body: [], headers: { 'X-Total-Count': '0' } }).as('getRutasInitial');
+    cy.intercept('GET', '/api/puntos-de-venta*', { body: { data: [newPoint], totalCount: 1 } }).as('getPuntosForRuta');
+    cy.intercept('GET', '/api/rutas*', { body: { data: [], totalCount: 0 } }).as('getRutasInitial');
     cy.intercept('POST', '/api/rutas', { statusCode: 201, body: newRoute }).as('createRuta');
 
     cy.visit('/rutas');

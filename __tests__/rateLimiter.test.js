@@ -1,32 +1,42 @@
 const httpMocks = require('node-mocks-http');
 
-describe('rate limiter fail open', () => {
-  const originalEnv = process.env;
+describe('rate limiter behavior without Redis', () => {
+  const originalEnv = { ...process.env };
 
-  afterEach(() => {
-    process.env = { ...originalEnv };
+  beforeEach(() => {
     jest.resetModules();
-  });
-
-  it('allows requests when Redis is unavailable and fail open', async () => {
-    process.env = { ...originalEnv, NODE_ENV: 'development' };
+    process.env = { ...originalEnv };
+    // Simulate Redis being unavailable for all tests in this suite
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
     delete process.env.UPSTASH_REDIS_URL;
+    // Set NODE_ENV to 'development' to bypass the 'test' escape hatch in the limiter
+    process.env.NODE_ENV = 'development';
+  });
+
+  afterAll(() => {
+    // Restore original environment after all tests have run
+    process.env = originalEnv;
+  });
+
+  it('should allow requests when fail-open is explicitly enabled', async () => {
+    process.env.RATE_LIMIT_FAIL_OPEN = 'true';
     const { checkRateLimit } = require('../lib/rateLimiter');
-    const req = httpMocks.createRequest({ method: 'GET' });
-    req.socket = { remoteAddress: '1.1.1.1' };
+    const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
     await expect(checkRateLimit(req)).resolves.toBe(true);
   });
 
-  it('blocks when fail open is disabled', async () => {
-    process.env = { ...originalEnv, NODE_ENV: 'development', RATE_LIMIT_FAIL_OPEN: 'false' };
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
-    delete process.env.UPSTASH_REDIS_URL;
+  it('should block requests when fail-open is explicitly disabled', async () => {
+    process.env.RATE_LIMIT_FAIL_OPEN = 'false';
     const { checkRateLimit } = require('../lib/rateLimiter');
-    const req = httpMocks.createRequest({ method: 'GET' });
-    req.socket = { remoteAddress: '1.1.1.1' };
+    const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
+    await expect(checkRateLimit(req)).resolves.toBe(false);
+  });
+
+  it('should block requests by default when fail-open is not set', async () => {
+    // In this test, RATE_LIMIT_FAIL_OPEN is deliberately not set
+    const { checkRateLimit } = require('../lib/rateLimiter');
+    const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
     await expect(checkRateLimit(req)).resolves.toBe(false);
   });
 });
