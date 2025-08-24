@@ -47,9 +47,16 @@ async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid file type' });
   }
 
+  // Only allow specific image extensions to prevent unexpected files
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp'];
+  const ext = path.extname(file.originalFilename || '').toLowerCase();
+  if (!allowedExts.includes(ext)) {
+    await fs.unlink(file.filepath).catch(() => {});
+    return res.status(400).json({ error: 'Invalid file extension' });
+  }
+
   const supabase = getSupabaseServerClient(req, res);
   const fileBuffer = await fs.readFile(file.filepath);
-  const ext = path.extname(file.originalFilename || '');
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
 
   const { error: uploadError } = await supabase.storage

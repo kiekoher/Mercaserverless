@@ -39,6 +39,16 @@ describe('/api/upload-foto', () => {
     expect(res._getStatusCode()).toBe(400);
   });
 
+  it('rejects files with disallowed extensions', async () => {
+    mockParse.mockImplementation((req, cb) => {
+      cb(null, {}, { file: [{ filepath: '/tmp/file', mimetype: 'image/gif', originalFilename: 'a.gif' }] });
+    });
+    const handler = require('../../pages/api/upload-foto');
+    const { req, res } = createMocks({ method: 'POST' });
+    await handler(req, res);
+    expect(res._getStatusCode()).toBe(400);
+  });
+
   it('uploads image and returns url', async () => {
     mockParse.mockImplementation((req, cb) => {
       cb(null, {}, { file: [{ filepath: '/tmp/file', mimetype: 'image/png', originalFilename: 'a.png' }] });

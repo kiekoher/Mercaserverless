@@ -7,6 +7,7 @@ const { checkRateLimit } = require('../../lib/rateLimiter');
 const { getCacheClient } = require('../../lib/redisCache');
 const { sanitizeInput } = require('../../lib/sanitize');
 
+
 const summarySchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }).length(10),
   mercaderistaId: z.string().uuid({ message: "El ID del mercaderista es requerido" }),
@@ -41,6 +42,8 @@ async function handler(req, res) {
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 5000;
+  const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH) || 1000;
 
   const parsed = summarySchema.safeParse(req.body);
 
@@ -68,6 +71,11 @@ async function handler(req, res) {
       - Puntos de venta: ${safePuntos.join(', ')}
     `;
 
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    logger.warn({ userId: user.id, promptLength: prompt.length }, 'Prompt too long');
+    return res.status(400).json({ error: 'Prompt demasiado largo' });
+  }
+
   if (UNSAFE_PROMPT_PATTERN.test(prompt)) {
     logger.warn({ userId: user.id, mercaderistaId }, 'Prompt contains unsafe content');
     return res.status(400).json({ error: 'Prompt no permitido' });
@@ -84,9 +92,13 @@ async function handler(req, res) {
     }
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt, { signal: controller.signal });
+    clearTimeout(timeout);
     const response = await result.response;
     const text = (await response.text()).replace(/```json|```/g, '');
 
@@ -108,7 +120,11 @@ async function handler(req, res) {
     res.status(200).json(parsedOutput);
 
   } catch (error) {
+    clearTimeout(timeout);
     logger.error({ err: error, userId: user.id }, 'Error calling Gemini API');
+    if (error.name === 'AbortError') {
+      return res.status(504).json({ error: 'La solicitud a la IA expiró' });
+    }
     const status = error?.response?.status;
     if (status === 401 || status === 403) {
       throw new Error('Error de autenticación o cuota con la API de IA.');
