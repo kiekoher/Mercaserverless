@@ -126,4 +126,6 @@ async function handler(req, res) {
   res.status(405).end(`Method ${req.method} Not Allowed`);
 }
 
-module.exports = withLogging(handler);;
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler;
+module.exports = mainHandler;

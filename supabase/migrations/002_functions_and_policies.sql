@@ -20,8 +20,12 @@ CREATE TRIGGER on_auth_user_created
 -- NOTE: SECURITY DEFINER is required to bypass RLS policies, which would
 -- otherwise cause a circular dependency (reading the profile requires the
 -- role, but getting the role requires reading the profile).
+-- By granting SELECT on the role column to authenticated users, we can
+-- break this circular dependency and change the function to SECURITY INVOKER.
+GRANT SELECT (role) ON TABLE public.profiles TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.get_my_role()
-RETURNS public.app_role LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
+RETURNS public.app_role LANGUAGE sql SECURITY INVOKER SET search_path = public AS $$
   SELECT role FROM public.profiles WHERE id = auth.uid();
 $$;
 

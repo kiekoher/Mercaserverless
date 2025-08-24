@@ -4,7 +4,7 @@ import { requireUser } from '../../lib/auth';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 
-async function handler(req, res) {
+export async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res, ['admin']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
@@ -77,4 +77,6 @@ async function handler(req, res) {
   res.status(405).end('Method Not Allowed');
 }
 
-export default withLogging(handler);
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler;
+module.exports = mainHandler;

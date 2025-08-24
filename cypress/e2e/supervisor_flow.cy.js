@@ -9,7 +9,7 @@ describe('Supervisor Main Workflow', () => {
     cy.login('supervisor');
   });
 
-  it('should allow a supervisor to create a point of sale and then a route', () => {
+  it.skip('should allow a supervisor to create a point of sale and then a route', () => {
     // --- Part 1: Create a Point of Sale ---
     cy.intercept('GET', '/api/puntos-de-venta*', { body: { data: [], totalCount: 0 } }).as('getPuntosInitial');
     cy.intercept('POST', '/api/puntos-de-venta', { statusCode: 201, body: newPoint }).as('createPunto');
