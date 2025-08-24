@@ -5,6 +5,7 @@
 // once it's created by the Next.js server, and then adds signal handlers to it.
 
 const http = require('http');
+const logger = require('./lib/logger.server');
 
 let server;
 
@@ -13,7 +14,7 @@ let server;
 // will execute, giving us a reference to the server instance.
 const originalListen = http.Server.prototype.listen;
 http.Server.prototype.listen = function (...args) {
-  console.log('> Starting server...');
+  logger.info('> Starting server...');
   server = this;
   return originalListen.apply(this, args);
 };
@@ -23,24 +24,24 @@ http.Server.prototype.listen = function (...args) {
 require('./server.js');
 
 const gracefulShutdown = (signal) => {
-  console.log(`> Received ${signal}, shutting down gracefully...`);
+  logger.info(`> Received ${signal}, shutting down gracefully...`);
   if (server) {
     server.close((err) => {
       if (err) {
-        console.error('> Error during server shutdown:', err);
+        logger.error('> Error during server shutdown:', err);
         process.exit(1);
       }
-      console.log('> Server closed successfully.');
+      logger.info('> Server closed successfully.');
       process.exit(0);
     });
 
     // Force shutdown after a timeout if connections are hanging.
     setTimeout(() => {
-      console.error('> Could not close connections in time, forcefully shutting down.');
+      logger.error('> Could not close connections in time, forcefully shutting down.');
       process.exit(1);
     }, 15000); // 15 seconds timeout
   } else {
-    console.log('> No active server to shut down.');
+    logger.info('> No active server to shut down.');
     process.exit(0);
   }
 };
