@@ -17,6 +17,7 @@ describe('/api/csrf', () => {
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData()).toHaveProperty('csrfToken');
+    expect(res.getHeader('Cache-Control')).toBe('no-store');
   });
 
   it('returns 429 when rate limit exceeded', async () => {
