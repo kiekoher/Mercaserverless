@@ -1,5 +1,5 @@
 const { Client } = require('@googlemaps/google-maps-services-js');
-const { formidable } = require('formidable');
+const formidable = require('formidable');
 const fs = require('fs');
 const Papa = require('papaparse');
 const { z } = require('zod');

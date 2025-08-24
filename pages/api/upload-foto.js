@@ -1,5 +1,5 @@
 const formidable = require('formidable');
-const { promises as fs } = require('fs');
+const { promises: fs } = require('fs');
 const path = require('path');
 const { withLogging } = require('../../lib/api-logger');
 const { getSupabaseServerClient } = require('../../lib/supabaseServer');

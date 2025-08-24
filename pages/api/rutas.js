@@ -18,25 +18,23 @@ async function handler(req, res) {
 
     const schema = z.object({
       page: z.coerce.number().int().positive().default(1),
-      search: z.string().optional().default(''),
+      pageSize: z.coerce.number().int().min(10).max(100).default(20),
+      mercaderistaId: z.string().uuid().optional(),
     });
     const parsed = schema.safeParse(req.query);
     if (!parsed.success) {
-      return res.status(400).json({ error: 'Parámetros de consulta inválidos.' });
+      return res.status(400).json({ error: 'Parámetros de consulta inválidos.', details: parsed.error.format() });
     }
 
-    const { page, search } = parsed.data;
-    const pageSize = 10;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+    const { page, pageSize, mercaderistaId } = parsed.data;
+    const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
 
     let query = supabase
       .from('rutas')
       .select('id,fecha,mercaderista_id,puntos_de_venta_ids', { count: 'exact' });
 
-    if (search) {
-      const safeSearch = sanitizeInput(search);
-      query = query.ilike('mercaderista_id', `%${safeSearch}%`);
+    if (mercaderistaId) {
+      query = query.eq('mercaderista_id', mercaderistaId);
     }
 
     const { data, error, count } = await query
@@ -47,13 +45,12 @@ async function handler(req, res) {
       throw error;
     }
 
-    res.setHeader('X-Total-Count', count);
     const transformedData = data.map(r => ({
       ...r,
       mercaderistaId: r.mercaderista_id,
       puntosDeVentaIds: r.puntos_de_venta_ids,
     }));
-    return res.status(200).json(transformedData);
+    return res.status(200).json({ data: transformedData, totalCount: count });
 
   } else if (req.method === 'POST') {
     if (!verifyCsrf(req, res)) return;
@@ -62,20 +59,19 @@ async function handler(req, res) {
     }
 
     const schema = z.object({
-      fecha: z.string().min(1),
-      mercaderistaId: z.string().uuid(),
-      puntosDeVentaIds: z.array(z.number().int()).min(1),
+      fecha: z.string().date('El formato de fecha debe ser YYYY-MM-DD'),
+      mercaderistaId: z.string().uuid('El ID del mercaderista debe ser un UUID válido'),
+      puntosDeVentaIds: z.array(z.number().int().positive()).min(1, 'Debe seleccionar al menos un punto de venta'),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
     const { fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
-    const safeFecha = sanitizeInput(fecha);
 
     const { data, error } = await supabase
       .from('rutas')
-      .insert([{ fecha: safeFecha, mercaderista_id: mercaderistaId, puntos_de_venta_ids: puntosDeVentaIds }])
+      .insert([{ fecha, mercaderista_id: mercaderistaId, puntos_de_venta_ids: puntosDeVentaIds }])
       .select('id,fecha,mercaderista_id,puntos_de_venta_ids')
       .single();
 
@@ -91,22 +87,21 @@ async function handler(req, res) {
     }
 
     const schema = z.object({
-      id: z.number().int(),
-      fecha: z.string().min(1),
-      mercaderistaId: z.string().uuid(),
-      puntosDeVentaIds: z.array(z.number().int()).min(1),
+      id: z.number().int().positive(),
+      fecha: z.string().date('El formato de fecha debe ser YYYY-MM-DD'),
+      mercaderistaId: z.string().uuid('El ID del mercaderista debe ser un UUID válido'),
+      puntosDeVentaIds: z.array(z.number().int().positive()).min(1, 'Debe seleccionar al menos un punto de venta'),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
     const { id, fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
-    const safeFecha = sanitizeInput(fecha);
 
     const { data, error } = await supabase
       .from('rutas')
       .update({
-        fecha: safeFecha,
+        fecha,
         mercaderista_id: mercaderistaId,
         puntos_de_venta_ids: puntosDeVentaIds,
       })

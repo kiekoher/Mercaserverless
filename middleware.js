@@ -26,6 +26,30 @@ export async function middleware(req) {
 
   const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true';
 
+  // --- CSRF Protection ---
+  // NOTE: A simple string comparison is used here instead of a timing-safe
+  // comparison because Node.js's `crypto.timingSafeEqual` is not available in the
+  // edge runtime. A timing attack against a 32-byte random token is considered
+  // computationally infeasible.
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
+    // Exempt the CSRF token endpoint itself, auth callbacks, and reporting endpoints.
+    const isExempted = ['/api/auth/callback', '/api/csrf', '/api/csp-report'].includes(req.nextUrl.pathname);
+
+    if (isStateChangingMethod && !isExempted) {
+      const headerToken = req.headers.get('x-csrf-token');
+      const cookieName = process.env.NODE_ENV === 'production' ? '__Host-csrf-secret' : 'csrf-secret';
+      const cookieToken = req.cookies.get(cookieName)?.value;
+
+      if (!headerToken || !cookieToken || headerToken !== cookieToken) {
+         return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+  }
+
   if (!bypassAuth) {
     // Create the Supabase client for production logic
     const supabase = createServerClient(
