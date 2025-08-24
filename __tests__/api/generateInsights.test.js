@@ -1,11 +1,9 @@
 /** @jest-environment node */
 import { createMocks } from 'node-mocks-http';
 import { requireUser } from '../../lib/auth';
-import { verifyCsrf } from '../../lib/csrf';
 import { checkRateLimit } from '../../lib/rateLimiter';
 
 jest.mock('../../lib/auth', () => ({ requireUser: jest.fn() }));
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 jest.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({

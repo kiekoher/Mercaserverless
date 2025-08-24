@@ -18,7 +18,6 @@ jest.mock('@googlemaps/google-maps-services-js');
 jest.mock('../../lib/redisCache', () => ({
   getCacheClient: jest.fn().mockReturnValue(null),
 }));
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 const mockRpc = jest.fn();

@@ -4,20 +4,17 @@ const fs = require('fs');
 const mockParse = jest.fn();
 jest.mock('formidable', () => jest.fn(() => ({ parse: mockParse })), { virtual: true });
 jest.mock('../../lib/auth');
-jest.mock('../../lib/csrf');
 jest.mock('../../lib/rateLimiter');
 jest.mock('../../lib/supabaseServer');
 jest.mock('../../lib/logger.server');
 
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { getSupabaseServerClient } = require('../../lib/supabaseServer');
 
 describe('/api/upload-foto', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    verifyCsrf.mockReturnValue(true);
     checkRateLimit.mockResolvedValue(true);
     requireUser.mockResolvedValue({ user: { id: 'u1' }, error: null });
     fs.promises.readFile = jest.fn().mockResolvedValue(Buffer.from('file'));
@@ -52,7 +49,6 @@ describe('/api/upload-foto', () => {
     expect(res._getStatusCode()).toBe(200);
     expect(res._getData()).toEqual(JSON.stringify({ url: 'http://example.com/img.jpg' }));
     expect(fs.promises.unlink).toHaveBeenCalled();
-    expect(verifyCsrf).toHaveBeenCalled();
     expect(checkRateLimit).toHaveBeenCalledWith(expect.anything(), { userId: 'u1' });
   });
 });

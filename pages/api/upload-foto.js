@@ -4,7 +4,6 @@ const path = require('path');
 const { withLogging } = require('../../lib/api-logger');
 const { getSupabaseServerClient } = require('../../lib/supabaseServer');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 
 export const config = {
@@ -23,7 +22,6 @@ async function handler(req, res) {
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
   }
-  if (!verifyCsrf(req, res)) return;
   if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too Many Requests' });
   }

@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "cy:run": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test start http://localhost:3000 \"cypress run\""
+    "cy:run": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev http://localhost:3000 \"cypress run\""
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
@@ -45,6 +45,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@babel/plugin-transform-unicode-property-regex": "^7.27.1",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.5.2",
@@ -52,9 +53,9 @@
     "dotenv": "^17.2.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.4",
-    "jest": "^29.7.0",
+    "jest": "^30.0.5",
     "jest-canvas-mock": "^2.5.2",
-    "jest-environment-jsdom": "^29.7.0",
+    "jest-environment-jsdom": "^30.0.5",
     "node-mocks-http": "^1.17.2",
     "pino-pretty": "^13.1.1",
     "start-server-and-test": "^2.0.13"

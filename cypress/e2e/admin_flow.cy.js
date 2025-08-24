@@ -34,11 +34,11 @@ describe('Admin User Management Workflow', () => {
     // Find the row for the "Test Mercaderista User"
     cy.contains('td', 'Test Mercaderista User').parent('tr').within(() => {
       // Find the select and change the role to 'supervisor'
-      cy.get('.MuiSelect-select').click();
+      cy.get('[data-testid="role-select-33333333-3333-3333-3333-333333333333"]').find('[role=button]').click();
     });
 
     // The select options are in a popover, so we select from the body
-    cy.get('ul[role="listbox"]').contains('li', 'Supervisor').click();
+    cy.get('[role="listbox"]').contains('Supervisor').click();
 
     // The role in the UI should have changed
     cy.contains('td', 'Test Mercaderista User').parent('tr').contains('div', 'supervisor');

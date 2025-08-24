@@ -12,23 +12,20 @@ jest.mock('@googlemaps/google-maps-services-js', () => ({
 jest.mock('../../lib/rateLimiter');
 jest.mock('../../lib/logger.server');
 jest.mock('../../lib/auth');
-jest.mock('../../lib/csrf');
 
 describe('optimize-route API', () => {
-  let handler, requireUser, checkRateLimit, verifyCsrf;
+  let handler, requireUser, checkRateLimit;
 
   beforeEach(() => {
     jest.resetModules();
 
     requireUser = require('../../lib/auth').requireUser;
     checkRateLimit = require('../../lib/rateLimiter').checkRateLimit;
-    verifyCsrf = require('../../lib/csrf').verifyCsrf;
     handler = require('../../pages/api/optimize-route');
 
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
     requireUser.mockResolvedValue({ user: { id: 'u1' }, error: null });
     checkRateLimit.mockResolvedValue(true);
-    verifyCsrf.mockReturnValue(true);
     mockDirections.mockClear();
   });
 

@@ -1,9 +1,8 @@
-const { getISOWeek, getISOWeekYear } = require('date-fns');
+import { getISOWeek, getISOWeekYear } from 'date-fns';
 const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 
@@ -112,7 +111,6 @@ async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  if (!verifyCsrf(req, res)) return;
 
   const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
   if (authError) {

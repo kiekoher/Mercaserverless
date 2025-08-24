@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/Auth';
+import { useDebounce } from '../../hooks/useDebounce';
 import {
   Typography, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Alert,
-  Box, Select, MenuItem, FormControl
+  Box, Select, MenuItem, FormControl, TextField, Pagination
 } from '@mui/material';
 import AppLayout from '../../components/AppLayout';
 import { useSnackbar } from 'notistack'; // Importar useSnackbar
@@ -20,22 +21,30 @@ export default function UserManagementPage() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState({});
 
+  // Pagination and Search state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/users');
+      const params = new URLSearchParams({ page, search: debouncedSearchTerm });
+      const res = await fetch(`/api/users?${params.toString()}`);
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || 'Failed to fetch users');
       }
-      const data = await res.json();
+      const { data, totalCount } = await res.json();
+      setTotalPages(Math.ceil(totalCount / 20)); // Assuming page size of 20
       setUsers(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, debouncedSearchTerm]);
 
   useEffect(() => {
     if (role) {
@@ -88,6 +97,15 @@ export default function UserManagementPage() {
       {/* El error ahora se manejará principalmente por el Snackbar, pero mantenemos esto como respaldo */}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper>
+        <Box sx={{ p: 2 }}>
+          <TextField
+            fullWidth
+            label="Buscar por nombre"
+            variant="outlined"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </Box>
         <TableContainer>
           <Table>
             <TableHead>
@@ -110,6 +128,7 @@ export default function UserManagementPage() {
                       <Select
                         value={u.role}
                         onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        data-testid={`role-select-${u.id}`}
                       >
                         <MenuItem value="admin">Admin</MenuItem>
                         <MenuItem value="supervisor">Supervisor</MenuItem>
@@ -132,6 +151,15 @@ export default function UserManagementPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(e, value) => setPage(value)}
+            color="primary"
+            disabled={loading}
+          />
+        </Box>
       </Paper>
     </AppLayout>
   );
