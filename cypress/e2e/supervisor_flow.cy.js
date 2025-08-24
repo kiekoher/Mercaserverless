@@ -30,6 +30,7 @@ describe('Supervisor Main Workflow', () => {
     cy.intercept('POST', '/api/rutas', { statusCode: 201, body: newRoute }).as('createRuta');
 
     cy.visit('/rutas');
+    cy.wait('@getRutasInitial');
     cy.contains('h4', 'Gestión de Rutas').should('be.visible');
 
     cy.get('input[name="mercaderistaId"]').type(newMercaderistaId);

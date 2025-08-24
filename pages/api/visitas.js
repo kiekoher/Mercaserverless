@@ -1,7 +1,6 @@
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { sanitizeInput } = require('../../lib/sanitize');
@@ -43,7 +42,6 @@ async function handler(req, res) {
 
   // MÉTODO POST: Para crear un registro de visita (Check-in)
   if (req.method === 'POST') {
-    if (!verifyCsrf(req, res)) return;
     if (role !== 'mercaderista') {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
     }
@@ -88,7 +86,6 @@ async function handler(req, res) {
 
   // MÉTODO PUT: Para actualizar una visita (Check-out y feedback)
   if (req.method === 'PUT') {
-    if (!verifyCsrf(req, res)) return;
     if (role !== 'mercaderista') {
       return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
     }

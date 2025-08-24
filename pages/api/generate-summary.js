@@ -2,7 +2,6 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { getCacheClient } = require('../../lib/redisCache');
@@ -26,7 +25,6 @@ async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  if (!verifyCsrf(req, res)) return;
 
   if (!process.env.GEMINI_API_KEY) {
     logger.error('GEMINI_API_KEY is not configured');

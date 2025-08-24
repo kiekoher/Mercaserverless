@@ -17,8 +17,6 @@ jest.mock('../../lib/supabaseServer', () => ({
   getSupabaseServerClient: jest.fn(),
 }));
 
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
-
 jest.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
     getGenerativeModel: () => ({

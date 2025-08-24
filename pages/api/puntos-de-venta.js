@@ -2,7 +2,6 @@ const { Client } = require('@googlemaps/google-maps-services-js');
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const geocodeConfig = require('../../lib/geocodeConfig');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
@@ -25,7 +24,6 @@ async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    if (!verifyCsrf(req, res)) return;
     if (!(await checkRateLimit(req, { userId: user.id }))) {
       return res.status(429).json({ error: 'Too many requests' });
     }
@@ -90,7 +88,6 @@ async function handler(req, res) {
     return res.status(201).json(data);
 
   } else if (req.method === 'PUT') {
-    if (!verifyCsrf(req, res)) return;
     if (!(await checkRateLimit(req, { userId: user.id }))) return res.status(429).json({ error: 'Too many requests' });
 
     const schema = z.object({
@@ -124,7 +121,6 @@ async function handler(req, res) {
     return res.status(200).json(data);
 
   } else if (req.method === 'DELETE') {
-    if (!verifyCsrf(req, res)) return;
     if (!(await checkRateLimit(req, { userId: user.id }))) return res.status(429).json({ error: 'Too many requests' });
     const schema = z.object({ id: z.coerce.number().int().positive() });
     const parsed = schema.safeParse(req.query);

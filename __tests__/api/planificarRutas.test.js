@@ -3,7 +3,6 @@ const { createMocks } = require('node-mocks-http');
 // Mock dependencies first
 jest.mock('../../lib/auth');
 jest.mock('../../lib/logger.server');
-jest.mock('../../lib/csrf');
 jest.mock('../../lib/rateLimiter');
 
 const mockRpc = jest.fn();
@@ -19,18 +18,16 @@ jest.mock('@supabase/supabase-js', () => ({
 
 describe('/api/planificar-rutas', () => {
   let handler;
-  let auth, csrf, rateLimiter, logger;
+  let auth, rateLimiter, logger;
 
   beforeEach(() => {
     jest.resetModules();
 
     auth = require('../../lib/auth');
-    csrf = require('../../lib/csrf');
     rateLimiter = require('../../lib/rateLimiter');
     logger = require('../../lib/logger.server');
 
     auth.requireUser.mockResolvedValue({ user: { id: 'test-user-id' }, error: null });
-    csrf.verifyCsrf.mockReturnValue(true);
     rateLimiter.checkRateLimit.mockResolvedValue(true);
 
     mockGt.mockClear();

@@ -1,7 +1,6 @@
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const { verifyCsrf } = require('../../lib/csrf');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { sanitizeInput } = require('../../lib/sanitize');
 
@@ -50,7 +49,6 @@ async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
-    if (!verifyCsrf(req, res)) return;
     const schema = z.object({
       userId: z.string().uuid(),
       newRole: z.enum(['admin', 'supervisor', 'mercaderista']),

@@ -16,8 +16,6 @@ function createMockRes() {
 jest.mock('../../lib/supabaseServer', () => ({
   getSupabaseServerClient: jest.fn(),
 }));
-
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 describe('visitas API', () => {

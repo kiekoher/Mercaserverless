@@ -37,8 +37,7 @@ describe('UsersPage', () => {
     ];
     fetch.mockResolvedValueOnce({
       ok: true,
-      headers: new Headers({ 'X-Total-Count': '2' }),
-      json: async () => mockUsers,
+      json: async () => ({ data: mockUsers, totalCount: 2 }),
     });
 
     render(
@@ -52,7 +51,7 @@ describe('UsersPage', () => {
 
     // Wait for the users to be fetched and rendered
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/users');
+      expect(fetch).toHaveBeenCalledWith('/api/users?page=1&search=');
     });
 
     // Check if the mock users are displayed in the table

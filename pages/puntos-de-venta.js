@@ -331,9 +331,9 @@ export default function PuntosDeVentaPage() {
           <Box>
             <Typography variant="h6" gutterBottom>Añadir Nuevo Punto</Typography>
             <Paper component="form" onSubmit={handleSubmit} sx={{ p: 2, mb: 2 }}>
-              <TextField label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
-              <TextField label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
-              <TextField label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField name="nombre" label="Nombre del Punto" value={nombre} onChange={(e) => setNombre(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField name="direccion" label="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} fullWidth required sx={{ mb: 2 }} />
+              <TextField name="ciudad" label="Ciudad" value={ciudad} onChange={(e) => setCiudad(e.target.value)} fullWidth required sx={{ mb: 2 }} />
               <TextField label="Tipología" value={tipologia} onChange={(e) => setTipologia(e.target.value)} fullWidth sx={{ mb: 2 }} />
               <TextField label="Cuota" value={cuota} onChange={(e) => setCuota(e.target.value)} type="number" fullWidth sx={{ mb: 2 }} />
               <TextField label="Frecuencia Mensual" value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)} type="number" fullWidth sx={{ mb: 2 }} />
@@ -342,7 +342,7 @@ export default function PuntosDeVentaPage() {
                 {isSubmitting ? <CircularProgress size={24} /> : 'Guardar Punto'}
               </Button>
             </Paper>
-            <CSVImport onImport={handleImport} isImporting={isImporting} />
+            <CSVImport onImportSuccess={fetchPuntos} isImporting={isImporting} setIsImporting={setIsImporting} />
           </Box>
         </Grid>
       </Grid>

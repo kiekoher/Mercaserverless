@@ -3,13 +3,12 @@ const formidable = require('formidable');
 const fs = require('fs');
 const Papa = require('papaparse');
 const { z } = require('zod');
-const pLimit = require('p-limit').default;
+import pLimit from 'p-limit';
 const logger = require('../../lib/logger.server');
 const { requireUser } = require('../../lib/auth');
 const { getCacheClient } = require('../../lib/redisCache');
 const geocodeConfig = require('../../lib/geocodeConfig');
 const { withLogging } = require('../../lib/api-logger');
-const { verifyCsrf } = require('../../lib/csrf');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { sanitizeInput } = require('../../lib/sanitize');
 
@@ -88,7 +87,6 @@ async function handler(req, res) {
     return res.status(authError.status).json({ error: authError.message });
   }
 
-  if (!verifyCsrf(req, res)) return;
   if (!(await checkRateLimit(req, { userId: user.id }))) {
     return res.status(429).json({ error: 'Too Many Requests' });
   }

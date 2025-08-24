@@ -17,8 +17,6 @@ jest.mock('../../lib/supabaseServer', () => ({
   getSupabaseServerClient: jest.fn(),
 }));
 
-jest.mock('../../lib/csrf', () => ({ verifyCsrf: jest.fn(() => true) }));
-
 describe('rutas API', () => {
   beforeEach(() => {
     jest.resetModules();
