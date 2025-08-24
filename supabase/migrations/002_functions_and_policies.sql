@@ -1,5 +1,8 @@
 -- Functions, triggers and RLS policies
 
+-- Creates a profile for a new user.
+-- NOTE: SECURITY DEFINER is required to grant this trigger permission
+-- to insert into the public.profiles table.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -13,6 +16,10 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- Fetches the role of the currently authenticated user.
+-- NOTE: SECURITY DEFINER is required to bypass RLS policies, which would
+-- otherwise cause a circular dependency (reading the profile requires the
+-- role, but getting the role requires reading the profile).
 CREATE OR REPLACE FUNCTION public.get_my_role()
 RETURNS public.app_role LANGUAGE sql SECURITY DEFINER SET search_path = public AS $$
   SELECT role FROM public.profiles WHERE id = auth.uid();
@@ -75,10 +82,10 @@ CREATE POLICY "Allow assigned or privileged read access" ON public.rutas
   );
 CREATE POLICY "Allow supervisors and admins to insert" ON public.rutas FOR INSERT WITH CHECK (get_my_role() IN ('supervisor', 'admin'));
 
-CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON public.profiles FOR SELECT USING (get_my_role() = 'admin');
-CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE USING (get_my_role() = 'admin');
+CREATE POLICY "Allow access to own profile or if admin" ON public.profiles
+  FOR ALL
+  USING (auth.uid() = id OR get_my_role() = 'admin')
+  WITH CHECK (auth.uid() = id OR get_my_role() = 'admin');
 
 CREATE POLICY "Users can see their own visits" ON public.visitas FOR SELECT USING (auth.uid() = mercaderista_id);
 CREATE POLICY "Users can insert their own visits" ON public.visitas FOR INSERT WITH CHECK (auth.uid() = mercaderista_id);
