@@ -1,23 +1,31 @@
 /** @jest-environment node */
-const { createClient } = require('@supabase/supabase-js');
-const { requireUser } = require('../../lib/auth');
+let createClient;
+let requireUser;
 const { createMockReq, createMockRes } = require('../../lib/test-utils');
-const { rawHandler: handler } = require('../../pages/api/puntos-de-venta');
-const { Client } = require('@googlemaps/google-maps-services-js');
-const { getCacheClient } = require('../../lib/redisCache');
+let Client;
+let getCacheClient;
+
+let handler;
 
 jest.mock('../../lib/auth');
 jest.mock('@supabase/supabase-js');
 jest.mock('@googlemaps/google-maps-services-js');
 jest.mock('../../lib/redisCache');
 
-describe.skip('puntos-de-venta API', () => {
+describe('puntos-de-venta API', () => {
   let supabase;
   let mockMapsClient;
   let mockRedisClient;
 
   beforeEach(() => {
+    jest.resetModules();
     jest.clearAllMocks();
+    ({ createClient } = require('@supabase/supabase-js'));
+    ({ requireUser } = require('../../lib/auth'));
+    ({ Client } = require('@googlemaps/google-maps-services-js'));
+    ({ getCacheClient } = require('../../lib/redisCache'));
+
+    process.env.GOOGLE_MAPS_API_KEY = 'test-key';
 
     supabase = {
       from: jest.fn().mockReturnThis(),
@@ -45,6 +53,8 @@ describe.skip('puntos-de-venta API', () => {
       del: jest.fn().mockResolvedValue(1),
     };
     getCacheClient.mockReturnValue(mockRedisClient);
+
+    handler = require('../../pages/api/puntos-de-venta').rawHandler;
   });
 
   it('returns 401 if user not authenticated', async () => {
@@ -69,7 +79,16 @@ describe.skip('puntos-de-venta API', () => {
 
   it('allows supervisors to update points', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
-    const updatedPdv = { id: 1, nombre: 'Updated PDV', direccion: 'Calle Real 456', ciudad: 'Bogota' };
+    const updatedPdv = {
+      id: 1,
+      nombre: 'Updated PDV',
+      direccion: 'Calle Real 456',
+      ciudad: 'Bogota',
+      cuota: null,
+      tipologia: null,
+      frecuencia_mensual: null,
+      minutos_servicio: null,
+    };
 
     const req = createMockReq('PUT', updatedPdv);
     const res = createMockRes();
