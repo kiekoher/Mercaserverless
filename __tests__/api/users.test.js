@@ -1,54 +1,69 @@
 /** @jest-environment node */
-import { jest } from '@jest/globals';
+const { createClient } = require('@supabase/supabase-js');
+const { requireUser } = require('../../lib/auth');
+const { createMockReq, createMockRes } = require('../../lib/test-utils');
+const { rawHandler: handler } = require('../../pages/api/users');
 
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k, v) { this.headers[k] = v; },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.data = payload; return this; },
-    end(payload){ this.data = payload; return this; }
-  };
-}
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
-}));
+jest.mock('../../lib/auth');
+jest.mock('@supabase/supabase-js');
 
 describe('users API', () => {
+  let supabase;
+
   beforeEach(() => {
-    jest.resetModules();
+    jest.clearAllMocks();
+    supabase = {
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn(),
+      range: jest.fn().mockReturnThis(),
+      order: jest.fn(),
+    };
+    createClient.mockReturnValue(supabase);
   });
 
   it('returns 401 when unauthenticated', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
-    });
-    const { default: handler } = await import('../../pages/api/users.js');
-    const req = { method: 'GET' };
+    requireUser.mockResolvedValue({ error: { status: 401, message: 'Unauthorized' } });
+    const req = createMockReq('GET');
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(401);
   });
 
-  it('returns 400 when role is invalid', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: () => ({
-        select: () => ({
-          eq: () => ({ single: () => Promise.resolve({ data: { role: 'admin' } }) })
-        })
-      })
-    });
-    const { default: handler } = await import('../../pages/api/users.js');
-    const req = { method: 'PUT', body: { userId: 'u2', newRole: 'invalid' } };
+  it('returns a list of users for admin', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
+    supabase.order.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const json = res._getJSONData();
+    expect(json.data.length).toBe(1);
+    expect(json.totalCount).toBe(1);
+  });
+
+  it('updates a user role for admin', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
+    const updatedUser = { id: 'u2', full_name: 'Test User', role: 'supervisor' };
+    supabase.single.mockResolvedValue({ data: updatedUser, error: null });
+
+    const req = createMockReq('PUT', { userId: '00000000-0000-0000-0000-000000000000', newRole: 'supervisor' });
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res._getJSONData().role).toBe('supervisor');
+  });
+
+  it('returns 400 for invalid role on update', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
+    const req = createMockReq('PUT', { userId: '00000000-0000-0000-0000-000000000000', newRole: 'invalid-role' });
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(400);
   });
 });
-

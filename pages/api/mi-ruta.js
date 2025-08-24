@@ -2,7 +2,7 @@ const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 
-async function handler(req, res) {
+export async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
@@ -33,4 +33,6 @@ async function handler(req, res) {
   return res.status(200).json(data);
 }
 
-module.exports = withLogging(handler);;
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler;
+module.exports = mainHandler;

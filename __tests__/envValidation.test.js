@@ -1,3 +1,6 @@
+jest.unmock('../lib/env');
+jest.unmock('../lib/env.server');
+
 const path = require('path');
 
 describe('environment variable validation', () => {

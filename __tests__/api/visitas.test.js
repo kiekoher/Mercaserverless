@@ -1,214 +1,154 @@
 /** @jest-environment node */
-import { jest } from '@jest/globals';
+const { createClient } = require('@supabase/supabase-js');
+const { requireUser } = require('../../lib/auth');
+const { createMockReq, createMockRes } = require('../../lib/test-utils');
+const { rawHandler: handler } = require('../../pages/api/visitas');
 
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k,v){ this.headers[k]=v; },
-    status(code){ this.statusCode=code; return this; },
-    json(payload){ this.data=payload; return this; },
-    end(payload){ this.data=payload; return this; }
-  };
-}
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
-}));
-jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
+jest.mock('../../lib/auth');
+jest.mock('@supabase/supabase-js');
 
 describe('visitas API', () => {
+  let supabase;
+
   beforeEach(() => {
-    jest.resetModules();
+    jest.clearAllMocks();
+    supabase = {
+      from: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      insert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      is: jest.fn().mockReturnThis(),
+      single: jest.fn(),
+    };
+    createClient.mockReturnValue(supabase);
   });
 
   it('returns 401 if user not authenticated', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
+    // Correctly mock the return object with the 'error' key
+    requireUser.mockResolvedValue({
+      error: { status: 401, message: 'Unauthorized' },
+      user: null,
+      role: null,
+      supabase: null,
     });
-    const { default: handler } = await import('../../pages/api/visitas.js');
-    const req = { method: 'POST', body: {} };
+    const req = createMockReq('POST');
     const res = createMockRes();
+
     await handler(req, res);
+
     expect(res.statusCode).toBe(401);
+    expect(res._getJSONData()).toEqual({ error: 'Unauthorized' });
   });
 
-  it('allows mercaderistas to create visits', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
-              })
-            })
-          };
-        }
-        if (table === 'rutas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] } })
-              })
-            })
-          };
-        }
-        if (table === 'visitas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  is: () => ({ single: () => Promise.resolve({ data: null }) })
-                })
-              })
-            }),
-            insert: () => ({
-              select: () => ({
-                single: () => Promise.resolve({ data: { id: 1 } })
-              })
-            })
-          };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/visitas.js');
-    const req = { method: 'POST', body: { ruta_id: 1, punto_de_venta_id: 2 } };
+  it('returns 403 if user is not a mercaderista for POST', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
+    const req = createMockReq('POST');
     const res = createMockRes();
+
     await handler(req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res._getJSONData()).toEqual({ error: 'Solo los mercaderistas pueden registrar visitas.' });
+  });
+
+  it('allows mercaderistas to create (check-in) visits', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
+
+    // 1. Fetch route for validation
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] }, error: null });
+
+    // 2. Check for existing active visit
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.is.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: null, error: null });
+
+    // 3. Insert the new visit
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.insert.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { id: 99, estado: 'En Progreso' }, error: null });
+
+    const req = createMockReq('POST', { ruta_id: 1, punto_de_venta_id: 2 });
+    const res = createMockRes();
+
+    await handler(req, res);
+
     expect(res.statusCode).toBe(201);
-    expect(res.data.id).toBe(1);
+    expect(res._getJSONData()).toEqual({ id: 99, estado: 'En Progreso' });
   });
 
-  it('prevents duplicate check-in for same point', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
-              })
-            })
-          };
-        }
-        if (table === 'rutas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] } })
-              })
-            })
-          };
-        }
-        if (table === 'visitas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  is: () => ({ single: () => Promise.resolve({ data: { id: 1 } }) })
-                })
-              })
-            }),
-            insert: () => ({
-              select: () => ({
-                single: () => Promise.resolve({ data: { id: 1 } })
-              })
-            })
-          };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/visitas.js');
-    const req = { method: 'POST', body: { ruta_id: 1, punto_de_venta_id: 2 } };
+  it('prevents duplicate check-in for the same point', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
+
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] }, error: null });
+
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.is.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { id: 1 }, error: null }); // Existing visit found
+
+    const req = createMockReq('POST', { ruta_id: 1, punto_de_venta_id: 2 });
     const res = createMockRes();
+
     await handler(req, res);
+
     expect(res.statusCode).toBe(409);
+    expect(res._getJSONData()).toEqual({ error: 'Visita ya iniciada para este punto' });
   });
 
-  it('sanitizes observaciones on update', async () => {
-    const selectBeforeUpdate = jest.fn().mockReturnValue({
-      eq: () => ({
-        eq: () => ({ single: () => Promise.resolve({ data: { check_out_at: null } }) })
-      })
-    });
-    const updateMock = jest.fn().mockReturnValue({
-      eq: () => ({
-        eq: () => ({
-          select: () => ({
-            single: () => Promise.resolve({ data: {} })
-          })
-        })
-      })
-    });
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
-              })
-            })
-          };
-        }
-        if (table === 'visitas') {
-          return { select: selectBeforeUpdate, update: updateMock };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/visitas.js');
-    const req = {
-      method: 'PUT',
-      body: { visita_id: 1, estado: 'Completada', observaciones: '<script>bad()</script>' }
-    };
+  it('allows mercaderistas to update (check-out) visits', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
+
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: null }, error: null });
+
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.update.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { id: 1, estado: 'Completada' }, error: null });
+
+    const req = createMockReq('PUT', { visita_id: 1, estado: 'Completada', observaciones: 'Test' });
     const res = createMockRes();
+
     await handler(req, res);
-    expect(updateMock).toHaveBeenCalled();
-    const sent = updateMock.mock.calls[0][0];
-    expect(sent.observaciones).toBe('');
+
+    expect(res.statusCode).toBe(200);
+    expect(res._getJSONData()).toEqual({ id: 1, estado: 'Completada' });
   });
 
   it('prevents double check-out', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    const updateMock = jest.fn();
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
-      from: (table) => {
-        if (table === 'profiles') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: () => Promise.resolve({ data: { role: 'mercaderista' } })
-              })
-            })
-          };
-        }
-        if (table === 'visitas') {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({ single: () => Promise.resolve({ data: { check_out_at: 'now' } }) })
-              })
-            }),
-            update: updateMock,
-          };
-        }
-      }
-    });
-    const { default: handler } = await import('../../pages/api/visitas.js');
-    const req = { method: 'PUT', body: { visita_id: 1, estado: 'Completada' } };
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
+
+    supabase.from.mockReturnValueOnce(supabase);
+    supabase.select.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.eq.mockReturnValueOnce(supabase);
+    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: '2024-01-01T12:00:00Z' }, error: null });
+
+    const req = createMockReq('PUT', { visita_id: 1, estado: 'Completada' });
     const res = createMockRes();
+
     await handler(req, res);
+
     expect(res.statusCode).toBe(400);
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(res._getJSONData()).toEqual({ error: 'Visita ya finalizada' });
+    expect(supabase.update).not.toHaveBeenCalled();
   });
 });

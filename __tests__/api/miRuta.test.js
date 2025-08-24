@@ -1,81 +1,57 @@
 /** @jest-environment node */
-import { jest } from '@jest/globals';
+const { createClient } = require('@supabase/supabase-js');
+const { requireUser } = require('../../lib/auth');
+const { createMockReq, createMockRes } = require('../../lib/test-utils');
+const { rawHandler: handler } = require('../../pages/api/mi-ruta');
 
-function createMockRes() {
-  return {
-    statusCode: 0,
-    data: null,
-    headers: {},
-    setHeader(k, v) { this.headers[k] = v; },
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.data = payload; return this; },
-    end(payload){ this.data = payload; return this; }
-  };
-}
-
-jest.mock('../../lib/supabaseServer', () => ({
-  getSupabaseServerClient: jest.fn(),
-}));
+jest.mock('../../lib/auth');
+jest.mock('@supabase/supabase-js');
 
 describe('mi-ruta API', () => {
+  let supabase;
+
   beforeEach(() => {
-    jest.resetModules();
+    jest.clearAllMocks();
+    supabase = {
+      rpc: jest.fn(),
+    };
+    createClient.mockReturnValue(supabase);
   });
 
   it('returns 401 when unauthenticated', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: null } }) },
-    });
-    const { default: handler } = await import('../../pages/api/mi-ruta.js');
-    const req = { method: 'GET' };
+    requireUser.mockResolvedValue({ error: { status: 401, message: 'Unauthorized' } });
+    const req = createMockReq('GET');
     const res = createMockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(401);
   });
 
   it('returns the route for an authenticated mercaderista', async () => {
-    const { getSupabaseServerClient } = await import('../../lib/supabaseServer');
-    const { requireUser } = await import('../../lib/auth');
-
-    function createMockRes() {
-      return {
-        statusCode: 0,
-        data: null,
-        headers: {},
-        setHeader(k, v) { this.headers[k] = v; },
-        status(code) { this.statusCode = code; return this; },
-        json(payload) { this.data = payload; return this; }
-      };
-    }
-
-    const mockUser = { id: 'user-mercaderista', role: 'mercaderista' };
+    const mockUser = { id: 'user-mercaderista' };
     const mockRoute = { id: 1, fecha: '2025-08-18', puntos: [{ id: 1, nombre: 'Punto 1' }] };
+    requireUser.mockResolvedValue({ user: mockUser, role: 'mercaderista', supabase });
+    supabase.rpc.mockResolvedValue({ data: mockRoute, error: null });
 
-    getSupabaseServerClient.mockReturnValue({
-      auth: { getUser: jest.fn().mockResolvedValue({ data: { user: mockUser } }) },
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: () => Promise.resolve({ data: { role: 'mercaderista' } })
-          })
-        })
-      }),
-      rpc: jest.fn().mockResolvedValue({ data: mockRoute, error: null }),
-    });
-
-    const { default: handler } = await import('../../pages/api/mi-ruta.js');
-    const req = { method: 'GET' };
+    const req = createMockReq('GET');
     const res = createMockRes();
-
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.data).toEqual(mockRoute);
+    expect(res._getJSONData()).toEqual(mockRoute);
+    expect(supabase.rpc).toHaveBeenCalledWith('get_todays_route_for_user', {
+      p_user_id: String(mockUser.id),
+    });
+  });
 
-    // We need to get the Supabase client instance that the handler would have used
-    const supaClient = getSupabaseServerClient(req, res);
-    expect(supaClient.rpc).toHaveBeenCalledWith('get_todays_route_for_user', { p_user_id: String(mockUser.id) });
+  it('returns 404 if no route is found', async () => {
+    const mockUser = { id: 'user-mercaderista' };
+    requireUser.mockResolvedValue({ user: mockUser, role: 'mercaderista', supabase });
+    supabase.rpc.mockResolvedValue({ data: null, error: null }); // No data returned
+
+    const req = createMockReq('GET');
+    const res = createMockRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(404);
   });
 });
-

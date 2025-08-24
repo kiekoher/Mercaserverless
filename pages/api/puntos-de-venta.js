@@ -13,7 +13,7 @@ const PDV_FIELDS =
 
 const googleMapsClient = new Client({});
 
-async function handler(req, res) {
+export async function handler(req, res) {
   if (!process.env.GOOGLE_MAPS_API_KEY) {
     throw new Error('GOOGLE_MAPS_API_KEY no configurada');
   }
@@ -173,4 +173,6 @@ async function handler(req, res) {
   }
 }
 
-module.exports = withLogging(handler);;
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler;
+module.exports = mainHandler;
