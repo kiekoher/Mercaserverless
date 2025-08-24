@@ -1,7 +1,16 @@
 describe('Admin User Management Workflow', () => {
   beforeEach(() => {
     // Intercept API calls to provide mock data
-    cy.intercept('GET', '/api/users', { fixture: 'users.json' }).as('getUsers');
+    // Load the fixture data first
+    cy.fixture('users.json').then((users) => {
+      // Now define the intercept, using the loaded data
+      cy.intercept('GET', '/api/users*', {
+        body: {
+          data: users,
+          totalCount: users.length,
+        },
+      }).as('getUsers');
+    });
     cy.intercept('PUT', '/api/users', { statusCode: 200, body: { message: 'Rol de usuario actualizado con éxito' } }).as('updateUser');
 
     // 1. Set the role in localStorage BEFORE visiting the page.
@@ -34,11 +43,13 @@ describe('Admin User Management Workflow', () => {
     // Find the row for the "Test Mercaderista User"
     cy.contains('td', 'Test Mercaderista User').parent('tr').within(() => {
       // Find the select and change the role to 'supervisor'
-      cy.get('[data-testid="role-select-33333333-3333-3333-3333-333333333333"]').find('[role=button]').click();
+      // Click the Select component directly to open the dropdown
+      cy.get('[data-testid="role-select-33333333-3333-3333-3333-333333333333"]').click({ force: true });
     });
 
-    // The select options are in a popover, so we select from the body
-    cy.get('[role="listbox"]').contains('Supervisor').click();
+    // The select options are in a popover, so we select from the body.
+    // The popover is attached to the body, not the select component.
+    cy.get('[role="listbox"]').contains('li', 'Supervisor').click();
 
     // The role in the UI should have changed
     cy.contains('td', 'Test Mercaderista User').parent('tr').contains('div', 'supervisor');

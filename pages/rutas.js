@@ -96,13 +96,13 @@ export default function RutasPage() {
 
   const fetchRutas = useCallback(async () => {
     setLoading(true);
+    const pageSize = 20;
     try {
-      const params = new URLSearchParams({ page, search: debouncedSearchTerm });
+      const params = new URLSearchParams({ page, pageSize, search: debouncedSearchTerm });
       const res = await fetch(`/api/rutas?${params.toString()}`);
       if (!res.ok) throw new Error('Error al cargar las rutas.');
-      const data = await res.json();
-      const totalCount = res.headers.get('X-Total-Count');
-      setTotalPages(Math.ceil(totalCount / 10));
+      const { data, totalCount } = await res.json();
+      setTotalPages(Math.ceil(totalCount / pageSize));
       setRutas(data);
 
       // Pre-fetch visits for all routes shown
@@ -125,7 +125,7 @@ export default function RutasPage() {
       const params = new URLSearchParams({ search: debouncedPuntoSearch });
       const res = await fetch(`/api/puntos-de-venta?${params.toString()}`);
       if(!res.ok) throw new Error('Failed to fetch points of sale');
-      const data = await res.json();
+      const { data } = await res.json();
       setPuntos(data);
     } catch(err) {
       enqueueSnackbar(err.message, { variant: 'error' });
