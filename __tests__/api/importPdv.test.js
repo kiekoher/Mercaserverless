@@ -37,6 +37,17 @@ describe('/api/import-pdv', () => {
     // Clear mocks before each test to ensure isolation
     jest.clearAllMocks();
     mockParse.mockClear();
+    Client.mockImplementation(() => ({
+      geocode: jest
+        .fn()
+        .mockResolvedValue({
+          data: {
+            results: [
+              { geometry: { location: { lat: 1.23, lng: 4.56 } } },
+            ],
+          },
+        }),
+    }));
   });
 
   it('should return 403 for non-admin/supervisor roles', async () => {
@@ -84,6 +95,9 @@ describe('/api/import-pdv', () => {
   });
 
   it('should process a valid CSV and call the RPC', async () => {
+    // Ensure required environment variables are present
+    process.env.GOOGLE_MAPS_API_KEY = 'test-key';
+
     // Configure a successful auth mock
     requireUser.mockResolvedValue({
       user: { id: 'test-admin' },
@@ -114,11 +128,6 @@ describe('/api/import-pdv', () => {
       config.complete();
     });
 
-    // Mock Google Maps Geocoding
-    Client.mockImplementation(() => ({
-      geocode: jest.fn().mockResolvedValue({ data: { results: [] } }),
-    }));
-
     // Prevent fs.createReadStream from executing by mocking it.
     // This is the key to fixing the ENOENT error.
     jest.spyOn(fs, 'createReadStream').mockImplementation(() => {});
@@ -126,7 +135,6 @@ describe('/api/import-pdv', () => {
     const handler = require('../../pages/api/import-pdv');
     const { req, res } = createMocks({ method: 'POST' });
     await handler(req, res);
-
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().message).toContain('Import completed successfully');
     expect(mockRpc).toHaveBeenCalledWith('bulk_upsert_pdv', { pdvs_data: expect.any(Array) });
