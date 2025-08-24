@@ -16,30 +16,37 @@ async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    const page = parseInt(req.query.page || '1', 10);
-    const search = req.query.search ? sanitizeInput(req.query.search) : '';
-    const PAGE_SIZE = 10;
-    const from = (page - 1) * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
+    const schema = z.object({
+      page: z.coerce.number().int().positive().default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(20),
+      search: z.string().optional().default(''),
+    });
+
+    const parsed = schema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Parámetros de consulta inválidos.', details: parsed.error.format() });
+    }
+
+    const { page, pageSize, search } = parsed.data;
+    const safeSearch = sanitizeInput(search).slice(0, 50);
+
+    const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
 
     let query = supabase
       .from('profiles')
       .select('id, full_name, role', { count: 'exact' });
 
-    if (search) {
-      query = query.ilike('full_name', `%${search}%`);
+    if (safeSearch) {
+      query = query.ilike('full_name', `%${safeSearch}%`);
     }
 
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
+    const { data, error, count } = await query.range(from, to).order('id');
 
     if (error) {
       throw error;
     }
 
-    res.setHeader('X-Total-Count', count);
-    return res.status(200).json(data);
+    return res.status(200).json({ data, totalCount: count });
   }
 
   if (req.method === 'PUT') {

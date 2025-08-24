@@ -138,43 +138,39 @@ async function handler(req, res) {
 
   } else if (req.method === 'GET') {
     if (!(await checkRateLimit(req, { userId: user.id }))) return res.status(429).json({ error: 'Too many requests' });
+
     const schema = z.object({
       page: z.coerce.number().int().positive().default(1),
+      pageSize: z.coerce.number().int().min(10).max(100).default(20),
       search: z.string().optional().default(''),
-      all: z.enum(['true', 'false']).optional().default('false'),
     });
-    const parsed = schema.safeParse(req.query);
-    if (!parsed.success) return res.status(400).json({ error: 'Parámetros de consulta inválidos.' });
-    const { page, search, all } = parsed.data;
-    const safeSearch = sanitizeInput(search).slice(0, 50);
 
-    if (all === 'true') {
-      const cache = getCacheClient();
-      const cacheKey = 'pdv:all';
-      if (cache) {
-        const cached = await cache.get(cacheKey);
-        if (cached) {
-          res.setHeader('X-Cache', 'HIT');
-          return res.status(200).json(JSON.parse(cached));
-        }
-      }
-      const { data, error } = await supabase.from('puntos_de_venta').select(PDV_FIELDS);
-      if (error) throw error;
-      if (cache) {
-        res.setHeader('X-Cache', 'MISS');
-        await cache.set(cacheKey, JSON.stringify(data), { ex: 60 });
-      }
-      return res.status(200).json(data);
+    const parsed = schema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Parámetros de consulta inválidos.', details: parsed.error.format() });
     }
 
-    const limit = 10;
-    const offset = (page - 1) * limit;
-    const query = supabase.from('puntos_de_venta').select(PDV_FIELDS, { count: 'exact' });
-    if (safeSearch) query.ilike('nombre', `%${safeSearch}%`);
-    const { data, error, count } = await query.range(offset, offset + limit - 1);
-    if (error) throw error;
-    res.setHeader('X-Total-Count', count);
-    return res.status(200).json(data);
+    const { page, pageSize, search } = parsed.data;
+    const safeSearch = sanitizeInput(search).slice(0, 50);
+
+    const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
+
+    const query = supabase
+      .from('puntos_de_venta')
+      .select(PDV_FIELDS, { count: 'exact' });
+
+    if (safeSearch) {
+      query.ilike('nombre', `%${safeSearch}%`);
+    }
+
+    // Add consistent ordering for stable pagination
+    const { data, error, count } = await query.range(from, to).order('id');
+
+    if (error) {
+      throw error;
+    }
+
+    return res.status(200).json({ data, totalCount: count });
   } else {
     res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
     res.status(405).end(`Method ${req.method} Not Allowed`);

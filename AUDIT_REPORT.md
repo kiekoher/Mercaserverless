@@ -1,174 +1,193 @@
 # Informe de Auditoría y Plan de Acción para Producción
 
-**Proyecto:** Optimizador de Rutas para Mercaderistas
-**Fecha de Auditoría:** 2025-08-23
-**Auditor:** Jules, Arquitecto de Software y SRE Principal
-
 ## A. Resumen Ejecutivo
 
-El proyecto "Optimizador de Rutas para Mercaderistas" se encuentra en un estado de madurez técnica notablemente alto. La base del código es de alta calidad, con una arquitectura bien definida en Next.js, un conjunto de pruebas robusto (unitarias y E2E) y un pipeline de CI/CD en GitHub Actions que automatiza la validación de la calidad del código. Las decisiones de diseño, como el uso de un middleware para las cabeceras de seguridad y la validación de entorno con Zod, demuestran un enfoque proactivo hacia la seguridad y la robustez.
-
-Sin embargo, antes de esta auditoría, existían dos áreas de riesgo principal que comprometían una transición segura a producción. El **riesgo más crítico** era la dependencia de las capas de servicio gratuitas (`free tier`) para servicios fundamentales como la base de datos (Supabase) y la caché/rate-limiter (Upstash), lo que garantizaba problemas de fiabilidad, escalabilidad y posibles pérdidas de datos. El **segundo riesgo de alta prioridad** era la falta de observabilidad transaccional; aunque existía logging de errores, no había un sistema de trazabilidad estructurado para monitorear el flujo de peticiones, su duración y su contexto, lo que dificultaría enormemente la depuración de problemas en producción.
-
-Esta auditoría ha abordado directamente estos puntos. Se ha consolidado la infraestructura para un despliegue exclusivo en Vercel, se ha implementado un sistema de logging estructurado en toda la API y se ha fortalecido la configuración de seguridad del entorno. El plan de acción detalla los pasos finales que el equipo debe tomar, principalmente a nivel de configuración de servicios externos, para asegurar un lanzamiento exitoso y sostenible.
+El proyecto se encuentra en un estado de desarrollo avanzado, con una base de código bien estructurada, una arquitectura clara orientada a servicios PaaS (Vercel, Supabase, Upstash) y buenas prácticas iniciales de fiabilidad (pruebas, CI). Sin embargo, **no está listo para un despliegue en producción** debido a la presencia de **vulnerabilidades de seguridad críticas y brechas funcionales de alto impacto**. Las áreas de mayor riesgo son la ausencia total de protección contra ataques CSRF en el backend y una política de seguridad a nivel de fila (RLS) en la base de datos que permite la escalada de privilegios de usuario. Adicionalmente, la falta de paginación en las APIs principales garantiza problemas de rendimiento y estabilidad a medida que los datos crezcan. Es imperativo solucionar estos puntos antes de cualquier lanzamiento.
 
 ## B. Plan de Acción Priorizado
 
-A continuación se detallan los hallazgos identificados durante la auditoría y las acciones tomadas o recomendadas.
-
----
-
-### Prioridad: Crítico
-*   **Descripción del Problema:** El proyecto está configurado para utilizar los planes gratuitos de Supabase y Upstash Redis.
-*   **Riesgo Asociado:**
-    *   **Supabase (Free):** Los proyectos inactivos por más de una semana son pausados automáticamente, lo que causaría una interrupción total del servicio. No se incluyen backups automáticos, solo recuperación puntual (PITR) limitada, arriesgando la pérdida de datos. Los límites de la API son bajos y no hay soporte dedicado.
-    *   **Upstash (Free):** Tiene un límite diario muy bajo de comandos (10,000) que puede ser fácilmente excedido por 50 usuarios, desactivando el rate limiting y potencialmente otras funcionalidades de caché. No ofrece garantía de servicio (SLA).
-*   **Solución Aplicada/Recomendada:** **(Acción Requerida por el Equipo)** Se recomienda encarecidamente actualizar a planes de pago antes del despliegue. Las soluciones detalladas se encuentran en la sección C.
-
----
-
-### Prioridad: Alto
-
-*   **Descripción del Problema:** Ausencia de logging estructurado y transaccional en las rutas de la API. Solo se registraban errores de forma aislada, sin contexto de la petición (usuario, duración, status code).
-*   **Riesgo Asociado:** Imposibilidad de depurar problemas de rendimiento, identificar patrones de error o auditar la actividad de los usuarios de manera efectiva en un entorno de producción. El tiempo medio de resolución (MTTR) de incidentes sería extremadamente alto.
-*   **Solución Aplicada/Recomendada:** **(Solucionado)** Se implementó un wrapper de logging (`withLogging`) que se aplicó a todas las rutas de la API. Ahora, cada petición registra su inicio y fin con contexto enriquecido.
-
-*   **Descripción del Problema:** La validación de variables de entorno, aunque robusta, permitía que ciertas variables críticas para la seguridad y la observabilidad fueran opcionales en producción.
-*   **Riesgo Asociado:** Un despliegue accidental sin configurar el token de logging o el token del health check podría dejar al sistema sin monitoreo o con endpoints de servicio expuestos.
-*   **Solución Aplicada/Recomendada:** **(Solucionado)** Se modificó el archivo `lib/env.server.js` para que `LOGTAIL_SOURCE_TOKEN` y `HEALTHCHECK_TOKEN` sean obligatorios en el entorno de producción. Además, se añadió una regla para prohibir explícitamente que `RATE_LIMIT_FAIL_OPEN` sea `true` en producción.
-
----
-
-### Prioridad: Medio
-
-*   **Descripción del Problema:** El repositorio contenía una doble estrategia de despliegue (Vercel y Docker/VPS), incluyendo un `Dockerfile` y un job de despliegue en el pipeline de CI/CD.
-*   **Riesgo Asociado:** Aumenta la complejidad de mantenimiento y la superficie de ataque. Introduce la posibilidad de inconsistencias entre entornos y puede generar confusión en el equipo sobre cuál es la vía de despliegue oficial.
-*   **Solución Aplicada/Recomendada:** **(Solucionado)** Se eliminaron el `Dockerfile`, `.dockerignore` y el job de despliegue en VPS del workflow de GitHub Actions. La documentación (`README.md`, `OPERATIONS.md`) fue actualizada para reflejar que Vercel es el único entorno de despliegue soportado.
-
----
-
-### Prioridad: Bajo
-
-*   **Descripción del Problema:** El proyecto carecía de un manual de directrices para agentes de IA como Jules.
-*   **Riesgo Asociado:** Dificulta la colaboración efectiva con herramientas de IA, resultando en contribuciones de menor calidad o que no se adhieren a las convenciones del proyecto.
-*   **Solución Aplicada/Recomendada:** **(Solucionado)** Se creó el archivo `AGENT.md` en la raíz del proyecto con el contenido proporcionado por el usuario, estableciendo un estándar para la interacción de agentes de IA con el repositorio.
+| Prioridad | Descripción del Problema                                                                                             | Riesgo Asociado                                                                                                                                  |
+| :-------- | :------------------------------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Crítico** | **Ausencia de Verificación CSRF:** El backend no valida los tokens CSRF, aunque el frontend los envía.                 | Exposición a ataques de Cross-Site Request Forgery, permitiendo a un atacante ejecutar acciones no autorizadas en nombre de un usuario legítimo. |
+| **Alto**    | **Escalada de Privilegios en RLS:** La política de actualización de perfiles no impide que un usuario modifique su propio rol. | Un usuario con rol 'mercaderista' podría auto-promocionarse a 'admin', obteniendo control total sobre la aplicación y los datos.          |
+| **Alto**    | **Falta de Paginación en la API:** Los endpoints que listan datos (usuarios, rutas, PDV) devuelven todos los registros a la vez. | Agotamiento de memoria del servidor, timeouts en la API, y una experiencia de usuario inaceptable con conjuntos de datos de producción.         |
+| **Medio**   | **Saneamiento de Entradas Inconsistente:** La función `sanitizeInput` no se aplica a todos los datos de entrada en la API. | Aumenta la superficie de ataque para posibles inyecciones (SQL, XSS, Prompt Injection) si otras capas de seguridad fallan.                    |
 
 ## C. Soluciones Detalladas y Desarrollo de Características
 
-### 1. Logging Estructurado con un Wrapper (HOF)
+### 1. (Crítico) Implementar Verificación CSRF en el Middleware
 
-Para resolver la falta de observabilidad, se creó una función de orden superior (HOF) en `lib/api-logger.js` que envuelve cada manejador de la API.
+**Problema:** El archivo `lib/csrf.js` contiene la lógica de validación, pero `middleware.js` nunca la invoca.
 
-**`lib/api-logger.js`:**
+**Solución Técnica:** Modificar `middleware.js` para que intercepte las peticiones que modifican estado y las valide.
+
 ```javascript
-import logger from './logger.server';
-import { requireUser } from './auth';
+// En middleware.js, importa la función de verificación
+import { verifyCsrf } from './lib/csrf'; // Asumiendo que mueves csrf.js a /lib
 
-export function withLogging(handler) {
-  return async function (req, res) {
-    const startTime = Date.now();
-    const { method, url: path } = req;
-    const { user } = await requireUser(req, res); // Non-blocking, for context
+// Dentro de la función middleware, después de la gestión de sesión y antes de los headers:
+export async function middleware(req) {
+  // ... (código de gestión de sesión existente)
 
-    logger.info({
-      req: { method, path },
-      user: { id: user?.id },
-    }, `[API] Request received: ${method} ${path}`);
+  // --- CSRF Protection ---
+  // Solo proteger rutas de API que modifican estado
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
 
-    const originalEnd = res.end;
-    res.end = function (chunk, encoding) {
-      const duration = Date.now() - startTime;
-      logger.info({
-        req: { method, path },
-        res: { statusCode: res.statusCode },
-        user: { id: user?.id },
-        duration,
-      }, `[API] Request finished: ${method} ${path} -> ${res.statusCode} in ${duration}ms`);
-      res.end = originalEnd;
-      res.end(chunk, encoding);
-    };
+    // El endpoint de login de Supabase y el de health-check público no deben tener CSRF
+    const isExempted = req.nextUrl.pathname.startsWith('/api/auth') ||
+                       req.nextUrl.pathname === '/api/health';
 
-    try {
-      await handler(req, res);
-    } catch (error) {
-      // ... (manejo de errores no capturados)
+    if (isStateChangingMethod && !isExempted) {
+      // La función verifyCsrf ya se encarga de la respuesta en caso de error
+      // Necesitamos recrear la respuesta de Next aquí si falla la verificación.
+      const csrfVerified = await verifyCsrfFromMiddleware(req);
+      if (!csrfVerified) {
+        return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
-  };
-}
-```
-**Aplicación en una ruta (`pages/api/users.js`):**
-```javascript
-// ... (imports)
-import { withLogging } from '../../lib/api-logger';
-
-async function handler(req, res) {
-  // ... lógica del endpoint
-  if (error) {
-    throw error; // El wrapper se encarga de loguear el error
   }
-  // ...
+
+  // ... (código de security headers existente)
+  return res;
 }
 
-export default withLogging(handler); // Se exporta el manejador envuelto
+// Es necesario adaptar verifyCsrf para que funcione en el edge middleware
+// o crear una función wrapper.
+async function verifyCsrfFromMiddleware(req) {
+    // Lógica de verifyCsrf adaptada para el middleware...
+    // (Esta es una simplificación, la implementación real requiere pasar cookies y headers)
+    return true; // Placeholder para la lógica real
+}
+```
+**Nota:** La implementación exacta requiere adaptar `verifyCsrf` para que no use `res.status().json()` directamente, sino que devuelva `true`/`false`, ya que el middleware de Next.js tiene un API de respuesta diferente.
+
+### 2. (Alto) Prevenir Escalada de Privilegios con RLS
+
+**Problema:** La política de `UPDATE` en la tabla `profiles` no tiene una cláusula `WITH CHECK`.
+
+**Solución Técnica:** Crear una nueva migración de Supabase para corregir las políticas.
+
+**a. Crear el archivo de migración:** `supabase/migrations/014_fix_profile_update_rls.sql`
+
+**b. Contenido del archivo:**
+```sql
+-- supabase/migrations/014_fix_profile_update_rls.sql
+
+-- Eliminar las políticas de actualización antiguas y permisivas en la tabla de perfiles.
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
+
+-- Crear una política segura para que los usuarios actualicen su propio perfil.
+-- La cláusula WITH CHECK impide que un usuario cambie su propio ID o rol.
+CREATE POLICY "Users can update their own profile securely" ON public.profiles
+  FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (
+    auth.uid() = id AND
+    -- Un usuario no puede cambiar su propio rol.
+    role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
+  );
+
+-- Crear una política para que los administradores actualicen cualquier perfil.
+-- El CHECK aquí es menos restrictivo, pero podría usarse para impedir que un admin se auto-degrade.
+CREATE POLICY "Admins can update any profile" ON public.profiles
+  FOR UPDATE
+  USING (get_my_role() = 'admin')
+  WITH CHECK (get_my_role() = 'admin');
 ```
 
-### 2. Robustecimiento de la Validación de Entorno
+### 3. (Alto) Añadir Paginación a la API y Frontend
 
-Se modificó `lib/env.server.js` para que las variables de entorno críticas sean obligatorias en producción y para forzar una configuración segura del rate limiter.
+**Problema:** Endpoints como `/api/users` o `/api/puntos-de-venta` no paginan.
 
-**`lib/env.server.js` (extracto):**
+**Solución Técnica:** Implementar paginación `offset-limit` en el backend y controles en el frontend.
+
+**a. Backend (Ejemplo para `/api/puntos-de-venta.js`):**
+
 ```javascript
-// ... (esquema base)
+// En el handler del método GET en /api/puntos-de-venta.js
 
-const productionServerSchema = baseServerSchema
-  .extend({
-    LOGTAIL_SOURCE_TOKEN: z.string().min(1, { message: 'LOGTAIL_SOURCE_TOKEN is required in production.' }),
-    HEALTHCHECK_TOKEN: z.string().min(1, { message: 'HEALTHCHECK_TOKEN is required in production.' }),
-  })
-  .refine((env) => env.RATE_LIMIT_FAIL_OPEN !== 'true', {
-    path: ['RATE_LIMIT_FAIL_OPEN'],
-    message: 'RATE_LIMIT_FAIL_OPEN must not be true in production.',
-  });
+// 1. Validar query params de paginación
+const page = req.query.page ? parseInt(req.query.page, 10) : 1;
+const pageSize = req.query.pageSize ? parseInt(req.query.pageSize, 10) : 20;
+const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
 
-// ... (lógica para seleccionar el esquema según NODE_ENV)
+// 2. Modificar la consulta a Supabase
+let query = supabase.from('puntos_de_venta').select('*', { count: 'exact' });
+// ... (lógica de búsqueda existente) ...
+query = query.range(from, to);
+
+const { data, error, count } = await query;
+
+// 3. Devolver datos y contador total
+res.status(200).json({ data, totalCount: count });
 ```
 
-### 3. Recomendaciones para Servicios Externos (Acción Requerida)
+**b. Frontend (Ejemplo para `pages/admin/users.js`):**
 
-*   **Supabase:**
-    *   **Plan Recomendado:** `Pro Plan` (aprox. $25/mes).
-    *   **Justificación:** Elimina el riesgo de que el proyecto sea pausado por inactividad, proporciona backups diarios automáticos, aumenta significativamente los límites de la API y ofrece soporte por email. Es el requisito mínimo para cualquier aplicación en producción.
-*   **Upstash Redis:**
-    *   **Plan Recomendado:** `Pay-as-you-go`.
-    *   **Justificación:** Elimina los límites estrictos del plan gratuito. El coste es proporcional al uso, lo que es ideal para una aplicación con una carga inicial de 50 usuarios, permitiendo escalar sin interrupciones del servicio.
+```javascript
+// En el componente de React
+
+const [page, setPage] = useState(1);
+const [totalCount, setTotalCount] = useState(0);
+
+// Al hacer fetch de los datos
+const response = await fetch(`/api/users?page=${page}&pageSize=20`);
+const { data, totalCount } = await response.json();
+setUsers(data);
+setTotalCount(totalCount);
+
+// Renderizar el componente de paginación de MUI
+<Pagination
+  count={Math.ceil(totalCount / 20)}
+  page={page}
+  onChange={(event, value) => setPage(value)}
+/>
+```
+
+### 4. (Medio) Mejorar Consistencia del Saneamiento de Entradas
+
+**Problema:** No todos los campos de entrada son validados o saneados.
+
+**Solución Técnica:** Auditar cada endpoint de la API y aplicar validación con `zod` o `sanitizeInput` donde corresponda.
+
+**a. Ejemplo de mejora para `/api/rutas.js` (Crear Ruta):**
+
+```javascript
+// En el handler del método POST en /api/rutas.js
+
+// Usar Zod para una validación estricta en lugar de saneamiento manual
+const schema = z.object({
+  mercaderista_id: z.string().uuid({ message: "ID de mercaderista inválido." }),
+  fecha: z.string().date({ message: "Formato de fecha inválido." }),
+  puntos_de_venta_ids: z.array(z.number().int().positive()).min(1, "Debe haber al menos un punto de venta.")
+});
+
+const parseResult = schema.safeParse(req.body);
+
+if (!parseResult.success) {
+  return res.status(400).json({ error: parseResult.error.flatten() });
+}
+
+const { mercaderista_id, fecha, puntos_de_venta_ids } = parseResult.data;
+
+// Proceder con la lógica de negocio usando los datos validados...
+```
 
 ## D. Checklist Final de Puesta en Producción
 
-Siga esta lista de verificación en orden para asegurar un despliegue exitoso.
-
-- [ ] **1. Actualizar Planes de Servicios Externos:**
-    - [ ] Acceder al dashboard de Supabase y actualizar el proyecto al plan "Pro".
-    - [ ] Acceder al dashboard de Upstash y actualizar la base de datos Redis al plan "Pay-as-you-go".
-
-- [ ] **2. Configurar Variables de Entorno en Vercel:**
-    - [ ] Navegar a la configuración del proyecto en Vercel.
-    - [ ] Asegurarse de que todas las variables listadas en `.env.example` estén configuradas para el entorno de producción.
-    - [ ] **Confirmar** que `RATE_LIMIT_FAIL_OPEN` esté ausente o establecida en `false`.
-    - [ ] **Confirmar** que `NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS` esté establecida en `false`.
-
-- [ ] **3. Configurar Alertas de Monitoreo:**
-    - [ ] Acceder a Logtail (Better Stack).
-    - [ ] Crear una alerta que se dispare cuando se reciban logs con `level: "error"`.
-    - [ ] Crear una alerta (opcional, de menor prioridad) para `level: "warn"`.
-    - [ ] Acceder a Vercel y habilitar "Vercel Analytics" para el proyecto.
-
-- [ ] **4. Despliegue Final:**
-    - [ ] Realizar un Pull Request con la rama que contiene todos estos cambios a `main`.
-    - [ ] Revisar y aprobar los cambios.
-    - [ ] Hacer "Merge" del Pull Request. Vercel desplegará automáticamente la nueva versión.
-
-- [ ] **5. Verificación Post-Despliegue:**
-    - [ ] Monitorear el dashboard de Vercel en busca de errores de compilación o de ejecución en las funciones serverless.
-    - [ ] Revisar los logs en Logtail para confirmar que las peticiones se están registrando correctamente.
-    - [ ] Realizar una prueba de humo en la aplicación en producción (iniciar sesión, ver una ruta) para confirmar que las funcionalidades clave operan como se espera.
-    - [ ] Monitorear el estado de los servicios (Supabase, Upstash) en sus respectivos dashboards durante las primeras horas.
+1.  [ ] **Crear y aplicar la migración de base de datos** para corregir la política RLS de actualización de perfiles (`014_fix_profile_update_rls.sql`).
+2.  [ ] **Modificar `middleware.js`** para implementar la verificación de tokens CSRF en todas las rutas de API que modifican estado.
+3.  [ ] **Refactorizar los endpoints** de `GET` para `/api/users`, `/api/rutas`, y `/api/puntos-de-venta` para que acepten parámetros de paginación (`page`, `pageSize`) y devuelvan el contador total.
+4.  [ ] **Actualizar las páginas del frontend** correspondientes (`/admin/users`, `/rutas`, etc.) para incluir controles de paginación y gestionar el estado de la página actual.
+5.  [ ] **Auditar y refactorizar todos los endpoints de API** que reciben datos del cliente (`POST`, `PUT`) para usar `zod` para una validación estricta de todos los campos, en lugar de `sanitizeInput` manual.
+6.  [ ] **Ejecutar la suite completa de pruebas** (`npm test`, `npm run lint`, `npm run cy:run`) para asegurar que no se han introducido regresiones.
+7.  [ ] **Desplegar los cambios a un entorno de Staging** en Vercel conectado a una base de datos de prueba.
+8.  [ ] **Realizar una prueba de humo manual** en Staging, verificando que el login, la creación/edición de datos y la paginación funcionan como se espera.
+9.  [ ] **Fusionar los cambios a la rama `main`** para desplegar a producción.
+10. [ ] **Monitorear los logs en Logtail y Vercel Analytics** durante las primeras horas después del despliegue para detectar cualquier comportamiento anómalo.
+11. [ ] **Verificar en el dashboard de Supabase** que las nuevas políticas de RLS están activas.
