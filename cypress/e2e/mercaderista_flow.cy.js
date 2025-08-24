@@ -2,7 +2,7 @@ describe('Mercaderista Main Workflow', () => {
   beforeEach(() => {
     // Intercept API calls to provide mock data for the route
     cy.intercept('GET', '/api/mi-ruta', { fixture: 'mi-ruta.json' }).as('getMiRuta');
-    cy.intercept('GET', '/api/visitas?ruta_id=ruta-123', { fixture: 'visitas.json' }).as('getVisitas');
+    cy.intercept('GET', '/api/visitas?ruta_id=ruta-123&page=1&pageSize=50', { fixture: 'visitas.json' }).as('getVisitas');
 
     // 1. Set the role in localStorage BEFORE visiting the page.
     cy.login('mercaderista');

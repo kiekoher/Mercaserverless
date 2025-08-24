@@ -58,9 +58,9 @@ export default function MiRutaPage() {
 
       // Si hay ruta, obtener las visitas asociadas
       if (dataRuta && dataRuta.id) {
-        const resVisitas = await fetch(`/api/visitas?ruta_id=${dataRuta.id}`);
+        const resVisitas = await fetch(`/api/visitas?ruta_id=${dataRuta.id}&page=1&pageSize=50`);
         if (!resVisitas.ok) throw new Error('Error al cargar el estado de las visitas.');
-        const dataVisitas = await resVisitas.json();
+        const { data: dataVisitas } = await resVisitas.json();
         setVisitas(dataVisitas);
       }
     } catch (err) {

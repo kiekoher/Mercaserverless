@@ -20,18 +20,25 @@ async function handler(req, res) {
     if (!(await checkRateLimit(req, { userId: user.id }))) {
       return res.status(429).json({ error: 'Too Many Requests' });
     }
-    const querySchema = z.object({ ruta_id: z.coerce.number() });
+    const querySchema = z.object({
+      ruta_id: z.coerce.number(),
+      page: z.coerce.number().min(1).optional(),
+      pageSize: z.coerce.number().min(1).max(100).optional(),
+    });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Se requiere un ID de ruta válido.' });
     }
-    const { ruta_id } = parsed.data;
-    const { data, error } = await supabase
+    const { ruta_id, page = 1, pageSize = 50 } = parsed.data;
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error, count } = await supabase
       .from('visitas')
-      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
-      .eq('ruta_id', ruta_id);
+      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto', { count: 'exact' })
+      .eq('ruta_id', ruta_id)
+      .range(from, to);
     if (error) throw error;
-    return res.status(200).json(data);
+    return res.status(200).json({ data, totalCount: count });
   }
 
   // MÉTODO POST: Para crear un registro de visita (Check-in)
