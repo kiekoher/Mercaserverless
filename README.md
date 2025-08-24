@@ -12,7 +12,9 @@ Este proyecto fue desarrollado como parte de una iniciativa para Kimberly-Clark 
 - **Gestión de Puntos de Venta (PDV):** Interfaz para la creación, visualización y gestión de puntos de venta, incluyendo la importación masiva desde archivos CSV.
 - **Planificación y Gestión de Rutas:** Herramientas para que los supervisores creen rutas diarias, asignando un mercaderista y una selección de puntos de venta.
 - **Vista de Ruta del Mercaderista:** Interfaz optimizada para móviles donde el mercaderista puede ver su ruta del día, registrar check-in/check-out y añadir observaciones.
-- **Asistente de IA:** Funcionalidades que utilizan modelos de lenguaje (Google Gemini) para generar resúmenes y análisis de las rutas, ayudando a los supervisores a obtener insights sobre la operación.
+- **Asistente de IA:** El panel de control del supervisor incluye dos funcionalidades de IA:
+  - **Análisis de Ruta Individual:** Permite generar un análisis detallado (KPI, insight, recomendación) para una ruta específica.
+  - **Resumen de Operaciones:** Una nueva herramienta que permite a los supervisores generar un resumen ejecutivo sobre el rendimiento operativo dentro de un rango de fechas y, opcionalmente, para un mercaderista específico. Analiza los datos históricos de visitas para identificar tendencias y oportunidades.
 
 ## Stack Tecnológico
 
@@ -71,6 +73,30 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org/) en su versión 20.x
     npm run dev
     ```
     Abre [http://localhost:3000](http://localhost:3000) en tu navegador para ver la aplicación.
+
+### Configuración Local Alternativa con Docker
+
+Para simplificar aún más el entorno de desarrollo y no depender de servicios en la nube para la base de datos y la caché, puedes usar Docker Compose.
+
+1.  **Asegúrate de tener Docker y Docker Compose instalados.**
+
+2.  **Inicia los servicios de base de datos y caché:**
+    Desde la raíz del proyecto, ejecuta:
+    ```bash
+    docker-compose up -d
+    ```
+    Esto iniciará un contenedor de PostgreSQL y uno de Redis en segundo plano.
+
+3.  **Configura tus variables de entorno locales:**
+    Copia el archivo `.env.local.example` a `.env` y úsalo. Este archivo ya está preconfigurado para conectarse a los servicios de Docker.
+
+4.  **Aplica las migraciones de la base de datos:**
+    Para que la base de datos local tenga el esquema correcto, necesitarás una herramienta de base de datos (como `psql` o DBeaver) para aplicar los archivos `.sql` de la carpeta `supabase/migrations` en tu base de datos `kimberly_db` local.
+
+5.  **Inicia la aplicación:**
+    ```bash
+    npm run dev
+    ```
 
 ### Compilación Local de Producción
 

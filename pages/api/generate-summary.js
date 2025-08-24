@@ -2,23 +2,18 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
+const env = require('../../lib/env.server');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { getCacheClient } = require('../../lib/redisCache');
 const { sanitizeInput } = require('../../lib/sanitize');
 
-
+// Schema for input validation
 const summarySchema = z.object({
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "La fecha debe estar en formato YYYY-MM-DD" }).length(10),
-  mercaderistaId: z.string().uuid({ message: "El ID del mercaderista es requerido" }),
-  puntos: z.array(
-    z.object({
-      nombre: z.string().min(1, { message: "El nombre del punto de venta es requerido" }).max(100)
-    })
-  ).min(1, { message: "Debe haber al menos un punto de venta" }),
+  fecha_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de la fecha de inicio debe ser YYYY-MM-DD"),
+  fecha_fin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "El formato de la fecha de fin debe ser YYYY-MM-DD"),
+  mercaderista_id: z.string().uuid().optional(),
 });
-
-const UNSAFE_PROMPT_PATTERN = /(\bSYSTEM\b|http(s)?:)/i;
 
 async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -26,111 +21,106 @@ async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-
-  if (!process.env.GEMINI_API_KEY) {
+  if (!env.GEMINI_API_KEY) {
     logger.error('GEMINI_API_KEY is not configured');
-    throw new Error('GEMINI_API_KEY no configurada');
+    throw new Error('La clave de API de Gemini no está configurada.');
   }
 
-  const { error: authError, user } = await requireUser(req, res, ['supervisor', 'admin']);
+  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+
+  const { error: authError, supabase, user } = await requireUser(req, res, ['supervisor', 'admin']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
   }
 
+  logger.info({ userId: user.id }, 'generate-summary endpoint invoked');
+
   if (!(await checkRateLimit(req, { userId: user.id }))) {
-    return res.status(429).json({ error: 'Too many requests' });
+    return res.status(429).json({ error: 'Demasiadas solicitudes' });
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS) || 5000;
-  const MAX_PROMPT_LENGTH = Number(process.env.MAX_PROMPT_LENGTH) || 1000;
-
   const parsed = summarySchema.safeParse(req.body);
-
   if (!parsed.success) {
-    const errorMessages = parsed.error.errors.map(e => e.message).join(', ');
+    const errorMessages = parsed.error.issues.map(e => e.message).join(', ');
     logger.warn({ userId: user.id, errors: parsed.error.format() }, `Invalid request to generate-summary: ${errorMessages}`);
     return res.status(400).json({ error: `Datos de entrada inválidos: ${errorMessages}` });
   }
+  const { fecha_inicio, fecha_fin, mercaderista_id } = parsed.data;
 
-  const { fecha, mercaderistaId, puntos } = parsed.data;
+  // Build the query to fetch visits
+  let query = supabase
+    .from('visitas')
+    .select('*, puntos_de_venta(nombre), profiles(full_name)')
+    .gte('created_at', fecha_inicio)
+    .lte('created_at', `${fecha_fin}T23:59:59.999Z`);
 
-  const safeFecha = sanitizeInput(fecha);
-  const safeMercaderista = sanitizeInput(mercaderistaId);
-  const safePuntos = puntos.map(p => sanitizeInput(p.nombre));
-
-  const prompt = `
-      Genera un resumen corto y amigable para una ruta de mercaderista.
-      Responde exclusivamente en formato JSON con la clave \"summary\":
-      {"summary":"..."}
-      No incluyas texto adicional.
-      Detalles:
-      - Fecha: ${safeFecha}
-      - Mercaderista: ${safeMercaderista}
-      - Número de paradas: ${puntos.length}
-      - Puntos de venta: ${safePuntos.join(', ')}
-    `;
-
-  if (prompt.length > MAX_PROMPT_LENGTH) {
-    logger.warn({ userId: user.id, promptLength: prompt.length }, 'Prompt too long');
-    return res.status(400).json({ error: 'Prompt demasiado largo' });
+  if (mercaderista_id) {
+    query = query.eq('mercaderista_id', mercaderista_id);
   }
 
-  if (UNSAFE_PROMPT_PATTERN.test(prompt)) {
-    logger.warn({ userId: user.id, mercaderistaId }, 'Prompt contains unsafe content');
-    return res.status(400).json({ error: 'Prompt no permitido' });
+  const { data: visitas, error: visitasError } = await query;
+
+  if (visitasError) throw visitasError;
+  if (!visitas || visitas.length === 0) {
+    return res.status(404).json({ error: 'No se encontraron visitas para el rango y filtro seleccionados.' });
   }
+
+  // Format the data for the AI prompt
+  const promptData = visitas.map(v =>
+    `- Mercaderista: ${v.profiles ? sanitizeInput(v.profiles.full_name) : 'N/A'}, Punto: ${v.puntos_de_venta ? sanitizeInput(v.puntos_de_venta.nombre) : 'N/A'}, Estado: ${sanitizeInput(v.estado)}, Observaciones: ${sanitizeInput(v.observaciones || 'N/A')}`
+  ).join('\n');
 
   const cache = getCacheClient();
   const hasCache = cache && typeof cache.get === 'function';
-  const cacheKey = `ai:summary:${fecha}:${mercaderistaId}`;
+  const cacheKey = `ai:summary:${fecha_inicio}:${fecha_fin}:${mercaderista_id || 'all'}`;
+
   if (hasCache) {
     const cached = await cache.get(cacheKey);
     if (cached) {
       res.setHeader('X-Cache', 'HIT');
-      return res.status(200).json(JSON.parse(cached));
+      return res.status(200).json({ summary: cached });
     }
+  }
+
+  const prompt = `
+      Eres un asistente de análisis de operaciones para una fuerza de ventas.
+      Analiza los siguientes datos de visitas de un equipo de mercaderistas y genera un resumen ejecutivo conciso en formato de texto plano (párrafos, no JSON).
+      El resumen debe destacar tendencias clave, puntos de dolor evidentes, y oportunidades de mejora basadas en los datos.
+
+      Datos de Visitas:
+      ${promptData}
+    `;
+
+  if (prompt.length > 15000) {
+    logger.warn({ userId: user.id, length: prompt.length }, 'Prompt too long for summary generation');
+    return res.status(413).json({ error: 'El rango de fechas es demasiado grande para generar un resumen. Por favor, elige un período más corto.' });
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), Number(env.AI_TIMEOUT_MS ?? 15000));
 
+  let text;
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     const result = await model.generateContent(prompt, { signal: controller.signal });
-    clearTimeout(timeout);
     const response = await result.response;
-    const text = (await response.text()).replace(/```json|```/g, '');
-
-    const outputSchema = z.object({ summary: z.string() });
-
-    let parsedOutput;
-    try {
-      parsedOutput = outputSchema.parse(JSON.parse(text));
-    } catch (e) {
-      logger.error({ err: e, text, userId: user.id }, 'Failed to parse summary response');
-      throw new Error('Respuesta de IA inválida');
+    text = response.text();
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      logger.error({ userId: user.id }, 'Gemini API request for summary timed out');
+      return res.status(504).json({ error: 'Tiempo de espera agotado para la API de IA' });
     }
-
-    if (hasCache) {
-      res.setHeader('X-Cache', 'MISS');
-      await cache.set(cacheKey, JSON.stringify(parsedOutput), { ex: 60 * 60 });
-    }
-
-    res.status(200).json(parsedOutput);
-
-  } catch (error) {
+    throw e;
+  } finally {
     clearTimeout(timeout);
-    logger.error({ err: error, userId: user.id }, 'Error calling Gemini API');
-    if (error.name === 'AbortError') {
-      return res.status(504).json({ error: 'La solicitud a la IA expiró' });
-    }
-    const status = error?.response?.status;
-    if (status === 401 || status === 403) {
-      throw new Error('Error de autenticación o cuota con la API de IA.');
-    }
-    throw error;
   }
+
+  if (hasCache) {
+    res.setHeader('X-Cache', 'MISS');
+    await cache.set(cacheKey, text, { ex: 60 * 30 }); // Cache for 30 minutes
+  }
+
+  res.status(200).json({ summary: text });
 }
 
-module.exports = withLogging(handler);;
+module.exports = withLogging(handler);
