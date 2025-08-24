@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/Auth';
 import {
-  Box, Typography, Button, Paper, CircularProgress, Alert, Grid, Card, CardContent
+  Box, Typography, Button, Paper, CircularProgress, Alert, Grid, Card, CardContent,
+  TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -32,11 +33,29 @@ export default function DashboardPage() {
   );
 
   const [stats, setStats] = useState(null);
-  const [insights, setInsights] = useState(null);
   const [projectionData, setProjectionData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingInsights, setLoadingInsights] = useState(false);
   const [loadingProjections, setLoadingProjections] = useState(true);
+
+  // State for the new Summary Generator
+  const [mercaderistas, setMercaderistas] = useState([]);
+  const [selectedMercaderista, setSelectedMercaderista] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [summary, setSummary] = useState('');
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+
+  const fetchMercaderistas = useCallback(async () => {
+    try {
+      const res = await fetch('/api/users?role=mercaderista');
+      if (!res.ok) throw new Error('No se pudieron cargar los mercaderistas.');
+      const { data } = await res.json();
+      setMercaderistas(data);
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    }
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -65,42 +84,44 @@ export default function DashboardPage() {
 
     if (profile?.role === 'supervisor' || profile?.role === 'admin') {
       fetchAllData();
+      fetchMercaderistas();
     }
-  }, [profile, enqueueSnackbar]);
+  }, [profile, enqueueSnackbar, fetchMercaderistas]);
 
-  const handleGenerateInsights = async () => {
-    setLoadingInsights(true);
-    setInsights(null);
+  const handleGenerateSummary = async () => {
+    if (!startDate || !endDate) {
+      setSummaryError('Por favor, selecciona una fecha de inicio y fin.');
+      return;
+    }
+    setLoadingSummary(true);
+    setSummary('');
+    setSummaryError('');
+
     try {
-      // For this example, we'll analyze the first route found.
-      // A real implementation might let the user select a date range.
-      const routesRes = await fetch('/api/rutas');
-      const routes = await routesRes.json();
-      if (!routes || routes.length === 0) {
-        enqueueSnackbar('No hay rutas para analizar.', { variant: 'warning' });
-        return;
-      }
+      const body = {
+        fecha_inicio: startDate,
+        fecha_fin: endDate,
+        ...(selectedMercaderista && { mercaderista_id: selectedMercaderista }),
+      };
 
-      const rutaId = routes[0].id; // Analyze the most recent route
-
-      const res = await fetchWithCsrf('/api/generate-insights', {
+      const res = await fetchWithCsrf('/api/generate-summary', {
         method: 'POST',
-        body: JSON.stringify({ rutaId }),
+        body: JSON.stringify(body),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Error al generar el análisis.');
+        throw new Error(data.error || 'Error al generar el resumen.');
       }
 
-      const data = await res.json();
-      setInsights(data);
-      enqueueSnackbar('Análisis generado con éxito.', { variant: 'success' });
-
+      setSummary(data.summary);
+      enqueueSnackbar('Resumen generado con éxito.', { variant: 'success' });
     } catch (err) {
+      setSummaryError(err.message);
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
-      setLoadingInsights(false);
+      setLoadingSummary(false);
     }
   };
 
@@ -177,21 +198,60 @@ export default function DashboardPage() {
       )}
 
       <Paper sx={{ p: 2, mt: 4 }}>
-        <Typography variant="h5" gutterBottom>Insights de la Operación por IA</Typography>
+        <Typography variant="h5" gutterBottom>Asistente de IA: Resumen de Operaciones</Typography>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label="Fecha de Inicio"
+              type="date"
+              fullWidth
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <TextField
+              label="Fecha de Fin"
+              type="date"
+              fullWidth
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <FormControl fullWidth>
+              <InputLabel id="mercaderista-select-label">Mercaderista (Opcional)</InputLabel>
+              <Select
+                labelId="mercaderista-select-label"
+                value={selectedMercaderista}
+                label="Mercaderista (Opcional)"
+                onChange={(e) => setSelectedMercaderista(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Todos</em>
+                </MenuItem>
+                {mercaderistas.map((m) => (
+                  <MenuItem key={m.id} value={m.id}>{m.full_name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
         <Button
           variant="contained"
-          onClick={handleGenerateInsights}
-          disabled={loadingInsights}
+          onClick={handleGenerateSummary}
+          disabled={loadingSummary}
         >
-          {loadingInsights ? <CircularProgress size={24} /> : 'Analizar Última Ruta'}
+          {loadingSummary ? <CircularProgress size={24} /> : 'Generar Resumen'}
         </Button>
 
-        {insights && (
+        {summaryError && <Alert severity="error" sx={{ mt: 2 }}>{summaryError}</Alert>}
+
+        {summary && (
           <Box sx={{ mt: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, whiteSpace: 'pre-wrap' }}>
-            <Typography variant="body1"><strong>KPI:</strong> {insights.kpi}</Typography>
-            <Typography variant="body1"><strong>Insight:</strong> {insights.insight}</Typography>
-            <Typography variant="body1"><strong>Observación:</strong> {insights.observation}</Typography>
-            <Typography variant="body1"><strong>Recomendación:</strong> {insights.recommendation}</Typography>
+            <Typography variant="body1">{summary}</Typography>
           </Box>
         )}
       </Paper>

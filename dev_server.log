@@ -1,0 +1,6 @@
+
+> kimberly-clark-rutero@0.1.0 dev:test
+> NODE_ENV=test RATE_LIMIT_FAIL_OPEN=true NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true next dev
+
+[dotenv@17.2.1] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild

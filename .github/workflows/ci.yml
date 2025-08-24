@@ -30,6 +30,14 @@ jobs:
         uses: returntocorp/semgrep-action@v1
         with:
           config: auto
+      - name: Ping Cron Monitor on Success
+        if: success() && github.event_name == 'schedule'
+        run: |
+          # In a real-world scenario, you would replace this with your actual cron monitoring
+          # service URL (e.g., from Better Uptime, Healthchecks.io, etc.).
+          # This ensures you get an alert if your scheduled dependency audit fails to run.
+          # curl -fsS -m 10 --retry 5 https://cron-monitoring.example.com/ping/your-check-id
+          echo "Simulating ping to cron monitoring service."
   lint:
     name: "Lint Code"
     runs-on: ubuntu-latest
