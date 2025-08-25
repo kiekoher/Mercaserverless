@@ -3,6 +3,10 @@ import { NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import logger from './lib/logger.server';
+import { crypto } from 'crypto';
+
+// Forzar el middleware a ejecutarse en el entorno de Node.js
+export const runtime = 'nodejs';
 
 // Inicializa el rate limiter
 const ratelimit = new Ratelimit({
@@ -49,7 +53,7 @@ export async function middleware(req) {
 
   // Refresca la sesión
   const { data: { session } } = await supabase.auth.getSession();
-  
+
   const { pathname } = req.nextUrl;
   const publicUrls = ['/login', '/forgot-password', '/update-password'];
 
@@ -66,7 +70,7 @@ export async function middleware(req) {
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
-  
+
   // Lógica de cabeceras de seguridad (CSP)
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
@@ -87,9 +91,26 @@ export async function middleware(req) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue);
+  
+  // Clonar las cabeceras de la respuesta para poder modificarlas
+  const responseHeaders = new Headers(res.headers);
+  responseHeaders.set('x-nonce', nonce);
+  responseHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue);
+
+  // Crear una nueva respuesta con las cabeceras actualizadas
+  const newResponse = new NextResponse(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: responseHeaders,
+  });
+
+  // Copiar las cookies de la respuesta original a la nueva
+  res.cookies.getAll().forEach(cookie => {
+    newResponse.cookies.set(cookie);
+  });
 
   // Pasa las cabeceras a la respuesta
-  return res;
+  return newResponse;
 }
 
 export const config = {
