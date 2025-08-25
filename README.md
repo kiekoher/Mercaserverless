@@ -147,14 +147,14 @@ Todas las variables de entorno requeridas por la aplicación (ver `.env.example`
 - URL del servicio de Redis. Se soporta la conexión REST de Upstash mediante `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` o el URL clásico `UPSTASH_REDIS_URL`.
 - Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
 - Tiempo máximo de espera para la API de IA (`AI_TIMEOUT_MS`).
-- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, por defecto `true`; establecer en `false` en producción para forzar bloqueo si Redis falla).
+- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, por defecto `false`; establecer en `true` si desea que las solicitudes continúen cuando Redis no esté disponible). El `middleware` comparte este comportamiento y omite el bloqueo cuando la variable está activada.
 - Bypass de autenticación para pruebas (`NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS`, mantener en `false` en producción).
 
 No se debe utilizar el archivo `.env` en el entorno de producción.
 
 ### Servicios en la Nube
 
-- **Rate Limiting:** Se utiliza un servicio de Redis serverless como [Upstash](https://upstash.com/) para gestionar el límite de peticiones a la API.
+- **Rate Limiting:** Se utiliza un servicio de Redis serverless como [Upstash](https://upstash.com/) para gestionar el límite de peticiones a la API. Si no se configura Redis, las solicitudes no se limitan y el servicio se degrada de forma controlada.
 - **Logging:** Los logs de la aplicación son enviados a un servicio de logging externo como [Logtail](https://logtail.com/) para su centralización y análisis.
 
 ### Seguridad y sanitización

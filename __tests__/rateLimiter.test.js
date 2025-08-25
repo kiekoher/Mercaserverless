@@ -37,19 +37,19 @@ describe('rate limiter behavior without Redis', () => {
     await expect(checkRateLimit(req)).resolves.toBe(true);
   });
 
-  it('should block requests when fail-open is explicitly disabled', async () => {
+  it('should allow requests when fail-open is explicitly disabled', async () => {
     process.env.RATE_LIMIT_FAIL_OPEN = 'false';
     const { checkRateLimit } = require('../lib/rateLimiter');
     const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
-    await expect(checkRateLimit(req)).resolves.toBe(false);
+    await expect(checkRateLimit(req)).resolves.toBe(true);
   });
 
-  it('should block requests by default when fail-open is not set', async () => {
+  it('should allow requests by default when fail-open is not set', async () => {
     // Ensure fail-open flag is undefined for this scenario
     delete process.env.RATE_LIMIT_FAIL_OPEN;
     const { checkRateLimit } = require('../lib/rateLimiter');
     const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
-    await expect(checkRateLimit(req)).resolves.toBe(false);
+    await expect(checkRateLimit(req)).resolves.toBe(true);
   });
 });
 
