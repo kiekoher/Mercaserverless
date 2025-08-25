@@ -12,6 +12,7 @@
     "build:local": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
     "start": "next start",
     "lint": "next lint",
+    "db:push": "supabase db push",
     "test": "GOOGLE_MAPS_API_KEY=test-key dotenv -e .env.test -- jest",
     "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev:test http://localhost:3000 \"cypress run\""
   },
@@ -42,11 +43,13 @@
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18",
     "react-leaflet": "^4.2.1",
+    "resend": "^6.0.1",
     "sanitize-html": "^2.17.0",
     "zod": "^4.1.1"
   },
   "devDependencies": {
     "@babel/plugin-transform-unicode-property-regex": "^7.27.1",
+    "@peculiar/webcrypto": "^1.5.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.5.2",
@@ -60,6 +63,8 @@
     "jest-environment-jsdom": "^30.0.5",
     "node-mocks-http": "^1.17.2",
     "pino-pretty": "^13.1.1",
-    "start-server-and-test": "^2.0.13"
+    "start-server-and-test": "^2.0.13",
+    "supabase": "^2.34.3",
+    "undici": "^7.15.0"
   }
 }
