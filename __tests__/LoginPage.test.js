@@ -34,4 +34,11 @@ describe('LoginPage', () => {
     // Check for the submit button
     expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument();
   });
+
+  it('shows a friendly message on network error', async () => {
+    mockSupabase.auth.signInWithPassword.mockRejectedValueOnce(new Error('Failed to fetch'));
+    render(<LoginPage />);
+    await screen.getByRole('button', { name: /iniciar sesión/i }).click();
+    expect(await screen.findByText(/no se pudo conectar/i)).toBeInTheDocument();
+  });
 });

@@ -24,8 +24,12 @@ export default function LoginPage() {
       if (error) throw error;
       // On successful login, redirect to the home page.
       router.push('/');
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      if (err && typeof err.message === 'string' && err.message.toLowerCase().includes('fetch')) {
+        setError('No se pudo conectar con el servidor. Inténtalo de nuevo.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
