@@ -1,134 +1,94 @@
-import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { tokensMatch } from './lib/tokensMatch';
+import { NextResponse } from 'next/server';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+import logger from './lib/logger.server';
 
-function setSecurityHeaders(res) {
-  res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
-  res.headers.set('Referrer-Policy', 'no-referrer');
-  res.headers.set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-  res.headers.set('X-Content-Type-Options', 'nosniff');
-  res.headers.set('X-Frame-Options', 'SAMEORIGIN');
-  res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-  res.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
-  res.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
-  res.headers.set('X-DNS-Prefetch-Control', 'off');
-}
+// Inicializa el rate limiter
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  analytics: true,
+});
 
 export async function middleware(req) {
-  const requestHeaders = new Headers(req.headers);
-  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  const res = NextResponse.next();
+  const ip = req.ip ?? '127.0.0.1';
 
-  if (
-    process.env.NODE_ENV === 'production' &&
-    process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true'
-  ) {
-    throw new Error('BYPASS_AUTH must be false in production');
-  }
-
-  const bypassAuth = process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true';
-
-  // --- CSRF Protection ---
-  // NOTE: A simple string comparison is used here instead of a timing-safe
-  // comparison because Node.js's `crypto.timingSafeEqual` is not available in the
-  // edge runtime. A timing attack against a 32-byte random token is considered
-  // computationally infeasible.
-  if (req.nextUrl.pathname.startsWith('/api/')) {
-    const isStateChangingMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method);
-    // Exempt the CSRF token endpoint itself, auth callbacks, and reporting endpoints.
-    const isExempted = ['/api/auth/callback', '/api/csrf', '/api/csp-report'].includes(req.nextUrl.pathname);
-
-    if (isStateChangingMethod && !isExempted) {
-      const headerToken = req.headers.get('x-csrf-token');
-      const cookieName = process.env.NODE_ENV === 'production' ? '__Host-csrf-secret' : 'csrf-secret';
-      const cookieToken = req.cookies.get(cookieName)?.value;
-
-      if (!headerToken || !cookieToken || !tokensMatch(headerToken, cookieToken)) {
-         return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
+  // Lógica de Rate Limiting
+  try {
+    const { success } = await ratelimit.limit(ip);
+    if (!success) {
+      logger.warn({ ip }, 'Rate limit exceeded');
+      return new Response('Too many requests', { status: 429 });
     }
+  } catch (error) {
+    logger.error({ error }, 'Error with rate limiter');
   }
 
-  if (!bypassAuth) {
-    // Create the Supabase client for production logic
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          get: (name) => req.cookies.get(name)?.value,
-          set: (name, value, options) => res.cookies.set({ name, value, ...options }),
-          remove: (name, options) => res.cookies.set({ name, value: '', ...options }),
+  // Crea el cliente de Supabase para el middleware
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get(name) {
+          return req.cookies.get(name)?.value;
         },
-      }
-    );
-
-    // Securely get the session from cookies
-    const { data: { session } } = await supabase.auth.getSession();
-    const { pathname } = req.nextUrl;
-
-    // Redirect unauthenticated users from protected pages to login.
-    if (!session && pathname !== '/login' && !pathname.startsWith('/api')) {
-      const url = req.nextUrl.clone();
-      url.pathname = '/login';
-      const redirectRes = NextResponse.redirect(url);
-      setSecurityHeaders(redirectRes);
-      return redirectRes;
+        set(name, value, options) {
+          req.cookies.set({ name, value, ...options });
+          res.cookies.set({ name, value, ...options });
+        },
+        remove(name, options) {
+          req.cookies.set({ name, value: '', ...options });
+          res.cookies.set({ name, value: '', ...options });
+        },
+      },
     }
+  );
 
-    // Redirect authenticated users from the login page to the dashboard.
-    if (session && pathname === '/login') {
-      const url = req.nextUrl.clone();
-      url.pathname = '/dashboard';
-      const redirectRes = NextResponse.redirect(url);
-      setSecurityHeaders(redirectRes);
-      return redirectRes;
-    }
+  // Refresca la sesión
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  const { pathname } = req.nextUrl;
+  const publicUrls = ['/login', '/forgot-password', '/update-password'];
+
+  // Redirección para usuarios no autenticados
+  if (!session && !publicUrls.includes(pathname) && !pathname.startsWith('/api/auth')) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
   }
 
-  // --- Security Headers ---
-  const nonceArray = new Uint8Array(16);
-  crypto.getRandomValues(nonceArray);
-  const nonce = btoa(String.fromCharCode(...nonceArray));
-  requestHeaders.set('x-nonce', nonce);
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '';
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const upstashHost = upstashUrl ? new URL(upstashUrl).host : '';
-
-  // Hardened CSP with specific Supabase host instead of wildcard
+  // Redirección para usuarios autenticados en páginas públicas
+  if (session && publicUrls.includes(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = '/dashboard';
+    return NextResponse.redirect(url);
+  }
+  
+  // Lógica de cabeceras de seguridad (CSP)
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com;
-    img-src 'self' blob: data: https://maps.gstatic.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org;
-    media-src 'none';
-    frame-src 'none';
+    style-src 'self' 'nonce-${nonce}';
+    img-src 'self' blob: data:;
+    font-src 'self';
     object-src 'none';
-    base-uri 'none';
-    font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' wss://${supabaseHost} https://${supabaseHost} https://*.googleapis.com https://in.logtail.com${upstashHost ? ` https://${upstashHost}` : ''};
+    base-uri 'self';
+    form-action 'self';
     frame-ancestors 'none';
-    report-to csp-endpoint;
-    report-uri /api/csp-report;
-  `.replace(/\s{2,}/g, ' ').trim();
+    block-all-mixed-content;
+    upgrade-insecure-requests;
+  `;
+  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, ' ').trim();
 
-  res.headers.set(
-    'Report-To',
-    JSON.stringify({
-      group: 'csp-endpoint',
-      max_age: 10886400,
-      endpoints: [{ url: '/api/csp-report' }],
-    })
-  );
-  res.headers.set('Content-Security-Policy', cspHeader);
-  // Update connect-src if integrating new external services.
-  setSecurityHeaders(res);
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue);
 
-  // Return the response object, which now has the cookies and headers set.
+  // Pasa las cabeceras a la respuesta
   return res;
 }
 
@@ -139,7 +99,6 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * The /login page is now processed by the middleware.
      */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
