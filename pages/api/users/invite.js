@@ -2,7 +2,7 @@ import { getSupabaseServerClient } from '../../../lib/supabaseServer';
 import logger from '../../../lib/logger.server';
 import { z } from 'zod';
 import { sendTransactionalEmail, WelcomeEmail } from '../../../lib/email';
-import { getUserProfile } from '../../../lib/auth';
+import { requireUser } from '../../../lib/auth'; // Cambiado de getUserProfile a requireUser
 
 const inviteUserSchema = z.object({
   email: z.string().email({ message: 'Email inválido.' }),
@@ -15,17 +15,14 @@ async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { session } } = await supabase.auth.getSession();
+  const { supabase, user: currentUser, role: currentUserRole } = await requireUser(req, res, ['supervisor']);
 
-  if (!session) {
+  if (!currentUser) {
     return res.status(401).json({ error: 'No autenticado.' });
   }
 
-  // Authorization: Only supervisors can invite users.
-  const userProfile = await getUserProfile(supabase, session.user.id);
-  if (!userProfile || userProfile.role !== 'supervisor') {
-    return res.status(403).json({ error: 'No autorizado para realizar esta acción.' });
+  if (currentUserRole !== 'supervisor') {
+      return res.status(403).json({ error: 'No autorizado para realizar esta acción.' });
   }
 
   const result = inviteUserSchema.safeParse(req.body);
@@ -36,6 +33,7 @@ async function handler(req, res) {
   const { email, role } = result.data;
 
   try {
+    const { data: userProfile } = await supabase.from('profiles').select('full_name').eq('id', currentUser.id).single();
     // Use Supabase Admin client to invite a new user
     const { data, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { role }, // Pass metadata to be stored with the user
@@ -50,7 +48,7 @@ async function handler(req, res) {
       return res.status(500).json({ error: 'Error interno al invitar al usuario.' });
     }
 
-    logger.info({ invitedUser: data.user, invitedBy: session.user.id }, 'Usuario invitado exitosamente via Supabase.');
+    logger.info({ invitedUser: data.user, invitedBy: currentUser.id }, 'Usuario invitado exitosamente via Supabase.');
 
     // Send a more user-friendly welcome email via Resend
     await sendTransactionalEmail({

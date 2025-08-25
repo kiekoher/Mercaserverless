@@ -1,25 +1,23 @@
 import { getSupabaseServerClient } from '../../../lib/supabaseServer';
 import logger from '../../../lib/logger.server';
-import { getUserProfile } from '../../../lib/auth';
+import { requireUser } from '../../../lib/auth'; // Cambiado de getUserProfile a requireUser
 
 async function handler(req, res) {
   const { id: targetUserId } = req.query;
 
-  const supabase = getSupabaseServerClient(req, res);
-  const { data: { session } } = await supabase.auth.getSession();
+  // requireUser ya te da el cliente de Supabase y el perfil del usuario actual
+  const { supabase, user: currentUser, role: currentUserRole } = await requireUser(req, res, ['supervisor']);
 
-  if (!session) {
+  if (!currentUser) {
     return res.status(401).json({ error: 'No autenticado.' });
   }
-
-  // Authorization: Only supervisors can delete users.
-  const userProfile = await getUserProfile(supabase, session.user.id);
-  if (!userProfile || userProfile.role !== 'supervisor') {
-    return res.status(403).json({ error: 'No autorizado para realizar esta acción.' });
+  
+  if (currentUserRole !== 'supervisor') {
+      return res.status(403).json({ error: 'No autorizado para realizar esta acción.' });
   }
 
   // A supervisor cannot delete themselves.
-  if (session.user.id === targetUserId) {
+  if (currentUser.id === targetUserId) {
     return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
   }
 
@@ -48,7 +46,7 @@ async function handler(req, res) {
           return res.status(500).json({ error: 'Error interno al eliminar el usuario.' });
         }
 
-        logger.info({ targetUserId, deletedBy: session.user.id }, 'Usuario eliminado exitosamente.');
+        logger.info({ targetUserId, deletedBy: currentUser.id }, 'Usuario eliminado exitosamente.');
         return res.status(200).json({ message: 'Usuario eliminado correctamente.' });
 
       } catch (err) {
