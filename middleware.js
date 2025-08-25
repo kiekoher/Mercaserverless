@@ -1,34 +1,40 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import { checkRateLimit } from './lib/rateLimiter';
 // import logger from './lib/logger.server'; // Se ha eliminado el logger
 
 // No es necesario forzar el runtime a 'nodejs' si usamos APIs compatibles
 // export const runtime = 'nodejs';
 
-// Inicializa el rate limiter
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
-  analytics: true,
-});
+
+export async function applyRateLimit(req) {
+  const ip = req.ip ?? '127.0.0.1';
+  try {
+    const headersObject = req.headers && typeof req.headers.entries === 'function'
+      ? Object.fromEntries(req.headers)
+      : req.headers || {};
+    const allowed = await checkRateLimit(
+      { headers: headersObject, socket: { remoteAddress: ip } },
+      { limit: 10 }
+    );
+    if (!allowed) {
+      console.warn(`Rate limit exceeded for IP: ${ip}`);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error with rate limiter:', error);
+    if (process.env.RATE_LIMIT_FAIL_OPEN !== 'true') {
+      return false;
+    }
+  }
+  return true;
+}
 
 export async function middleware(req) {
   const res = NextResponse.next();
-  const ip = req.ip ?? '127.0.0.1';
-
-  // Lógica de Rate Limiting
-  try {
-    const { success } = await ratelimit.limit(ip);
-    if (!success) {
-      // logger.warn({ ip }, 'Rate limit exceeded');
-      console.warn(`Rate limit exceeded for IP: ${ip}`);
-      return new Response('Too many requests', { status: 429 });
-    }
-  } catch (error) {
-    // logger.error({ error }, 'Error with rate limiter');
-    console.error('Error with rate limiter:', error);
+  const allowed = await applyRateLimit(req);
+  if (!allowed) {
+    return new Response('Too many requests', { status: 429 });
   }
 
   // Crea el cliente de Supabase para el middleware
