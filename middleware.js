@@ -1,41 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
-import { checkRateLimit } from './lib/rateLimiter';
 // import logger from './lib/logger.server'; // Se ha eliminado el logger
 
-// No es necesario forzar el runtime a 'nodejs' si usamos APIs compatibles
-// export const runtime = 'nodejs';
-
-
-export async function applyRateLimit(req) {
-  const ip = req.ip ?? '127.0.0.1';
-  try {
-    const headersObject = req.headers && typeof req.headers.entries === 'function'
-      ? Object.fromEntries(req.headers)
-      : req.headers || {};
-    const allowed = await checkRateLimit(
-      { headers: headersObject, socket: { remoteAddress: ip } },
-      { limit: 10 }
-    );
-    if (!allowed) {
-      console.warn(`Rate limit exceeded for IP: ${ip}`);
-      return false;
-    }
-  } catch (error) {
-    console.error('Error with rate limiter:', error);
-    if (process.env.RATE_LIMIT_FAIL_OPEN !== 'true') {
-      return false;
-    }
-  }
+export async function applyRateLimit() {
   return true;
 }
 
 export async function middleware(req) {
   const res = NextResponse.next();
-  const allowed = await applyRateLimit(req);
-  if (!allowed) {
-    return new Response('Too many requests', { status: 429 });
-  }
 
   // Crea el cliente de Supabase para el middleware
   const supabase = createServerClient(
@@ -111,18 +83,12 @@ export async function middleware(req) {
   res.cookies.getAll().forEach(cookie => {
     response.cookies.set(cookie);
   });
-  
+
   return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };
