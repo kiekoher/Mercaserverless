@@ -46,7 +46,7 @@ describe('/api/generate-summary handler', () => {
       from: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
-      lte: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockResolvedValue({ data, error: null }),
       eq: jest.fn().mockResolvedValue({ data, error: null }),
     };
     getSupabaseServerClient.mockReturnValue(supabaseMock);
@@ -58,7 +58,7 @@ describe('/api/generate-summary handler', () => {
       from: jest.fn().mockReturnThis(),
       select: jest.fn().mockReturnThis(),
       gte: jest.fn().mockReturnThis(),
-      lte: jest.fn().mockReturnThis(),
+      lte: jest.fn().mockResolvedValue({ data: null, error }),
       eq: jest.fn().mockResolvedValue({ data: null, error }),
     };
     getSupabaseServerClient.mockReturnValue(supabaseMock);
@@ -88,11 +88,9 @@ describe('/api/generate-summary handler', () => {
     expect(res._getStatusCode()).toBe(404);
   });
 
-  it('should throw an error if the database query fails, leading to a 500 from the logger', async () => {
+  it('should throw an error if the database query fails', async () => {
     mockDbFailure();
     const { req, res } = createMocks({ method: 'POST', body: { fecha_inicio: '2023-01-01', fecha_fin: '2023-01-31' } });
-    // The HOC will catch the thrown error and return 500
-    await handler(req, res);
-    expect(res._getStatusCode()).toBe(500);
+    await expect(handler(req, res)).rejects.toThrow('DB Error');
   });
 });

@@ -11,10 +11,10 @@
     "build": "next build",
     "build:local": "NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS=true NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "RATE_LIMIT_FAIL_OPEN=false dotenv -e .env.test -- next lint",
     "db:push": "supabase db push",
     "test": "GOOGLE_MAPS_API_KEY=test-key dotenv -e .env.test -- jest",
-    "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev:test http://localhost:3000 \"cypress run\""
+    "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co start-server-and-test dev:test http://localhost:3000 \"cypress run\""
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.2.2",
@@ -60,6 +60,7 @@
     "react-leaflet": "^4.2.1",
     "resend": "^6.0.1",
     "sanitize-html": "^2.17.0",
+    "standard-as-callback": "^2.1.0",
     "uncrypto": "^0.1.3",
     "zod": "^4.1.1"
   },
