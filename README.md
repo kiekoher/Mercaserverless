@@ -91,7 +91,11 @@ Para simplificar aún más el entorno de desarrollo y no depender de servicios e
     Copia el archivo `.env.local.example` a `.env` y úsalo. Este archivo ya está preconfigurado para conectarse a los servicios de Docker.
 
 4.  **Aplica las migraciones de la base de datos:**
-    Para que la base de datos local tenga el esquema correcto, necesitarás una herramienta de base de datos (como `psql` o DBeaver) para aplicar los archivos `.sql` de la carpeta `supabase/migrations` en tu base de datos `kimberly_db` local.
+    Para que la base de datos local tenga el esquema correcto, asegúrate de que los servicios de Docker estén corriendo (`docker-compose up -d`) y luego ejecuta el siguiente comando:
+    ```bash
+    npx supabase db push
+    ```
+    Este comando aplicará todas las migraciones pendientes de la carpeta `supabase/migrations` a tu base de datos local.
 
 5.  **Inicia la aplicación:**
     ```bash

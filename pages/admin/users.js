@@ -4,10 +4,11 @@ import { useDebounce } from '../../hooks/useDebounce';
 import {
   Typography, Button, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, CircularProgress, Alert,
-  Box, Select, MenuItem, FormControl, TextField, Pagination
+  Box, Select, MenuItem, FormControl, TextField, Pagination,
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
 } from '@mui/material';
 import AppLayout from '../../components/AppLayout';
-import { useSnackbar } from 'notistack'; // Importar useSnackbar
+import { useSnackbar } from 'notistack';
 import { useAuthorization } from '../../hooks/useAuthorization';
 import { useCsrfFetcher } from '../../lib/fetchWithCsrf';
 
@@ -16,16 +17,26 @@ export default function UserManagementPage() {
   const { enqueueSnackbar } = useSnackbar();
   const { can, role } = useAuthorization();
   const fetchWithCsrf = useCsrfFetcher();
+
+  // Existing state
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState({});
-
-  // Pagination and Search state
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // New state for invite/delete functionality
+  const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('mercaderista');
+  const [isInviting, setIsInviting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -57,30 +68,46 @@ export default function UserManagementPage() {
     }
   }, [role, can, fetchUsers]);
 
-  const handleRoleChange = (userId, newRole) => {
-    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
-  };
-
-  const handleSaveRole = async (userId) => {
-    setSaving(prev => ({ ...prev, [userId]: true }));
-    setError(null);
-    const userToUpdate = users.find(u => u.id === userId);
+  const handleInvite = async () => {
+    setIsInviting(true);
     try {
-      const res = await fetchWithCsrf('/api/users', {
-        method: 'PUT',
-        body: JSON.stringify({ userId, newRole: userToUpdate.role }),
+      const res = await fetchWithCsrf('/api/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to update role');
-      }
-      enqueueSnackbar('Rol de usuario actualizado con éxito', { variant: 'success' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al invitar al usuario.');
+
+      enqueueSnackbar('Invitación enviada correctamente.', { variant: 'success' });
+      setInviteModalOpen(false);
+      setInviteEmail('');
+      setInviteRole('mercaderista');
+      fetchUsers(); // Refresh user list
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
-      setError(err.message);
-      fetchUsers(); // Re-fetch to revert optimistic update on error
     } finally {
-      setSaving(prev => ({ ...prev, [userId]: false }));
+      setIsInviting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetchWithCsrf(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar el usuario.');
+
+      enqueueSnackbar('Usuario eliminado correctamente.', { variant: 'success' });
+      setConfirmDeleteOpen(false);
+      setUserToDelete(null);
+      fetchUsers(); // Refresh user list
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -93,25 +120,22 @@ export default function UserManagementPage() {
 
   return (
     <AppLayout>
-      <Typography variant="h4" gutterBottom>Administración de Usuarios</Typography>
-      {/* El error ahora se manejará principalmente por el Snackbar, pero mantenemos esto como respaldo */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h4" gutterBottom>Administración de Usuarios</Typography>
+        <Button variant="contained" onClick={() => setInviteModalOpen(true)}>Invitar Usuario</Button>
+      </Box>
+
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
       <Paper>
         <Box sx={{ p: 2 }}>
-          <TextField
-            fullWidth
-            label="Buscar por nombre"
-            variant="outlined"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <TextField fullWidth label="Buscar por nombre o email" variant="outlined" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </Box>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>ID de Usuario</TableCell>
                 <TableCell>Nombre Completo</TableCell>
+                <TableCell>Email</TableCell>
                 <TableCell>Rol</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
@@ -121,29 +145,18 @@ export default function UserManagementPage() {
                 <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
               ) : users.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{u.id}</TableCell>
-                  <TableCell>{u.full_name || 'N/A'}</TableCell>
-                  <TableCell>
-                    <FormControl size="small">
-                      <Select
-                        value={u.role}
-                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                        data-testid={`role-select-${u.id}`}
-                      >
-                        <MenuItem value="admin">Admin</MenuItem>
-                        <MenuItem value="supervisor">Supervisor</MenuItem>
-                        <MenuItem value="mercaderista">Mercaderista</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </TableCell>
+                  <TableCell>{u.full_name || 'N/A (Invitado)'}</TableCell>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>{u.role}</TableCell>
                   <TableCell align="right">
                     <Button
-                      variant="contained"
+                      variant="outlined"
+                      color="error"
                       size="small"
-                      onClick={() => handleSaveRole(u.id)}
-                      disabled={saving[u.id]}
+                      onClick={() => { setUserToDelete(u); setConfirmDeleteOpen(true); }}
+                      disabled={u.id === user.id} // Disable deleting self
                     >
-                      {saving[u.id] ? <CircularProgress size={20} /> : 'Guardar'}
+                      Eliminar
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -152,15 +165,49 @@ export default function UserManagementPage() {
           </Table>
         </TableContainer>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-          <Pagination
-            count={totalPages}
-            page={page}
-            onChange={(e, value) => setPage(value)}
-            color="primary"
-            disabled={loading}
-          />
+          <Pagination count={totalPages} page={page} onChange={(e, value) => setPage(value)} color="primary" disabled={loading} />
         </Box>
       </Paper>
+
+      {/* Invite User Modal */}
+      <Dialog open={isInviteModalOpen} onClose={() => setInviteModalOpen(false)}>
+        <DialogTitle>Invitar Nuevo Usuario</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Ingresa el email y asigna un rol. El usuario recibirá un correo para configurar su cuenta.
+          </DialogContentText>
+          <TextField autoFocus margin="dense" id="email" label="Dirección de Email" type="email" fullWidth variant="standard" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+          <FormControl fullWidth margin="dense" variant="standard">
+            <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+              <MenuItem value="mercaderista">Mercaderista</MenuItem>
+              <MenuItem value="supervisor">Supervisor</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteModalOpen(false)}>Cancelar</Button>
+          <Button onClick={handleInvite} variant="contained" disabled={isInviting}>
+            {isInviting ? <CircularProgress size={24} /> : 'Enviar Invitación'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Confirm Delete Dialog */}
+      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
+        <DialogTitle>Confirmar Eliminación</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que quieres eliminar al usuario <strong>{userToDelete?.email}</strong>? Esta acción no se puede deshacer.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button>
+          <Button onClick={handleDelete} color="error" variant="contained" disabled={isDeleting}>
+            {isDeleting ? <CircularProgress size={24} /> : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </AppLayout>
   );
 }

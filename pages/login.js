@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { useRouter } from 'next/router';
-import { Container, Box, Typography, TextField, Button, CircularProgress, Alert } from '@mui/material';
+import Link from 'next/link';
+import { Container, Box, Typography, TextField, Button, CircularProgress, Alert, Grid } from '@mui/material';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -85,6 +86,13 @@ export default function LoginPage() {
           >
             {loading ? <CircularProgress size={24} /> : 'Iniciar Sesión'}
           </Button>
+          <Grid container>
+            <Grid item xs>
+              <Link href="/forgot-password" variant="body2">
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </Grid>
+          </Grid>
         </Box>
       </Box>
     </Container>
