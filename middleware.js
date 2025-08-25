@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
-import logger from './lib/logger.server';
+// import logger from './lib/logger.server'; // Se ha eliminado el logger
 
 // No es necesario forzar el runtime a 'nodejs' si usamos APIs compatibles
 // export const runtime = 'nodejs';
@@ -22,11 +22,13 @@ export async function middleware(req) {
   try {
     const { success } = await ratelimit.limit(ip);
     if (!success) {
-      logger.warn({ ip }, 'Rate limit exceeded');
+      // logger.warn({ ip }, 'Rate limit exceeded');
+      console.warn(`Rate limit exceeded for IP: ${ip}`);
       return new Response('Too many requests', { status: 429 });
     }
   } catch (error) {
-    logger.error({ error }, 'Error with rate limiter');
+    // logger.error({ error }, 'Error with rate limiter');
+    console.error('Error with rate limiter:', error);
   }
 
   // Crea el cliente de Supabase para el middleware
@@ -71,7 +73,6 @@ export async function middleware(req) {
   }
 
   // Lógica de cabeceras de seguridad (CSP)
-  // Usamos la API web 'crypto' que está disponible globalmente en el Edge Runtime
   const nonce = crypto.randomUUID();
   const cspHeader = `
     default-src 'self';
@@ -92,23 +93,19 @@ export async function middleware(req) {
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', contentSecurityPolicyHeaderValue);
 
-  // Crear una nueva respuesta para poder añadir las cabeceras
   const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
 
-  // Añadir las cabeceras a la respuesta
   response.headers.set('x-nonce', nonce);
   response.headers.set('Content-Security-Policy', contentSecurityPolicyHeaderValue);
 
-  // Copiar las cookies de la respuesta original a la nueva
   res.cookies.getAll().forEach(cookie => {
     response.cookies.set(cookie);
   });
   
-  // Pasa las cabeceras a la respuesta
   return response;
 }
 
