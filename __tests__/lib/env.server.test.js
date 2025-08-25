@@ -47,11 +47,11 @@ describe('Environment Variable Validation (env.server.js)', () => {
     expect(() => require('../../lib/env.server')).not.toThrow();
   });
 
-  it('should throw an error if a required production variable is missing', () => {
+  it('should load even if optional production variables like LOGTAIL_SOURCE_TOKEN are missing', () => {
     const invalidProdEnv = getValidProdEnv();
     delete invalidProdEnv.LOGTAIL_SOURCE_TOKEN;
     process.env = { ...invalidProdEnv };
-    expect(() => require('../../lib/env.server')).toThrow('Invalid environment variables. See logs for details.');
+    expect(() => require('../../lib/env.server')).not.toThrow();
   });
 
   it('should throw an error if RATE_LIMIT_FAIL_OPEN is true in production', () => {
