@@ -16,6 +16,16 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
 
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      'node:https': 'https',
+      'node:http': 'http',
+      'node:zlib': 'zlib',
+    };
+    return config;
+  },
+
   // The security headers are now set in middleware.js
   // This allows for dynamic values like nonces and is the recommended approach.
 };
