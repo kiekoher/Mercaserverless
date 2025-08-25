@@ -17,12 +17,14 @@
     "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co xvfb-run -a --server-args=\"-screen 0 1024x768x24\" start-server-and-test dev:test http://localhost:3000 \"cypress run\""
   },
   "dependencies": {
+    "@emotion/is-prop-valid": "^1.2.2",
     "@emotion/react": "^11.11.4",
     "@emotion/server": "^11.11.0",
     "@emotion/styled": "^11.11.5",
     "@emotion/use-insertion-effect-with-fallbacks": "^1.0.1",
     "@google/generative-ai": "^0.24.1",
     "@googlemaps/google-maps-services-js": "^3.4.0",
+    "@kurkle/color": "^0.3.2",
     "@logtail/pino": "^0.5.5",
     "@mui/icons-material": "^5.15.20",
     "@mui/material": "^5.15.20",
@@ -48,6 +50,7 @@
     "p-limit": "^7.1.0",
     "papaparse": "^5.4.1",
     "pino": "^9.9.0",
+    "quick-format-unescaped": "^4.0.5",
     "react": "^18",
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18",
