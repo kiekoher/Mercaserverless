@@ -120,6 +120,11 @@ Para las pruebas de extremo a extremo (E2E), utiliza Cypress:
 ```bash
 npm run cy:run
 ```
+En entornos Linux minimalistas, Cypress requiere algunas dependencias del sistema. Si aparece un error como `missing system library libatk-1.0.so.0`, instala los paquetes necesarios con:
+```bash
+npm run cy:deps
+```
+Este script instala `xvfb`, `libatk1.0-0` y otras bibliotecas requeridas antes de ejecutar las pruebas.
 Para verificar el estilo del código, puedes ejecutar:
 ```bash
 npm run lint

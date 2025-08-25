@@ -14,7 +14,8 @@
     "lint": "RATE_LIMIT_FAIL_OPEN=false dotenv -e .env.test -- next lint",
     "db:push": "supabase db push",
     "test": "GOOGLE_MAPS_API_KEY=test-key dotenv -e .env.test -- jest",
-    "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co start-server-and-test dev:test http://localhost:3000 \"cypress run\""
+    "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co start-server-and-test dev:test http://localhost:3000 \"cypress run\"",
+    "cy:deps": "apt-get update && apt-get install -y xvfb libatk1.0-0 libatk-bridge2.0-0 libgtk-3-0 libnss3 libxss1 libasound2t64"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.2.2",
