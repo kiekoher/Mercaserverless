@@ -11,8 +11,14 @@
 
 ## Pruebas y Calidad de Código
 
-- Ejecuta las pruebas unitarias: `npm test`
-- Ejecuta las pruebas de extremo a extremo (E2E): `npm run cy:run`
+- Ejecuta las pruebas unitarias y de integración: `npm test`
+- Ejecuta las pruebas E2E contra tu **entorno local**: `npm run cy:run`
+- **(Avanzado)** Ejecuta las pruebas E2E contra un **despliegue de Preview en Vercel**:
+  1. Abre un Pull Request. Vercel generará y comentará automáticamente una URL de preview.
+  2. Ejecuta el siguiente comando en tu terminal, reemplazando la URL por la de Vercel:
+     ```bash
+     CYPRESS_BASE_URL=https://<tu-preview-url>.vercel.app npm run cy:run:preview
+     ```
 - Formatea y revisa el estilo del código: `npm run lint`
 - Asegúrate de que todas las pruebas pasen antes de enviar un Pull Request.
 

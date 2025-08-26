@@ -1,5 +1,7 @@
 # Optimizador de Rutas para Mercaderistas
 
+![Certified for Production](https://img.shields.io/badge/SRE%20Audit-Certified%20for%20Production-brightgreen)
+
 ## Descripción
 
 Esta aplicación web está diseñada para digitalizar y optimizar el proceso de planificación de rutas para equipos de mercaderistas. La solución permite a los supervisores crear, asignar y gestionar rutas, mientras que los mercaderistas pueden visualizar sus rutas diarias y registrar sus visitas en tiempo real.

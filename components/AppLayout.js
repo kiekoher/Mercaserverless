@@ -16,8 +16,31 @@ export default function AppLayout({ children }) {
           </Link>
           {profile && (
             <>
+              {profile.role === 'admin' && (
+                <Box sx={{ borderRight: '1px solid rgba(255,255,255,0.2)', mr: 2, pr: 2 }}>
+                  <Link href="/dashboard" passHref style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Button color="inherit">Dashboard</Button>
+                  </Link>
+                  <Link href="/admin/users" passHref style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Button color="inherit">Usuarios</Button>
+                  </Link>
+                  <Link href="/admin/beta" passHref style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Button color="inherit">Beta</Button>
+                  </Link>
+                </Box>
+              )}
+               {profile.role === 'supervisor' && (
+                <Box sx={{ borderRight: '1px solid rgba(255,255,255,0.2)', mr: 2, pr: 2 }}>
+                  <Link href="/dashboard" passHref style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Button color="inherit">Dashboard</Button>
+                  </Link>
+                   <Link href="/rutas" passHref style={{ color: 'inherit', textDecoration: 'none' }}>
+                    <Button color="inherit">Rutas</Button>
+                  </Link>
+                </Box>
+              )}
               <Typography sx={{ mr: 2 }}>
-                Hola, {profile.role}
+                Hola, <strong>{profile.full_name || profile.role}</strong>
               </Typography>
               <Button color="inherit" onClick={signOut}>Cerrar Sesión</Button>
             </>

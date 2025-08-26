@@ -13,7 +13,6 @@ try {
 
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   poweredByHeader: false,
 
   webpack: (config) => {
