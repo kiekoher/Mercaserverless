@@ -5,11 +5,9 @@ import { validateCsrfToken } from './lib/csrf';
 import logger from './lib/logger.server';
 
 export async function middleware(req) {
-  // 1. Start with a base response object. This will be mutated by Supabase client
-  // and then have headers added before being returned.
   const res = NextResponse.next();
+  let session = null;
 
-  // 2. Create Supabase client that mutates `res` by reference
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -22,8 +20,28 @@ export async function middleware(req) {
     }
   );
 
-  // 3. Refresh the session and get user data
-  const { data: { session } } = await supabase.auth.getSession();
+  // In a test environment, we may bypass real authentication.
+  if (process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true') {
+    const role = req.cookies.get('cypress-role')?.value;
+    if (role) {
+      // Create a mock session object that mimics a real Supabase session.
+      session = {
+        user: {
+          id: `${role}-user-id`, // Stable ID for tests
+          email: `${role}@example.com`,
+          app_metadata: { role },
+        },
+        expires_in: 3600,
+        access_token: 'mock-access-token',
+      };
+    }
+  }
+
+  if (!session) {
+    // If not in a test with a role, or if the cookie is missing, perform real auth.
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  }
 
   // 4. Apply Rate Limiting to all API requests to prevent abuse
   if (req.nextUrl.pathname.startsWith('/api/')) {
