@@ -40,7 +40,7 @@ Durante el diseño del esquema de la base de datos, se tomó la decisión de alm
 
 El proyecto ha sido desarrollado con un fuerte enfoque en la seguridad y la operabilidad, siguiendo las mejores prácticas para aplicaciones web modernas.
 
-- **Seguridad a Nivel de Aplicación:** Se implementa una estricta Política de Seguridad de Contenido (CSP) y protección contra CSRF a través de middleware para mitigar ataques comunes.
+- **Seguridad a Nivel de Aplicación:** Se implementa una estricta Política de Seguridad de Contenido (CSP), y el middleware activa por defecto la protección contra CSRF y el *rate limiting* para mitigar ataques comunes.
 - **Seguridad de Datos:** El acceso a los datos está controlado por políticas de Row Level Security (RLS) en Supabase, asegurando que los usuarios solo puedan acceder a la información que les corresponde.
 - **Guía de Operaciones:** Para procedimientos detallados sobre monitoreo, configuración de alertas, rotación de secretos y planes de recuperación ante desastres, consulte la [**Guía Operacional (OPERATIONS.md)**](./OPERATIONS.md).
 
@@ -141,7 +141,7 @@ La aplicación se despliega automáticamente en Vercel con cada `push` a la rama
 
 ### Gestión de Variables de Entorno en Producción
 
-Todas las variables de entorno requeridas por la aplicación (ver `.env.example`) deben ser configuradas directamente en el **panel de control de Vercel** para el proyecto correspondiente. Esto incluye:
+Todas las variables de entorno requeridas por la aplicación (ver `.env.example`) **son obligatorias** y deben configurarse directamente en el **panel de control de Vercel** para el proyecto correspondiente. La aplicación no arrancará correctamente si falta alguna de ellas. Esto incluye:
 - Credenciales de Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`).
 - Claves de API para servicios externos (`GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`).
 - URL del servicio de Redis. Se soporta la conexión REST de Upstash mediante `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` o el URL clásico `UPSTASH_REDIS_URL`.

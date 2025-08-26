@@ -1,17 +1,15 @@
-const { Client } = require('@googlemaps/google-maps-services-js');
 const { z } = require('zod');
 const { withLogging } = require('../../lib/api-logger');
 const { requireUser } = require('../../lib/auth');
-const geocodeConfig = require('../../lib/geocodeConfig');
 const logger = require('../../lib/logger.server');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { getCacheClient } = require('../../lib/redisCache');
 const { sanitizeInput } = require('../../lib/sanitize');
+const { geocodeAddress } = require('../../lib/geocode');
 
 const PDV_FIELDS =
   'id,nombre,direccion,ciudad,latitud,longitud,cuota,tipologia,frecuencia_mensual,minutos_servicio';
 
-const googleMapsClient = new Client({});
 
 export async function handler(req, res) {
   if (!process.env.GOOGLE_MAPS_API_KEY) {
@@ -50,27 +48,12 @@ export async function handler(req, res) {
     let longitud = null;
 
     try {
-      const cache = getCacheClient();
-      const hasCache = cache && typeof cache.get === 'function';
-      const cacheKey = hasCache ? `geo:${sanitizeInput(direccion)}:${sanitizeInput(ciudad)}` : null;
-      if (hasCache && cacheKey) {
-        const cached = await cache.get(cacheKey);
-        if (cached) [latitud, longitud] = JSON.parse(cached);
-      }
-
-      if (latitud === null || longitud === null) {
-        const geocodeResponse = await googleMapsClient.geocode({
-          params: { address: `${direccion}, ${ciudad}, Colombia`, key: process.env.GOOGLE_MAPS_API_KEY },
-          timeout: geocodeConfig.GEOCODE_TIMEOUT_MS,
-        });
-        if (geocodeResponse.data.results.length > 0) {
-          const location = geocodeResponse.data.results[0].geometry.location;
-          latitud = location.lat;
-          longitud = location.lng;
-          if (hasCache && cacheKey) await cache.set(cacheKey, JSON.stringify([latitud, longitud]), { ex: 60 * 60 * 24 * 30 });
-        } else {
-          logger.warn({ direccion, ciudad, userId: user.id }, 'Geocoding failed for address');
-        }
+      const location = await geocodeAddress(`${safeDireccion}, ${safeCiudad}, Colombia`);
+      if (location) {
+        latitud = location.lat;
+        longitud = location.lng;
+      } else {
+        logger.warn({ direccion, ciudad, userId: user.id }, 'Geocoding failed for address');
       }
     } catch (e) {
       logger.error({ err: e, userId: user.id }, 'Geocode error');

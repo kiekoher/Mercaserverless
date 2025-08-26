@@ -2,19 +2,18 @@
 let createClient;
 let requireUser;
 const { createMockReq, createMockRes } = require('../../lib/test-utils');
-let Client;
+let geocodeAddress;
 let getCacheClient;
 
 let handler;
 
 jest.mock('../../lib/auth');
 jest.mock('@supabase/supabase-js');
-jest.mock('@googlemaps/google-maps-services-js');
+jest.mock('../../lib/geocode');
 jest.mock('../../lib/redisCache');
 
 describe('puntos-de-venta API', () => {
   let supabase;
-  let mockMapsClient;
   let mockRedisClient;
 
   beforeEach(() => {
@@ -22,7 +21,7 @@ describe('puntos-de-venta API', () => {
     jest.clearAllMocks();
     ({ createClient } = require('@supabase/supabase-js'));
     ({ requireUser } = require('../../lib/auth'));
-    ({ Client } = require('@googlemaps/google-maps-services-js'));
+    ({ geocodeAddress } = require('../../lib/geocode'));
     ({ getCacheClient } = require('../../lib/redisCache'));
 
     process.env.GOOGLE_MAPS_API_KEY = 'test-key';
@@ -38,14 +37,7 @@ describe('puntos-de-venta API', () => {
     };
     createClient.mockReturnValue(supabase);
 
-    mockMapsClient = {
-      geocode: jest.fn().mockResolvedValue({
-        data: {
-          results: [{ geometry: { location: { lat: 4.60971, lng: -74.08175 } } }],
-        },
-      }),
-    };
-    Client.mockReturnValue(mockMapsClient);
+    geocodeAddress.mockResolvedValue({ lat: 4.60971, lng: -74.08175 });
 
     mockRedisClient = {
       get: jest.fn().mockResolvedValue(null),
@@ -74,7 +66,7 @@ describe('puntos-de-venta API', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(201);
-    expect(mockMapsClient.geocode).toHaveBeenCalled();
+    expect(geocodeAddress).toHaveBeenCalled();
   });
 
   it('allows supervisors to update points', async () => {
