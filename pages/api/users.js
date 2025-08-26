@@ -4,7 +4,7 @@ import { requireUser } from '../../lib/auth';
 import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 
-export async function handler(req, res) {
+async function handler(req, res) {
   const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
@@ -54,4 +54,4 @@ export async function handler(req, res) {
 
 const mainHandler = withLogging(handler);
 mainHandler.rawHandler = handler;
-module.exports = mainHandler;
+export default mainHandler;
