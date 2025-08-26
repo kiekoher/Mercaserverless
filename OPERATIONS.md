@@ -2,6 +2,24 @@
 
 Este documento proporciona instrucciones críticas para el mantenimiento, monitorización y recuperación del sistema en un entorno de producción.
 
+---
+
+## Checklist Crítico Pre-Despliegue
+
+Antes de cada despliegue a producción (`git push a main`), el ingeniero responsable **DEBE** confirmar los siguientes puntos.
+
+- **[ ] 1. Backups de Base de Datos Activos:**
+  - **Acción:** Navegar al Dashboard de Supabase del proyecto de **producción**.
+  - **Verificar:** En la sección `Infraestructura > Backups`, confirmar que los "Daily backups" están **activos** y que se ha realizado al menos un backup en las últimas 24 horas.
+  - **Riesgo si se ignora:** Pérdida total de datos en caso de un fallo.
+
+- **[ ] 2. Variables de Entorno Configuradas:**
+  - **Acción:** Navegar a `Settings > Environment Variables` en el proyecto de Vercel.
+  - **Verificar:** Confirmar que todas las variables de entorno listadas en `VERCEL_DEPLOYMENT.md` para el entorno de `Production` están configuradas y tienen los valores correctos.
+  - **Riesgo si se ignora:** La aplicación no se iniciará o tendrá fallos críticos en tiempo de ejecución.
+
+---
+
 ## 1. Plan de Recuperación Ante Desastres (DRP) - Base de Datos Supabase
 
 Esta es la tarea de mayor criticidad para el equipo de operaciones. La integridad de los datos es primordial.
@@ -51,9 +69,27 @@ Nunca realice una restauración de prueba sobre el proyecto de producción.
 
 ## 2. Configuración de Alertas en Plataforma de Logging (Logtail/Better Stack)
 
-El código ha sido instrumentado con `pino` para emitir logs estructurados. El equipo de operaciones debe configurar alertas basadas en los siguientes mensajes y niveles de log para una monitorización proactiva.
+El código ha sido instrumentado con `pino` para emitir logs estructurados y enviarlos a un servicio externo (como Logtail/Better Stack) en producción. El equipo de operaciones debe configurar alertas en dicha plataforma basadas en los siguientes mensajes y niveles de log para una monitorización proactiva.
 
-### Alertas de Prioridad CRÍTICA (Requieren acción inmediata)
+### 2.1. Cómo Configurar las Alertas
+
+En tu plataforma de logging (ej. Better Stack), navega a la sección de "Alerting" y crea reglas de alerta. La lógica general es:
+
+`SI el nivel de log es [NIVEL] Y el mensaje contiene [TEXTO], ENTONCES enviar una notificación a [CANAL]`.
+
+**Ejemplo de Alerta Crítica:**
+- **Condición:** `level = "fatal"` (o número `60`)
+- **Canal de Notificación:** PagerDuty / SMS / Llamada
+- **Descripción:** Alerta de disponibilidad del sistema.
+
+**Ejemplo de Alerta de Seguridad:**
+- **Condición:** `level = "error"` (o número `50`) Y `msg` contiene `CSRF validation failed`
+- **Canal de Notificación:** Slack canal `#security-alerts`
+- **Descripción:** Intento de ataque CSRF detectado.
+
+### 2.2. Definición de Alertas
+
+#### Alertas de Prioridad CRÍTICA (Requieren acción inmediata)
 
 | Nivel de Log | Mensaje Clave a Buscar | Razón y Acción |
 | :--- | :--- | :--- |
@@ -78,3 +114,26 @@ El código ha sido instrumentado con `pino` para emitir logs estructurados. El e
 | :--- | :--- | :--- |
 | `info` (30) | `Unauthenticated user redirected to login` | Informativo. Un usuario no autenticado intentó acceder a una ruta protegida. Normal, pero picos pueden indicar intentos de escaneo de vulnerabilidades. |
 | `info` (30) | `User logged in successfully` | Informativo. Útil para seguimiento de actividad de usuarios. |
+
+---
+
+## 3. Monitorización de Disponibilidad (Uptime)
+
+Además de las alertas basadas en logs, es fundamental tener un monitor de uptime externo (como Better Uptime, UptimeRobot, etc.) que verifique constantemente si la aplicación está en línea y respondiendo correctamente.
+
+### Configuración del Monitor
+
+- **Endpoint a Monitorear:** `https://<tu-dominio-de-produccion>.com/api/health`
+- **Método HTTP:** `GET`
+- **Frecuencia:** Recomendado: cada 1-5 minutos.
+
+### Cabeceras de Autenticación
+
+El endpoint `/api/health` es securizado. El monitor de uptime **DEBE** enviar la siguiente cabecera HTTP en cada petición para autenticarse:
+
+- **Nombre de la Cabecera:** `Authorization`
+- **Valor de la Cabecera:** `Bearer <TU_HEALTHCHECK_TOKEN>`
+
+Reemplaza `<TU_HEALTHCHECK_TOKEN>` con el valor de la variable de entorno `HEALTHCHECK_TOKEN` que has configurado en Vercel para el entorno de producción.
+
+Si el monitor recibe una respuesta que no sea un `200 OK`, debe disparar una alerta de disponibilidad (ej. PagerDuty, SMS). Una respuesta `401 Unauthorized` o `403 Forbidden` indica un problema con el token de autenticación. Una respuesta `503 Service Unavailable` indica un problema con las dependencias de la aplicación (Base de Datos o Redis).

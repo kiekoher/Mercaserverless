@@ -26,10 +26,30 @@ Esta aplicación web está diseñada para digitalizar y optimizar el proceso de 
 - **Estilos:** CSS plano (inline y global)
 - **Hosting:** [Vercel](https://vercel.com/)
 
-## Despliegue en Producción (Serverless)
+## Despliegue y Operaciones
 
-Este proyecto está diseñado y configurado para un despliegue **100% serverless** utilizando Vercel y Supabase.
+Este proyecto está diseñado para un despliegue **100% serverless** utilizando Vercel y Supabase, con un fuerte enfoque en la seguridad y la observabilidad.
 
-1.  **Hosting y Funciones Serverless:** El proyecto se despliega en **Vercel**. Cada `push` a la rama `main` dispara un despliegue automático a producción. Las Pull Requests generan sus propios despliegues de previsualización.
-2.  **Base de Datos y Autenticación:** Se utiliza un proyecto de **Supabase** en la nube como base de datos PostgreSQL gestionada y para la autenticación de usuarios.
-3.  **Configuración:** Las variables de entorno para producción (credenciales de Supabase, APIs, etc.) deben ser configuradas en el dashboard del proyecto en Vercel.
+### Entornos de Despliegue
+
+El proyecto se gestiona con tres entornos en Vercel:
+- **Production:** Desplegado automáticamente desde la rama `main`. Es el entorno en vivo.
+- **Preview:** Cada Pull Request genera su propio despliegue de previsualización. Sirve como entorno de Staging.
+- **Development:** Para el desarrollo local, sincronizado mediante el CLI de Vercel.
+
+### Configuración y Secretos
+
+La configuración de la aplicación se gestiona exclusivamente a través de variables de entorno en el dashboard de Vercel. **No se deben utilizar archivos `.env` en producción.**
+
+Para una guía detallada sobre cómo configurar las variables de entorno para cada ambiente, consulta el documento **[VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md)**.
+
+### Seguridad
+
+La aplicación ha sido robustecida con las siguientes medidas de seguridad:
+- **Cabeceras de Seguridad:** Se implementa una Política de Seguridad de Contenidos (CSP) estricta y otras cabeceras de seguridad (`X-Content-Type-Options`, `Referrer-Policy`, etc.) a través de middleware para mitigar ataques XSS y otros vectores.
+- **Endpoint de Health Check Securizado:** El endpoint `/api/health` requiere un token de autorización para evitar su abuso.
+- **CI/CD Seguro:** El pipeline de integración continua incluye auditoría de dependencias y análisis estático de código (SAST) con Semgrep.
+
+### Operaciones y Monitorización
+
+Para instrucciones sobre recuperación ante desastres, monitorización y configuración de alertas, consulta la **[Guía de Operaciones](./OPERATIONS.md)**.
