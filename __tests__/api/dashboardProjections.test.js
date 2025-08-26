@@ -30,7 +30,14 @@ describe('/api/dashboard-projections', () => {
 
   it('should return 405 if method is not GET', async () => {
     const { default: handler } = await import('../../pages/api/dashboard-projections');
-    const { req, res } = createMocks({ method: 'POST' });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: {
+        'x-csrf-token': token,
+        'cookie': `csrf-secret=${token}`,
+      },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(405);
   });

@@ -107,9 +107,10 @@ async function handler(req, res) {
     text = response.text();
   } catch (e) {
     if (e.name === 'AbortError') {
-      logger.error({ userId: user.id }, 'Gemini API request for summary timed out');
+      logger.error({ userId: user.id }, 'AI API timeout');
       return res.status(504).json({ error: 'Tiempo de espera agotado para la API de IA' });
     }
+    logger.error({ err: e, userId: user.id }, 'Gemini error');
     throw e;
   } finally {
     clearTimeout(timeout);

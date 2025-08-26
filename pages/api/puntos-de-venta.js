@@ -73,7 +73,7 @@ export async function handler(req, res) {
         }
       }
     } catch (e) {
-      logger.error({ err: e, userId: user.id }, 'Geocoding API error');
+      logger.error({ err: e, userId: user.id }, 'Geocode error');
     }
 
     const { data, error } = await supabase

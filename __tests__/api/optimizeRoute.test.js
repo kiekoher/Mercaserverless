@@ -30,14 +30,21 @@ describe('optimize-route API', () => {
   });
 
   it('returns 400 for invalid body', async () => {
-    const { req, res } = createMocks({ method: 'POST', body: { puntos: [] } });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
+      body: { puntos: [] },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
 
   it('returns 400 for malformed points', async () => {
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: { puntos: [{ direccion: 'A' }, { direccion: 'B', ciudad: 'Y' }] },
     });
     await handler(req, res);
@@ -45,8 +52,10 @@ describe('optimize-route API', () => {
   });
 
   it('sanitizes addresses before calling Google Maps', async () => {
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: {
         puntos: [
           { id: 1, direccion: '<b>A</b>', ciudad: '<i>X</i>' },
@@ -68,8 +77,10 @@ describe('optimize-route API', () => {
   });
 
   it('passes the transport mode to Google Maps API', async () => {
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: {
         puntos: [
           { id: 1, direccion: 'A', ciudad: 'X' },
