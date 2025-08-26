@@ -17,20 +17,31 @@ jest.mock('notistack', () => ({
   }),
 }));
 
+// Mock useAuthorization instead of useAuth for role-based checks
+jest.mock('../hooks/useAuthorization', () => ({
+  useAuthorization: jest.fn(),
+}));
+import { useAuthorization } from '../hooks/useAuthorization';
+
 describe('UsersPage', () => {
   beforeEach(() => {
     fetch.mockClear();
-    useAuth.mockClear();
+    useAuthorization.mockClear();
+    useAuth.mockClear(); // Clear useAuth mock as well
   });
 
   it('renders the user management page for an admin', async () => {
-    // Mock the useAuth hook to return an admin user
+    useAuthorization.mockReturnValue({
+      user: { id: 'admin-user' },
+      role: 'admin',
+      can: true,
+    });
     useAuth.mockReturnValue({
       user: { id: 'admin-user' },
-      profile: { role: 'admin' },
+      profile: { role: 'admin', full_name: 'Admin User' },
+      signOut: jest.fn(),
     });
 
-    // Mock the API response for fetching users
     const mockUsers = [
       { id: 'user-1', full_name: 'John Doe', role: 'mercaderista' },
       { id: 'user-2', full_name: 'Jane Smith', role: 'supervisor' },
@@ -40,40 +51,50 @@ describe('UsersPage', () => {
       json: async () => ({ data: mockUsers, totalCount: 2 }),
     });
 
-    render(
-      <CsrfProvider>
-        <UsersPage />
-      </CsrfProvider>
-    );
+    render(<CsrfProvider><UsersPage /></CsrfProvider>);
 
-    // Check that the main heading is rendered
-    expect(screen.getByRole('heading', { name: /administración de usuarios/i })).toBeInTheDocument();
+    // Use the new heading text
+    expect(screen.getByRole('heading', { name: /gestión de usuarios/i })).toBeInTheDocument();
 
-    // Wait for the users to be fetched and rendered
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/users?page=1&search=');
+      expect(fetch).toHaveBeenCalledWith('/api/users?page=1&search=&pageSize=20');
     });
 
-    // Check if the mock users are displayed in the table
     expect(await screen.findByText('John Doe')).toBeInTheDocument();
     expect(await screen.findByText('Jane Smith')).toBeInTheDocument();
   });
 
-  it('shows a permission denied message for non-admin users', () => {
-    // Mock the useAuth hook to return a non-admin user
+  it('renders the user management page for a supervisor', async () => {
+    useAuthorization.mockReturnValue({
+      user: { id: 'supervisor-user' },
+      role: 'supervisor',
+      can: true,
+    });
+    useAuth.mockReturnValue({
+      user: { id: 'supervisor-user' },
+      profile: { role: 'supervisor', full_name: 'Supervisor User' },
+      signOut: jest.fn(),
+    });
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ data: [], totalCount: 0 }) });
+    render(<CsrfProvider><UsersPage /></CsrfProvider>);
+    expect(screen.getByRole('heading', { name: /gestión de usuarios/i })).toBeInTheDocument();
+  });
+
+  it('shows a permission denied message for mercaderista', () => {
+    useAuthorization.mockReturnValue({
+      user: { id: 'mercaderista-user' },
+      role: 'mercaderista',
+      can: false,
+    });
     useAuth.mockReturnValue({
       user: { id: 'mercaderista-user' },
-      profile: { role: 'mercaderista' },
+      profile: { role: 'mercaderista', full_name: 'Mercaderista User' },
+      signOut: jest.fn(),
     });
 
-    render(
-      <CsrfProvider>
-        <UsersPage />
-      </CsrfProvider>
-    );
+    render(<CsrfProvider><UsersPage /></CsrfProvider>);
 
-    // Check that the permission denied alert is shown
-    expect(screen.getByRole('alert')).toHaveTextContent(/no tienes permiso para acceder a esta página/i);
-    expect(screen.queryByRole('heading', { name: /administración de usuarios/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/no tienes permiso para ver esta página/i);
+    expect(screen.queryByRole('heading', { name: /gestión de usuarios/i })).not.toBeInTheDocument();
   });
 });

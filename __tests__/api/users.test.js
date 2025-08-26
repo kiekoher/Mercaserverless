@@ -46,24 +46,25 @@ describe('users API', () => {
     expect(json.totalCount).toBe(1);
   });
 
-  it('updates a user role for admin', async () => {
-    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
-    const updatedUser = { id: 'u2', full_name: 'Test User', role: 'supervisor' };
-    supabase.single.mockResolvedValue({ data: updatedUser, error: null });
+  it('returns a list of users for supervisor', async () => {
+    requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
+    supabase.order.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
 
-    const req = createMockReq('PUT', { userId: '00000000-0000-0000-0000-000000000000', newRole: 'supervisor' });
+    const req = createMockReq('GET');
     const res = createMockRes();
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res._getJSONData().role).toBe('supervisor');
+    const json = res._getJSONData();
+    expect(json.data.length).toBe(1);
+    expect(json.totalCount).toBe(1);
   });
 
-  it('returns 400 for invalid role on update', async () => {
+  it('returns 405 for non-GET methods', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
-    const req = createMockReq('PUT', { userId: '00000000-0000-0000-0000-000000000000', newRole: 'invalid-role' });
+    const req = createMockReq('PUT', { userId: 'u2', newRole: 'supervisor' });
     const res = createMockRes();
     await handler(req, res);
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(405);
   });
 });

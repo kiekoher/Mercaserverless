@@ -55,11 +55,15 @@ describe('visitas API', () => {
   it('allows mercaderistas to create (check-in) visits', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
 
-    // 1. Fetch route for validation
-    supabase.from.mockReturnValueOnce(supabase);
+    // 1. Nueva lógica de validación: consulta a 'ruta_pdv'
+    supabase.from.mockReturnValueOnce(supabase); // from('ruta_pdv')
     supabase.select.mockReturnValueOnce(supabase);
-    supabase.eq.mockReturnValueOnce(supabase);
-    supabase.single.mockResolvedValueOnce({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] }, error: null });
+    supabase.eq.mockReturnValueOnce(supabase); // eq('ruta_id', ...)
+    supabase.eq.mockReturnValueOnce(supabase); // eq('pdv_id', ...)
+    supabase.single.mockResolvedValueOnce({
+      data: { id: 1, rutas: { mercaderista_id: 'u1' } }, // Devuelve el owner correcto
+      error: null
+    });
 
     // 2. Check for existing active visit
     supabase.from.mockReturnValueOnce(supabase);
@@ -87,10 +91,15 @@ describe('visitas API', () => {
   it('prevents duplicate check-in for the same point', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'mercaderista', supabase });
 
-    supabase.from.mockReturnValueOnce(supabase);
+    // 1. Nueva lógica de validación: consulta a 'ruta_pdv'
+    supabase.from.mockReturnValueOnce(supabase); // from('ruta_pdv')
     supabase.select.mockReturnValueOnce(supabase);
-    supabase.eq.mockReturnValueOnce(supabase);
-    supabase.single.mockResolvedValueOnce({ data: { mercaderista_id: 'u1', puntos_de_venta_ids: [2] }, error: null });
+    supabase.eq.mockReturnValueOnce(supabase); // eq('ruta_id', ...)
+    supabase.eq.mockReturnValueOnce(supabase); // eq('pdv_id', ...)
+    supabase.single.mockResolvedValueOnce({
+      data: { id: 1, rutas: { mercaderista_id: 'u1' } },
+      error: null
+    });
 
     supabase.from.mockReturnValueOnce(supabase);
     supabase.select.mockReturnValueOnce(supabase);

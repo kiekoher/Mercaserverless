@@ -170,9 +170,8 @@ export default function RutasPage() {
     setLoadingSummary(true);
     setSummaryContent('');
     try {
-      const routePuntos = ruta.puntos_de_venta_ids
-        .map(id => puntos.find(p => p.id === id))
-        .filter(Boolean);
+      // La API ahora nos da los puntos de venta directamente en la ruta
+      const routePuntos = ruta.puntos_de_venta;
 
       const res = await fetchWithCsrf('/api/generate-summary', {
         method: 'POST',
@@ -199,23 +198,29 @@ export default function RutasPage() {
 
   const calculateProgress = (ruta) => {
     const visitasDeRuta = visitas[ruta.id] || [];
-    if (!ruta.puntos_de_venta_ids || ruta.puntos_de_venta_ids.length === 0) return 0;
+    // Usamos el nuevo array de objetos
+    if (!ruta.puntos_de_venta || ruta.puntos_de_venta.length === 0) return 0;
     const completadas = visitasDeRuta.filter(v => v.estado === 'Completada' || v.estado === 'Incidencia').length;
-    return (completadas / ruta.puntos_de_venta_ids.length) * 100;
+    // El denominador es ahora la longitud del nuevo array
+    return (completadas / ruta.puntos_de_venta.length) * 100;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Simplified for brevity, assuming this logic exists
     setIsSubmitting(true);
     try {
+        // El cuerpo de la petición ahora usa 'pdvIds'
         const res = await fetchWithCsrf('/api/rutas', {
             method: 'POST',
-            body: JSON.stringify({ fecha, mercaderistaId, puntosDeVentaIds: selectedPuntos })
+            body: JSON.stringify({ fecha, mercaderistaId, pdvIds: selectedPuntos })
         });
         if (!res.ok) throw new Error('Failed to create route');
         enqueueSnackbar('Ruta creada con éxito', { variant: 'success' });
         fetchRutas(); // Refresh
+        // Reset form
+        setFecha(new Date().toISOString().split('T')[0]);
+        setMercaderistaId('');
+        setSelectedPuntos([]);
     } catch (err) {
         enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
@@ -248,16 +253,18 @@ export default function RutasPage() {
   const openEditRutaDialog = (ruta) => {
     setRutaToEdit(ruta);
     setEditFecha(ruta.fecha);
-    setEditPuntos(ruta.puntos_de_venta_ids.join(','));
+    // Usamos el nuevo array de objetos para obtener los IDs
+    setEditPuntos(ruta.puntos_de_venta.map(p => p.id).join(','));
     setEditRutaOpen(true);
   };
 
   const handleEditRutaSubmit = async () => {
     try {
       const ids = editPuntos.split(',').map(n => parseInt(n.trim(), 10)).filter(Boolean);
+      // El cuerpo de la petición ahora usa 'pdvIds'
       const res = await fetchWithCsrf('/api/rutas', {
         method: 'PUT',
-        body: JSON.stringify({ id: rutaToEdit.id, fecha: editFecha, mercaderistaId: rutaToEdit.mercaderista_id, puntosDeVentaIds: ids })
+        body: JSON.stringify({ id: rutaToEdit.id, fecha: editFecha, mercaderistaId: rutaToEdit.mercaderista_id, pdvIds: ids })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -354,8 +361,8 @@ export default function RutasPage() {
                     <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
                   ) : rutas.map((ruta) => (
                     <TableRow key={ruta.id} hover>
-                      <TableCell>{new Date(ruta.fecha).toLocaleDateString('es-CO')}</TableCell>
-                      <TableCell>{ruta.mercaderista_id}</TableCell>
+                      <TableCell>{new Date(ruta.fecha + 'T00:00:00').toLocaleDateString('es-CO', { timeZone: 'UTC' })}</TableCell>
+                      <TableCell>{ruta.mercaderista_name || ruta.mercaderista_id}</TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box sx={{ width: '100%', mr: 1 }}>
@@ -467,9 +474,8 @@ export default function RutasPage() {
           <Typography variant="h6" gutterBottom>Detalle de la Ruta</Typography>
           {loadingVisitas ? <CircularProgress /> : (
             <List sx={{ maxHeight: 400, overflow: 'auto' }}>
-              {selectedRuta?.puntos_de_venta_ids.map(puntoId => {
-                const punto = puntos.find(p => p.id === puntoId);
-                const visita = visitas[selectedRuta.id]?.find(v => v.punto_de_venta_id === puntoId);
+              {selectedRuta?.puntos_de_venta.map(punto => {
+                const visita = visitas[selectedRuta.id]?.find(v => v.punto_de_venta_id === punto.id);
                 const estado = visita?.estado || 'Pendiente';
 
                 let chipColor = 'default';
@@ -478,16 +484,16 @@ export default function RutasPage() {
                 if (estado === 'En Progreso') chipColor = 'info';
 
                 return (
-                  <ListItem key={puntoId} divider>
+                  <ListItem key={punto.id} divider>
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body1">{punto?.nombre}</Typography>
-                          {punto?.tipologia && <Chip label={punto.tipologia} size="small" />}
+                          <Typography variant="body1">{punto.nombre}</Typography>
+                          {punto.tipologia && <Chip label={punto.tipologia} size="small" />}
                           <Chip label={estado} size="small" color={chipColor} />
                         </Box>
                       }
-                      secondary={`Frec: ${punto?.frecuencia_mensual || 'N/A'} | T. Serv: ${punto?.minutos_servicio || 'N/A'} min. | ${visita?.observaciones ? `Obs: ${visita.observaciones}` : 'Sin feedback.'}`}
+                      secondary={`Frec: ${punto.frecuencia_mensual || 'N/A'} | T. Serv: ${punto.minutos_servicio || 'N/A'} min. | ${visita?.observaciones ? `Obs: ${visita.observaciones}` : 'Sin feedback.'}`}
                     />
                   </ListItem>
                 );
@@ -504,11 +510,7 @@ export default function RutasPage() {
             </Typography>
             {selectedRuta && (
               <RutaMap
-                puntos={
-                  selectedRuta.puntos_de_venta_ids
-                    .map(id => puntos.find(p => p.id === id))
-                    .filter(Boolean) // Filter out any undefined points
-                }
+                puntos={selectedRuta.puntos_de_venta}
               />
             )}
         </Box>

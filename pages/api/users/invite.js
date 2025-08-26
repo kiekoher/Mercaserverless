@@ -1,8 +1,8 @@
-import { getSupabaseServerClient } from '../../../lib/supabaseServer';
 import logger from '../../../lib/logger.server';
 import { z } from 'zod';
 import { sendTransactionalEmail, WelcomeEmail } from '../../../lib/email';
-import { requireUser } from '../../../lib/auth'; // Cambiado de getUserProfile a requireUser
+import { requireUser } from '../../../lib/auth';
+import { checkRateLimit } from '../../../lib/rateLimiter';
 
 const inviteUserSchema = z.object({
   email: z.string().email({ message: 'Email inválido.' }),
@@ -15,15 +15,17 @@ async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const { supabase, user: currentUser, role: currentUserRole } = await requireUser(req, res, ['supervisor']);
+  const { supabase, user: currentUser, role: currentUserRole } = await requireUser(req, res, ['admin', 'supervisor']);
 
   if (!currentUser) {
     return res.status(401).json({ error: 'No autenticado.' });
   }
 
-  if (currentUserRole !== 'supervisor') {
-      return res.status(403).json({ error: 'No autorizado para realizar esta acción.' });
+  if (!(await checkRateLimit(req, { userId: currentUser.id }))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
+
+  // The requireUser function already handles role checking, so this explicit check is redundant and can be removed.
 
   const result = inviteUserSchema.safeParse(req.body);
   if (!result.success) {

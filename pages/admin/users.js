@@ -1,75 +1,81 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/Auth';
-import { useDebounce } from '../../hooks/useDebounce';
 import {
-  Typography, Button, Paper, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, CircularProgress, Alert,
-  Box, Select, MenuItem, FormControl, TextField, Pagination,
-  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
+  Box, Typography, Button, Grid, Paper, TextField, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, CircularProgress, Pagination, Alert, Modal,
+  Dialog, DialogTitle, DialogContent, DialogActions, Select, MenuItem, InputLabel, FormControl, IconButton, Tooltip
 } from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import AppLayout from '../../components/AppLayout';
-import { useSnackbar } from 'notistack';
 import { useAuthorization } from '../../hooks/useAuthorization';
+import { useDebounce } from '../../hooks/useDebounce';
 import { useCsrfFetcher } from '../../lib/fetchWithCsrf';
+import { useSnackbar } from 'notistack';
 
-export default function UserManagementPage() {
-  const { user } = useAuth();
-  const { enqueueSnackbar } = useSnackbar();
-  const { can, role } = useAuthorization();
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: { xs: '90%', md: 400 },
+  bgcolor: 'background.paper',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  boxShadow: 24,
+  p: 4,
+};
+
+export default function UsersPage() {
+  const { can, user, role } = useAuthorization(['admin', 'supervisor']);
   const fetchWithCsrf = useCsrfFetcher();
+  const { enqueueSnackbar } = useSnackbar();
 
-  // Existing state
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [saving, setSaving] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // New state for invite/delete functionality
-  const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+  // Modals state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const [userToEdit, setUserToEdit] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
+
+  // Form state
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('mercaderista');
-  const [isInviting, setIsInviting] = useState(false);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [editRole, setEditRole] = useState('mercaderista');
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page, search: debouncedSearchTerm });
+      const params = new URLSearchParams({ page, search: debouncedSearchTerm, pageSize: 20 });
       const res = await fetch(`/api/users?${params.toString()}`);
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to fetch users');
-      }
+      if (!res.ok) throw new Error('Error al cargar los usuarios.');
       const { data, totalCount } = await res.json();
-      setTotalPages(Math.ceil(totalCount / 20)); // Assuming page size of 20
       setUsers(data);
+      setTotalPages(Math.ceil(totalCount / 20));
     } catch (err) {
-      setError(err.message);
+      enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearchTerm]);
+  }, [page, debouncedSearchTerm, enqueueSnackbar]);
 
   useEffect(() => {
-    if (role) {
-      if (can('admin')) {
-        fetchUsers();
-      } else {
-        setLoading(false);
-        setError('No tienes permiso para acceder a esta página.');
-      }
+    if (user) {
+      fetchUsers();
     }
-  }, [role, can, fetchUsers]);
+  }, [user, fetchUsers]);
 
-  const handleInvite = async () => {
-    setIsInviting(true);
+  const handleInviteUser = async () => {
+    setIsSubmitting(true);
     try {
       const res = await fetchWithCsrf('/api/users/invite', {
         method: 'POST',
@@ -77,137 +83,173 @@ export default function UserManagementPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al invitar al usuario.');
-
-      enqueueSnackbar('Invitación enviada correctamente.', { variant: 'success' });
+      enqueueSnackbar('Invitación enviada con éxito.', { variant: 'success' });
       setInviteModalOpen(false);
       setInviteEmail('');
       setInviteRole('mercaderista');
-      fetchUsers(); // Refresh user list
+      fetchUsers();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
-      setIsInviting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!userToDelete) return;
-    setIsDeleting(true);
+  const handleUpdateRole = async () => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetchWithCsrf(`/api/users/${userToEdit.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: editRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al actualizar el rol.');
+      enqueueSnackbar('Rol actualizado con éxito.', { variant: 'success' });
+      setEditModalOpen(false);
+      fetchUsers();
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    setIsSubmitting(true);
     try {
       const res = await fetchWithCsrf(`/api/users/${userToDelete.id}`, {
         method: 'DELETE',
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al eliminar el usuario.');
-
-      enqueueSnackbar('Usuario eliminado correctamente.', { variant: 'success' });
-      setConfirmDeleteOpen(false);
-      setUserToDelete(null);
-      fetchUsers(); // Refresh user list
+      enqueueSnackbar('Usuario eliminado con éxito.', { variant: 'success' });
+      setDeleteModalOpen(false);
+      fetchUsers();
     } catch (err) {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
-      setIsDeleting(false);
+      setIsSubmitting(false);
     }
   };
 
-  if (!user || !role) {
-    return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
-  }
-  if (!can('admin')) {
-    return <AppLayout><Alert severity="error">No tienes permiso para acceder a esta página.</Alert></AppLayout>;
-  }
+  const openEditModal = (user) => {
+    setUserToEdit(user);
+    setEditRole(user.role);
+    setEditModalOpen(true);
+  };
+
+  const openDeleteModal = (user) => {
+    setUserToDelete(user);
+    setDeleteModalOpen(true);
+  };
+
+  if (!user) return <AppLayout><Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box></AppLayout>;
+  if (!can) return <AppLayout><Alert severity="error">No tienes permiso para ver esta página.</Alert></AppLayout>;
 
   return (
     <AppLayout>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4" gutterBottom>Administración de Usuarios</Typography>
-        <Button variant="contained" onClick={() => setInviteModalOpen(true)}>Invitar Usuario</Button>
-      </Box>
-
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Paper>
-        <Box sx={{ p: 2 }}>
-          <TextField fullWidth label="Buscar por nombre o email" variant="outlined" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </Box>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Nombre Completo</TableCell>
-                <TableCell>Email</TableCell>
-                <TableCell>Rol</TableCell>
-                <TableCell align="right">Acciones</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
-              ) : users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.full_name || 'N/A (Invitado)'}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>{u.role}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => { setUserToDelete(u); setConfirmDeleteOpen(true); }}
-                      disabled={u.id === user.id} // Disable deleting self
-                    >
-                      Eliminar
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
-          <Pagination count={totalPages} page={page} onChange={(e, value) => setPage(value)} color="primary" disabled={loading} />
-        </Box>
+      <Typography variant="h4" gutterBottom>Gestión de Usuarios</Typography>
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Grid container spacing={2} justifyContent="space-between" alignItems="center">
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Buscar por nombre de usuario"
+              variant="outlined"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Grid>
+          <Grid item>
+            <Button variant="contained" onClick={() => setInviteModalOpen(true)}>Invitar Usuario</Button>
+          </Grid>
+        </Grid>
       </Paper>
 
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Nombre Completo</TableCell>
+              <TableCell>Rol</TableCell>
+              <TableCell align="right">Acciones</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={4} align="center"><CircularProgress /></TableCell></TableRow>
+            ) : users.map((u) => (
+              <TableRow key={u.id}>
+                <TableCell><Tooltip title={u.id}><Typography variant="body2" sx={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: 100 }}>{u.id}</Typography></Tooltip></TableCell>
+                <TableCell>{u.full_name || '(invitado)'}</TableCell>
+                <TableCell>{u.role}</TableCell>
+                <TableCell align="right">
+                  <IconButton onClick={() => openEditModal(u)} disabled={u.id === user.id}><EditIcon /></IconButton>
+                  <IconButton onClick={() => openDeleteModal(u)} disabled={u.id === user.id}><DeleteIcon /></IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Box sx={{ p: 2, display: 'flex', justifyContent: 'center' }}>
+        <Pagination count={totalPages} page={page} onChange={(e, value) => setPage(value)} color="primary" disabled={loading} />
+      </Box>
+
       {/* Invite User Modal */}
-      <Dialog open={isInviteModalOpen} onClose={() => setInviteModalOpen(false)}>
-        <DialogTitle>Invitar Nuevo Usuario</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Ingresa el email y asigna un rol. El usuario recibirá un correo para configurar su cuenta.
-          </DialogContentText>
-          <TextField autoFocus margin="dense" id="email" label="Dirección de Email" type="email" fullWidth variant="standard" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-          <FormControl fullWidth margin="dense" variant="standard">
-            <Select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+      <Modal open={inviteModalOpen} onClose={() => setInviteModalOpen(false)}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" gutterBottom>Invitar Nuevo Usuario</Typography>
+          <TextField label="Email" type="email" fullWidth value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} sx={{ mb: 2 }} />
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Rol</InputLabel>
+            <Select value={inviteRole} label="Rol" onChange={e => setInviteRole(e.target.value)}>
               <MenuItem value="mercaderista">Mercaderista</MenuItem>
               <MenuItem value="supervisor">Supervisor</MenuItem>
+              {role === 'admin' && <MenuItem value="admin">Admin</MenuItem>}
+            </Select>
+          </FormControl>
+          <Button variant="contained" onClick={handleInviteUser} disabled={isSubmitting} fullWidth>
+            {isSubmitting ? <CircularProgress size={24} /> : 'Enviar Invitación'}
+          </Button>
+        </Box>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Dialog open={editModalOpen} onClose={() => setEditModalOpen(false)}>
+        <DialogTitle>Editar Rol de {userToEdit?.full_name || 'usuario'}</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Rol</InputLabel>
+            <Select value={editRole} label="Rol" onChange={e => setEditRole(e.target.value)}>
+              <MenuItem value="mercaderista">Mercaderista</MenuItem>
+              <MenuItem value="supervisor">Supervisor</MenuItem>
+              {role === 'admin' && <MenuItem value="admin">Admin</MenuItem>}
             </Select>
           </FormControl>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setInviteModalOpen(false)}>Cancelar</Button>
-          <Button onClick={handleInvite} variant="contained" disabled={isInviting}>
-            {isInviting ? <CircularProgress size={24} /> : 'Enviar Invitación'}
+          <Button onClick={() => setEditModalOpen(false)}>Cancelar</Button>
+          <Button onClick={handleUpdateRole} disabled={isSubmitting}>
+            {isSubmitting ? <CircularProgress size={24} /> : 'Guardar'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Confirm Delete Dialog */}
-      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)}>
-        <DialogTitle>Confirmar Eliminación</DialogTitle>
+      {/* Delete User Confirmation */}
+      <Dialog open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
+        <DialogTitle>¿Estás seguro de que quieres eliminar a {userToDelete?.full_name || 'este usuario'}?</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            ¿Estás seguro de que quieres eliminar al usuario <strong>{userToDelete?.email}</strong>? Esta acción no se puede deshacer.
-          </DialogContentText>
+          <Typography>Esta acción es irreversible.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button>
-          <Button onClick={handleDelete} color="error" variant="contained" disabled={isDeleting}>
-            {isDeleting ? <CircularProgress size={24} /> : 'Eliminar'}
+          <Button onClick={() => setDeleteModalOpen(false)}>Cancelar</Button>
+          <Button onClick={handleDeleteUser} color="error" disabled={isSubmitting}>
+            {isSubmitting ? <CircularProgress size={24} /> : 'Eliminar'}
           </Button>
         </DialogActions>
       </Dialog>
-
     </AppLayout>
   );
 }

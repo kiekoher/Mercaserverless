@@ -103,22 +103,39 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Push DB migrations to test database
+        run: |
+          echo "Pushing migrations to test DB..."
+          supabase db push --password ${{ secrets.CYPRESS_SUPABASE_DB_PASSWORD }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_URL: ${{ secrets.CYPRESS_SUPABASE_DB_URL }}
+
       - name: Run Cypress tests
         uses: cypress-io/github-action@v6
         with:
           build: npm run build
           start: npm start
         env:
+          # Estas variables ahora deben estar configuradas como Secretos en el repositorio de GitHub
+          # con el prefijo CYPRESS_ para distinguirlas de las de producción.
           NODE_ENV: test
-          NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: "example-anon-key"
-          SUPABASE_SERVICE_KEY: "example-service-key"
-          GEMINI_API_KEY: "example-gemini-key"
-          GOOGLE_MAPS_API_KEY: "example-maps-key"
-          UPSTASH_REDIS_REST_URL: "https://example-redis.upstash.io"
-          UPSTASH_REDIS_REST_TOKEN: "example-rest-token"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.CYPRESS_NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CYPRESS_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.CYPRESS_SUPABASE_SERVICE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.CYPRESS_GEMINI_API_KEY }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.CYPRESS_GOOGLE_MAPS_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.CYPRESS_UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.CYPRESS_UPSTASH_REDIS_REST_TOKEN }}
           HEALTHCHECK_TOKEN: "test-token"
           LOGTAIL_SOURCE_TOKEN: ""
           RATE_LIMIT_FAIL_OPEN: "true"
