@@ -16,6 +16,13 @@
 // Import commands.js using ES2015 syntax:
 import './commands.js'
 
+// Fetch the CSRF token once before any tests run
+before(() => {
+  cy.request('/api/csrf').then((response) => {
+    Cypress.env('csrfToken', response.body.csrfToken);
+  });
+});
+
 // Alternatively, you can use CommonJS syntax:
 // require('./commands')
 

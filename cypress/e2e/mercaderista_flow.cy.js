@@ -6,8 +6,12 @@ describe('Mercaderista Main Workflow', () => {
 
     // 1. Set the role in localStorage BEFORE visiting the page.
     cy.login('mercaderista');
-    // 2. Visit the page. AuthProvider will read the role and create the mock user.
-    cy.visit('/mi-ruta');
+    // 2. Visit the page, injecting the CSRF token.
+    cy.visit('/mi-ruta', {
+      onBeforeLoad(win) {
+        win.__CSRF_TOKEN__ = Cypress.env('csrfToken');
+      },
+    });
   });
 
   it('should allow a mercaderista to visit their route page and see their points of sale', () => {

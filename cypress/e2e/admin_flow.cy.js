@@ -15,8 +15,12 @@ describe('Admin User Management Workflow', () => {
 
     // 1. Set the role in localStorage BEFORE visiting the page.
     cy.login('admin');
-    // 2. Visit the page. AuthProvider will read the role and create the mock user.
-    cy.visit('/admin/users');
+    // 2. Visit the page, injecting the CSRF token into the window for the app to use.
+    cy.visit('/admin/users', {
+      onBeforeLoad(win) {
+        win.__CSRF_TOKEN__ = Cypress.env('csrfToken');
+      },
+    });
   });
 
   it('should allow an admin to visit the user management page and see the user list', () => {
