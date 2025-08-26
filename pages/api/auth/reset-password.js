@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import logger from '../../../lib/logger.server';
 import { z } from 'zod';
+import { checkRateLimit } from '../../../lib/rateLimiter';
 
 const resetPasswordSchema = z.object({
   email: z.string().email('Por favor, introduce una dirección de email válida.'),
@@ -10,6 +11,10 @@ async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  if (!(await checkRateLimit(req))) {
+    return res.status(429).json({ error: 'Too many requests' });
   }
 
   const result = resetPasswordSchema.safeParse(req.body);

@@ -58,19 +58,27 @@ async function handler(req, res) {
       return res.status(400).json({ error: 'Datos de visita inválidos.' });
     }
     const { ruta_id, punto_de_venta_id, url_foto } = parsed.data;
-    const { data: rutaData, error: rutaError } = await supabase.from('rutas').select('mercaderista_id, puntos_de_venta_ids').eq('id', ruta_id).single();
-    if (rutaError || !rutaData) {
-      logger.error({ err: rutaError, ruta_id, userId: user.id }, 'Error fetching route for validation');
-      return res.status(404).json({ error: 'La ruta especificada no fue encontrada.' });
+
+    // Nueva lógica de validación:
+    // 1. Comprueba si el PDV está en la tabla de unión para esa ruta.
+    // 2. Trae el mercaderista_id de la ruta padre para la validación de propiedad.
+    const { data: validationData, error: validationError } = await supabase
+      .from('ruta_pdv')
+      .select('id, rutas(mercaderista_id)')
+      .eq('ruta_id', ruta_id)
+      .eq('pdv_id', punto_de_venta_id)
+      .single();
+
+    if (validationError || !validationData) {
+      logger.warn({ err: validationError, userId: user.id, ruta_id, punto_de_venta_id }, 'User tried to check-in to a point not in the route or route not found');
+      return res.status(404).json({ error: 'El punto de venta no pertenece a la ruta especificada o la ruta no existe.' });
     }
-    if (rutaData.mercaderista_id !== user.id) {
-      logger.warn({ userId: user.id, ruta_id, expectedOwner: rutaData.mercaderista_id }, 'User tried to check-in to a route not assigned to them');
+
+    if (!validationData.rutas || validationData.rutas.mercaderista_id !== user.id) {
+      logger.warn({ userId: user.id, ruta_id, expectedOwner: validationData.rutas?.mercaderista_id }, 'User tried to check-in to a route not assigned to them');
       return res.status(403).json({ error: 'No tienes permiso para registrar visitas en esta ruta.' });
     }
-    if (!rutaData.puntos_de_venta_ids.includes(punto_de_venta_id)) {
-      logger.warn({ userId: user.id, ruta_id, punto_de_venta_id }, 'User tried to check-in to a point not in the route');
-      return res.status(400).json({ error: 'El punto de venta no pertenece a la ruta especificada.' });
-    }
+
     const { data: existingVisit } = await supabase.from('visitas').select('id').eq('ruta_id', ruta_id).eq('punto_de_venta_id', punto_de_venta_id).is('check_out_at', null).single();
     if (existingVisit) {
       return res.status(409).json({ error: 'Visita ya iniciada para este punto' });

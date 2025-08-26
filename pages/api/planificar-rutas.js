@@ -157,16 +157,16 @@ async function handler(req, res) {
     });
   }
 
+  // Se ajusta el payload para el nuevo RPC
   const routesToInsert = plan.dailyRoutes.map(route => ({
     fecha: route.date,
-    puntos_de_venta_ids: route.points.map(p => p.id)
+    pdv_ids: route.points.map(p => p.id) // Cambiado de puntos_de_venta_ids a pdv_ids
   }));
 
-  const { error: rpcError } = await supabaseAdmin.rpc('bulk_insert_planned_routes', {
-    mercaderista_id_param: mercaderistaId,
-    start_date_param: startDate,
-    end_date_param: endDate,
-    routes_payload: routesToInsert
+  // Se llama al nuevo RPC 'bulk_create_routes'
+  const { error: rpcError } = await supabaseAdmin.rpc('bulk_create_routes', {
+    p_mercaderista_id: mercaderistaId,
+    p_routes: routesToInsert
   });
 
   if (rpcError) {

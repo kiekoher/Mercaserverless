@@ -5,7 +5,7 @@ import { checkRateLimit } from '../../lib/rateLimiter';
 import { sanitizeInput } from '../../lib/sanitize';
 
 export async function handler(req, res) {
-  const { error: authError, supabase, user } = await requireUser(req, res, ['admin']);
+  const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
   if (authError) {
     return res.status(authError.status).json({ error: authError.message });
   }
@@ -48,32 +48,7 @@ export async function handler(req, res) {
     return res.status(200).json({ data, totalCount: count });
   }
 
-  if (req.method === 'PUT') {
-    const schema = z.object({
-      userId: z.string().uuid(),
-      newRole: z.enum(['admin', 'supervisor', 'mercaderista']),
-    });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'User ID and new role are required and must be valid.' });
-    }
-
-    const { userId, newRole } = parsed.data;
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-      .select('id, full_name, role')
-      .single();
-
-    if (error) {
-      throw error;
-    }
-    return res.status(200).json(data);
-  }
-
-  res.setHeader('Allow', ['GET', 'PUT']);
+  res.setHeader('Allow', ['GET']);
   res.status(405).end('Method Not Allowed');
 }
 

@@ -1,8 +1,22 @@
 describe('Supervisor Main Workflow', () => {
   const newPointName = `Test Point ${Date.now()}`;
   const newMercaderistaId = `test-mercaderista-${Date.now()}`;
-  const newPoint = { id: 'pdv-test', nombre: newPointName, direccion: '123 Test St', ciudad: 'Test City' };
-  const newRoute = { id: 'ruta-test', mercaderista_id: newMercaderistaId, puntos_de_venta_ids: [newPoint.id], fecha: new Date().toISOString().split('T')[0] };
+  const newPoint = { id: 1, nombre: newPointName, direccion: '123 Test St', ciudad: 'Test City' };
+  // Mock de la ruta con la nueva estructura que devuelve la API
+  const newRouteApiResponse = {
+    id: 1,
+    fecha: new Date().toISOString().split('T')[0],
+    mercaderista_id: newMercaderistaId,
+    mercaderista_name: 'Test Mercaderista',
+    puntos_de_venta: [newPoint]
+  };
+  // Mock de la respuesta del RPC, que es más simple
+  const newRouteRpcResponse = [{
+    id: 1,
+    fecha: newRouteApiResponse.fecha,
+    mercaderista_id: newMercaderistaId
+  }];
+
 
   beforeEach(() => {
     // Set the role for all tests in this suite
@@ -38,7 +52,12 @@ describe('Supervisor Main Workflow', () => {
     // --- Part 2: Create a Route ---
     cy.intercept('GET', '/api/puntos-de-venta*', { body: { data: [newPoint], totalCount: 1 } }).as('getPuntosForRuta');
     cy.intercept('GET', '/api/rutas*', { body: { data: [], totalCount: 0 } }).as('getRutasInitial');
-    cy.intercept('POST', '/api/rutas', { statusCode: 201, body: newRoute }).as('createRuta');
+    // La API POST ahora devuelve la respuesta del RPC
+    cy.intercept('POST', '/api/rutas', { statusCode: 201, body: newRouteRpcResponse }).as('createRuta');
+
+    // Después de crear, la página pide las rutas de nuevo. Devolvemos la ruta con la estructura completa.
+    cy.intercept('GET', '/api/rutas*', { body: { data: [newRouteApiResponse], totalCount: 1 } }).as('getRutasAfterCreate');
+
 
     cy.visit('/rutas');
     cy.wait('@getRutasInitial');

@@ -23,6 +23,7 @@ describe('rutas API', () => {
       single: jest.fn(),
       order: jest.fn().mockReturnThis(),
       range: jest.fn(),
+      rpc: jest.fn(), // Añadimos el mock para rpc
     };
     createClient.mockReturnValue(supabase);
   });
@@ -37,7 +38,17 @@ describe('rutas API', () => {
 
   it('allows supervisors to get routes', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
-    const mockRoutes = [{ id: 1, fecha: '2024-01-01', mercaderista_id: VALID_UUID, puntos_de_venta_ids: [1] }];
+    // Mock data con la nueva estructura anidada
+    const mockRoutes = [{
+      id: 1,
+      fecha: '2024-01-01',
+      mercaderista_id: VALID_UUID,
+      profiles: { full_name: 'Test User' },
+      ruta_pdv: [
+        { puntos_de_venta: { id: 101, nombre: 'PDV A' } },
+        { puntos_de_venta: { id: 102, nombre: 'PDV B' } }
+      ]
+    }];
     supabase.range.mockResolvedValue({ data: mockRoutes, error: null, count: 1 });
 
     const req = createMockReq('GET');
@@ -47,36 +58,56 @@ describe('rutas API', () => {
     expect(res.statusCode).toBe(200);
     const json = res._getJSONData();
     expect(json.data[0].id).toBe(1);
+    expect(json.data[0].mercaderista_name).toBe('Test User');
+    expect(json.data[0].puntos_de_venta).toHaveLength(2);
+    expect(json.data[0].puntos_de_venta[0].nombre).toBe('PDV A');
     expect(json.totalCount).toBe(1);
   });
 
-  it('allows supervisors to create routes', async () => {
+  it('allows supervisors to create routes via RPC', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
-    const newRoute = { fecha: '2024-01-01', mercaderistaId: VALID_UUID, puntosDeVentaIds: [1, 2] };
-    const expectedData = { id: 1, ...newRoute };
+    // El payload ahora usa pdvIds
+    const newRoute = { fecha: '2024-01-01', mercaderistaId: VALID_UUID, pdvIds: [1, 2] };
+    const expectedData = [{ id: 1, fecha: '2024-01-01', mercaderista_id: VALID_UUID }];
 
-    supabase.single.mockResolvedValue({ data: expectedData, error: null });
+    // Mockeamos la llamada a rpc
+    supabase.rpc.mockResolvedValue({ data: expectedData, error: null });
 
     const req = createMockReq('POST', newRoute);
     const res = createMockRes();
     await handler(req, res);
 
     expect(res.statusCode).toBe(201);
+    expect(supabase.rpc).toHaveBeenCalledWith('create_or_update_route', {
+      p_ruta_id: null,
+      p_fecha: newRoute.fecha,
+      p_mercaderista_id: newRoute.mercaderistaId,
+      p_pdv_ids: newRoute.pdvIds,
+    });
     expect(res._getJSONData()).toEqual(expectedData);
   });
 
-  it('allows supervisors to update routes', async () => {
+  it('allows supervisors to update routes via RPC', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
-    const updatedRoute = { id: 1, fecha: '2024-01-02', mercaderistaId: VALID_UUID, puntosDeVentaIds: [3, 4] };
+    // El payload ahora usa pdvIds
+    const updatedRoute = { id: 1, fecha: '2024-01-02', mercaderistaId: VALID_UUID, pdvIds: [3, 4] };
+    const expectedData = [{ id: 1, fecha: '2024-01-02', mercaderista_id: VALID_UUID }];
 
-    supabase.single.mockResolvedValue({ data: updatedRoute, error: null });
+    // Mockeamos la llamada a rpc
+    supabase.rpc.mockResolvedValue({ data: expectedData, error: null });
 
     const req = createMockReq('PUT', updatedRoute);
     const res = createMockRes();
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res._getJSONData()).toEqual(updatedRoute);
+    expect(supabase.rpc).toHaveBeenCalledWith('create_or_update_route', {
+      p_ruta_id: updatedRoute.id,
+      p_fecha: updatedRoute.fecha,
+      p_mercaderista_id: updatedRoute.mercaderistaId,
+      p_pdv_ids: updatedRoute.pdvIds,
+    });
+    expect(res._getJSONData()).toEqual(expectedData);
   });
 
   it('allows supervisors to delete routes', async () => {

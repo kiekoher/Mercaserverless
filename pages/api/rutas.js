@@ -28,9 +28,13 @@ export async function handler(req, res) {
     const { page, pageSize, mercaderistaId } = parsed.data;
     const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
 
+    // El `select` ahora es mucho más potente. Trae datos anidados de las tablas relacionadas.
+    // Supabase detecta las relaciones por las Foreign Keys.
+    // - `profiles!inner(full_name)`: Trae el nombre del mercaderista. `!inner` asegura que solo vengan rutas con mercaderista.
+    // - `ruta_pdv!inner(puntos_de_venta(*))`: Trae todos los datos de los puntos de venta a través de la tabla de unión.
     let query = supabase
       .from('rutas')
-      .select('id,fecha,mercaderista_id,puntos_de_venta_ids', { count: 'exact' });
+      .select('id, fecha, mercaderista_id, profiles!inner(full_name), ruta_pdv!inner(puntos_de_venta(*))', { count: 'exact' });
 
     if (mercaderistaId) {
       query = query.eq('mercaderista_id', mercaderistaId);
@@ -44,72 +48,50 @@ export async function handler(req, res) {
       throw error;
     }
 
+    // La transformación ahora es para aplanar la estructura anidada para el frontend
     const transformedData = data.map(r => ({
-      ...r,
-      mercaderistaId: r.mercaderista_id,
-      puntosDeVentaIds: r.puntos_de_venta_ids,
+      id: r.id,
+      fecha: r.fecha,
+      mercaderista_id: r.mercaderista_id,
+      mercaderista_name: r.profiles.full_name,
+      puntos_de_venta: r.ruta_pdv.map(rp => rp.puntos_de_venta),
     }));
+
     return res.status(200).json({ data: transformedData, totalCount: count });
 
-  } else if (req.method === 'POST') {
+  } else if (req.method === 'POST' || req.method === 'PUT') {
     if (!await checkRateLimit(req, { userId: user.id })) {
       return res.status(429).json({ error: 'Too many requests' });
     }
 
     const schema = z.object({
-      fecha: z.string().date('El formato de fecha debe ser YYYY-MM-DD'),
+      id: z.number().int().positive().optional(), // opcional para POST
+      fecha: z.string().refine(val => !isNaN(Date.parse(val)), { message: 'El formato de fecha debe ser válido' }),
       mercaderistaId: z.string().uuid('El ID del mercaderista debe ser un UUID válido'),
-      puntosDeVentaIds: z.array(z.number().int().positive()).min(1, 'Debe seleccionar al menos un punto de venta'),
+      pdvIds: z.array(z.number().int().positive()).min(1, 'Debe seleccionar al menos un punto de venta'),
     });
+
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
     }
-    const { fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
+    const { id, fecha, mercaderistaId, pdvIds } = parsed.data;
 
-    const { data, error } = await supabase
-      .from('rutas')
-      .insert([{ fecha, mercaderista_id: mercaderistaId, puntos_de_venta_ids: puntosDeVentaIds }])
-      .select('id,fecha,mercaderista_id,puntos_de_venta_ids')
-      .single();
-
-    if (error) {
-      throw error;
-    }
-    return res.status(201).json(data);
-
-  } else if (req.method === 'PUT') {
-    if (!await checkRateLimit(req, { userId: user.id })) {
-      return res.status(429).json({ error: 'Too many requests' });
+    if(req.method === 'PUT' && !id) {
+      return res.status(400).json({ message: 'El ID de la ruta es requerido para actualizar' });
     }
 
-    const schema = z.object({
-      id: z.number().int().positive(),
-      fecha: z.string().date('El formato de fecha debe ser YYYY-MM-DD'),
-      mercaderistaId: z.string().uuid('El ID del mercaderista debe ser un UUID válido'),
-      puntosDeVentaIds: z.array(z.number().int().positive()).min(1, 'Debe seleccionar al menos un punto de venta'),
+    const { data, error } = await supabase.rpc('create_or_update_route', {
+      p_ruta_id: id || null,
+      p_fecha: fecha,
+      p_mercaderista_id: mercaderistaId,
+      p_pdv_ids: pdvIds
     });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ message: 'Validación fallida', details: parsed.error.format() });
-    }
-    const { id, fecha, mercaderistaId, puntosDeVentaIds } = parsed.data;
-
-    const { data, error } = await supabase
-      .from('rutas')
-      .update({
-        fecha,
-        mercaderista_id: mercaderistaId,
-        puntos_de_venta_ids: puntosDeVentaIds,
-      })
-      .eq('id', id)
-      .select('id,fecha,mercaderista_id,puntos_de_venta_ids')
-      .single();
 
     if (error) {
       throw error;
     }
-    return res.status(200).json(data);
+    return res.status(req.method === 'POST' ? 201 : 200).json(data);
 
   } else if (req.method === 'DELETE') {
     if (!await checkRateLimit(req, { userId: user.id })) {
