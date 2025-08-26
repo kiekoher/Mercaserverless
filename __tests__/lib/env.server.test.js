@@ -2,38 +2,34 @@ describe('Environment Variable Validation (env.server.js)', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
-    jest.resetModules();
-    // Reset process.env to a snapshot of the original environment
-    // This prevents pollution between tests
-    process.env = { ...originalEnv };
+    jest.resetModules(); // This is key to re-running the module initialization
+    process.env = { ...originalEnv }; // Reset to a clean state
   });
 
   afterAll(() => {
-    // Restore original process.env after all tests
-    process.env = originalEnv;
+    process.env = originalEnv; // Restore original env after all tests
   });
 
+  // A minimal but valid environment for development/testing
   const getValidDevEnv = () => ({
     NODE_ENV: 'development',
     NEXT_PUBLIC_SUPABASE_URL: 'http://test.co',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-key',
-    SUPABASE_SERVICE_KEY: 'test-service-key',
-    GEMINI_API_KEY: 'test-gemini-key',
-    GOOGLE_MAPS_API_KEY: 'test-maps-key',
-    UPSTASH_REDIS_URL: 'redis://test.redis.io:6379',
+    // Note: Most keys are optional in dev
   });
 
+  // A complete and valid environment for production
   const getValidProdEnv = () => ({
     NODE_ENV: 'production',
     NEXT_PUBLIC_SUPABASE_URL: 'http://test.co',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-key',
-    SUPABASE_SERVICE_KEY: 'test-service-key',
-    GEMINI_API_KEY: 'test-gemini-key',
-    GOOGLE_MAPS_API_KEY: 'test-maps-key',
-    UPSTASH_REDIS_URL: 'redis://test.redis.io:6379',
-    LOGTAIL_SOURCE_TOKEN: 'test-logtail-token',
-    HEALTHCHECK_TOKEN: 'test-healthcheck-token',
-    RESEND_API_KEY: 'test-resend-key',
+    SUPABASE_SERVICE_KEY: 'prod-service-key',
+    GEMINI_API_KEY: 'prod-gemini-key',
+    GOOGLE_MAPS_API_KEY: 'prod-maps-key',
+    UPSTASH_REDIS_URL: 'redis://prod.redis.io:6379',
+    LOGTAIL_SOURCE_TOKEN: 'prod-logtail-token',
+    HEALTHCHECK_TOKEN: 'prod-healthcheck-token',
+    RESEND_API_KEY: 'prod-resend-key',
     RATE_LIMIT_FAIL_OPEN: 'false',
   });
 
@@ -47,17 +43,36 @@ describe('Environment Variable Validation (env.server.js)', () => {
     expect(() => require('../../lib/env.server')).not.toThrow();
   });
 
-  it('should load even if optional production variables like LOGTAIL_SOURCE_TOKEN are missing', () => {
-    const invalidProdEnv = getValidProdEnv();
-    delete invalidProdEnv.LOGTAIL_SOURCE_TOKEN;
-    process.env = { ...invalidProdEnv };
-    expect(() => require('../../lib/env.server')).not.toThrow();
+  // Test that required production variables cause an error if missing
+  const requiredProdKeys = [
+    'SUPABASE_SERVICE_KEY',
+    'RESEND_API_KEY',
+    'LOGTAIL_SOURCE_TOKEN',
+    'HEALTHCHECK_TOKEN',
+    'GEMINI_API_KEY',
+    'GOOGLE_MAPS_API_KEY',
+  ];
+
+  requiredProdKeys.forEach((key) => {
+    it(`should throw an error if required prod key ${key} is missing in production`, () => {
+      const invalidProdEnv = getValidProdEnv();
+      delete invalidProdEnv[key];
+      process.env = { ...invalidProdEnv };
+      expect(() => require('../../lib/env.server')).toThrow('Invalid environment variables');
+    });
   });
 
-  it('should throw an error if RATE_LIMIT_FAIL_OPEN is true in production', () => {
+  it('should throw an error if Redis config is missing in production', () => {
+    const invalidProdEnv = getValidProdEnv();
+    delete invalidProdEnv.UPSTASH_REDIS_URL;
+    process.env = { ...invalidProdEnv };
+    expect(() => require('../../lib/env.server')).toThrow('Invalid environment variables');
+  });
+
+  it('should throw an error if RATE_LIMIT_FAIL_OPEN is not "false" in production', () => {
     const invalidEnv = { ...getValidProdEnv(), RATE_LIMIT_FAIL_OPEN: 'true' };
     process.env = { ...invalidEnv };
-    expect(() => require('../../lib/env.server')).toThrow('Invalid environment variables. See logs for details.');
+    expect(() => require('../../lib/env.server')).toThrow('Invalid environment variables');
   });
 
   it('should not throw if an optional variable like RESEND_API_KEY is missing in dev', () => {
