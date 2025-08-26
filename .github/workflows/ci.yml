@@ -33,11 +33,15 @@ jobs:
       - name: Ping Cron Monitor on Success
         if: success() && github.event_name == 'schedule'
         run: |
-          # In a real-world scenario, you would replace this with your actual cron monitoring
-          # service URL (e.g., from Better Uptime, Healthchecks.io, etc.).
-          # This ensures you get an alert if your scheduled dependency audit fails to run.
-          # curl -fsS -m 10 --retry 5 https://cron-monitoring.example.com/ping/your-check-id
-          echo "Simulating ping to cron monitoring service."
+          # This step acts as a "dead man's switch" for the scheduled job.
+          # You should create a monitor in a service like Healthchecks.io, Better Uptime, or Cronitor.
+          # These services provide a unique URL to ping. If the service doesn't receive a ping
+          # within the expected schedule (e.g., once a week), it will trigger an alert.
+          # This is critical for detecting silent failures of scheduled tasks.
+          #
+          # Replace the URL below with the one from your monitoring service.
+          # curl -fsS -m 10 --retry 5 "https://hc-ping.com/your-uuid-here" || true
+          echo "Simulating ping to cron monitoring service. In a real setup, the curl command above would be used."
   lint:
     name: "Lint Code"
     runs-on: ubuntu-latest
@@ -76,13 +80,16 @@ jobs:
         run: npm test
         env:
           NODE_ENV: test
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "example-anon-key"
+          SUPABASE_SERVICE_KEY: "example-service-key"
+          GEMINI_API_KEY: "example-gemini-key"
+          GOOGLE_MAPS_API_KEY: "example-maps-key"
+          UPSTASH_REDIS_REST_URL: "https://example-redis.upstash.io"
+          UPSTASH_REDIS_REST_TOKEN: "example-rest-token"
+          HEALTHCHECK_TOKEN: "test-token"
+          LOGTAIL_SOURCE_TOKEN: ""
+          RATE_LIMIT_FAIL_OPEN: "true"
 
   cypress-tests:
     name: "Run Cypress E2E Tests"
@@ -105,11 +112,15 @@ jobs:
           start: npm start
         env:
           NODE_ENV: test
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "example-anon-key"
+          SUPABASE_SERVICE_KEY: "example-service-key"
+          GEMINI_API_KEY: "example-gemini-key"
+          GOOGLE_MAPS_API_KEY: "example-maps-key"
+          UPSTASH_REDIS_REST_URL: "https://example-redis.upstash.io"
+          UPSTASH_REDIS_REST_TOKEN: "example-rest-token"
+          HEALTHCHECK_TOKEN: "test-token"
+          LOGTAIL_SOURCE_TOKEN: ""
+          RATE_LIMIT_FAIL_OPEN: "true"
+          NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS: "true"
 

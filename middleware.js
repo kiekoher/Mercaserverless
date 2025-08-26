@@ -81,9 +81,13 @@ export async function middleware(req) {
     return NextResponse.redirect(url);
   }
 
-  // 7. Apply robust Content Security Policy (CSP)
+  // 7. Apply robust Security Headers
   const nonce = crypto.randomUUID();
-  // Adjusted CSP: Allows Google Maps, unsafe-inline for MUI compatibility, and strict-dynamic for script loading.
+  res.headers.set('x-nonce', nonce);
+
+  // Content Security Policy (CSP)
+  // For more info: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+  // 'unsafe-inline' for style-src is required by Material-UI (Emotion). This is a known trade-off.
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
@@ -98,9 +102,14 @@ export async function middleware(req) {
     upgrade-insecure-requests;
     report-uri /api/csp-report;
   `.replace(/\s{2,}/g, ' ').trim();
-
-  res.headers.set('x-nonce', nonce);
   res.headers.set('Content-Security-Policy', cspHeader);
+
+  // Other Security Headers
+  // For more info: https://web.dev/articles/security-headers
+  res.headers.set('Referrer-Policy', 'origin-when-cross-origin');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('Permissions-Policy', "camera=(), microphone=(), geolocation=()");
 
   // 8. Return the final response object, which now contains updated cookies and security headers
   return res;
