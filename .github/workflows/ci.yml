@@ -31,17 +31,18 @@ jobs:
         with:
           config: auto
       - name: Ping Cron Monitor on Success
-        if: success() && github.event_name == 'schedule'
+        # This step acts as a "dead man's switch" for the scheduled job.
+        # It pings an external monitoring service to confirm the job ran successfully.
+        # If the service doesn't receive a ping, it will trigger an alert.
+        #
+        # TO ENABLE:
+        # 1. Create a "check" in a service like https://healthchecks.io or https://cronitor.io
+        # 2. Get the unique ping URL provided by the service.
+        # 3. Create a new repository secret named CRON_MONITOR_URL with the ping URL as its value.
+        if: success() && github.event_name == 'schedule' && secrets.CRON_MONITOR_URL
         run: |
-          # This step acts as a "dead man's switch" for the scheduled job.
-          # You should create a monitor in a service like Healthchecks.io, Better Uptime, or Cronitor.
-          # These services provide a unique URL to ping. If the service doesn't receive a ping
-          # within the expected schedule (e.g., once a week), it will trigger an alert.
-          # This is critical for detecting silent failures of scheduled tasks.
-          #
-          # Replace the URL below with the one from your monitoring service.
-          # curl -fsS -m 10 --retry 5 "https://hc-ping.com/your-uuid-here" || true
-          echo "Simulating ping to cron monitoring service. In a real setup, the curl command above would be used."
+          echo "Pinging cron monitoring service..."
+          curl -fsS -m 10 --retry 5 ${{ secrets.CRON_MONITOR_URL }} || echo "Cron monitor ping failed. This is non-critical."
   lint:
     name: "Lint Code"
     runs-on: ubuntu-latest
@@ -141,3 +142,19 @@ jobs:
           RATE_LIMIT_FAIL_OPEN: "true"
           NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS: "true"
 
+  deploy:
+    name: "Deploy to Production"
+    runs-on: ubuntu-latest
+    needs: [lint, jest-tests, cypress-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel Production
+        uses: vercel/vercel-action@v3
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod"

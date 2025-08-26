@@ -1,9 +1,9 @@
-const { z } = require('zod');
-const { withLogging } = require('../../lib/api-logger');
-const { requireUser } = require('../../lib/auth');
-const logger = require('../../lib/logger.server');
-const { checkRateLimit } = require('../../lib/rateLimiter');
-const { sanitizeInput } = require('../../lib/sanitize');
+import { z } from 'zod';
+import { withLogging } from '../../lib/api-logger';
+import { requireUser } from '../../lib/auth';
+import logger from '../../lib/logger.server';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { sanitizeInput } from '../../lib/sanitize';
 
 async function handler(req, res) {
   const { error: authError, supabase, user, role } = await requireUser(req, res);
@@ -31,11 +31,16 @@ async function handler(req, res) {
     const { ruta_id, page = 1, pageSize = 50 } = parsed.data;
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
-    const { data, error, count } = await supabase
+
+    // CORRECT SYNTAX: .select() -> .eq() -> .range()
+    let query = supabase
       .from('visitas')
-      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto', { count: 'exact' })
-      .eq('ruta_id', ruta_id)
-      .range(from, to);
+      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto', { count: 'exact' });
+
+    query = query.eq('ruta_id', ruta_id);
+
+    const { data, error, count } = await query.range(from, to);
+
     if (error) throw error;
     return res.status(200).json({ data, totalCount: count });
   }
@@ -59,9 +64,6 @@ async function handler(req, res) {
     }
     const { ruta_id, punto_de_venta_id, url_foto } = parsed.data;
 
-    // Nueva lógica de validación:
-    // 1. Comprueba si el PDV está en la tabla de unión para esa ruta.
-    // 2. Trae el mercaderista_id de la ruta padre para la validación de propiedad.
     const { data: validationData, error: validationError } = await supabase
       .from('ruta_pdv')
       .select('id, rutas(mercaderista_id)')
@@ -136,4 +138,4 @@ async function handler(req, res) {
 
 const mainHandler = withLogging(handler);
 mainHandler.rawHandler = handler;
-module.exports = mainHandler;
+export default mainHandler;
