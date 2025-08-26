@@ -427,10 +427,10 @@ export default function RutasPage() {
                 <Typography variant="h6" gutterBottom>Crear Nueva Ruta (Manual)</Typography>
                 {/* Formulario de creación de ruta simplificado para el ejemplo */}
                 <form onSubmit={handleSubmit}>
-                    <TextField label="Fecha" type="date" value={fecha} onChange={e => setFecha(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
-                    <TextField label="ID Mercaderista" value={mercaderistaId} onChange={e => setMercaderistaId(e.target.value)} fullWidth sx={{ mb: 2 }} />
+                    <TextField name="fecha" label="Fecha" type="date" value={fecha} onChange={e => setFecha(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} sx={{ mb: 2 }} />
+                    <TextField name="mercaderistaId" label="ID Mercaderista" value={mercaderistaId} onChange={e => setMercaderistaId(e.target.value)} fullWidth sx={{ mb: 2 }} />
                       <Typography>Puntos de Venta</Typography>
-                      <TextField label="Buscar punto" value={puntoSearch} onChange={e => setPuntoSearch(e.target.value)} fullWidth sx={{ mb: 1 }} />
+                      <TextField name="puntoSearch" label="Buscar punto" value={puntoSearch} onChange={e => setPuntoSearch(e.target.value)} fullWidth sx={{ mb: 1 }} />
                       <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto', p: 1, mb: 2 }}>
                           <FormGroup>
                               {puntos.map(p => (

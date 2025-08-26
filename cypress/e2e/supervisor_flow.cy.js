@@ -9,9 +9,19 @@ describe('Supervisor Main Workflow', () => {
     cy.login('supervisor');
   });
 
-  it.skip('should allow a supervisor to create a point of sale and then a route', () => {
+  it('should allow a supervisor to create a point of sale and then a route', () => {
+    // This test simulates the entire workflow for a supervisor.
+    // It uses cy.intercept() to mock API responses, ensuring the test is fast and reliable
+    // without depending on a live backend state.
+
     // --- Part 1: Create a Point of Sale ---
-    cy.intercept('GET', '/api/puntos-de-venta*', { body: { data: [], totalCount: 0 } }).as('getPuntosInitial');
+    // Mock the initial GET request to show an empty list of points.
+    cy.intercept('GET', '/api/puntos-de-venta*', {
+      statusCode: 200,
+      body: { data: [], totalCount: 0 },
+    }).as('getPuntosInitial');
+
+    // Mock the POST request to simulate a successful creation.
     cy.intercept('POST', '/api/puntos-de-venta', { statusCode: 201, body: newPoint }).as('createPunto');
 
     cy.visit('/puntos-de-venta');
@@ -32,8 +42,9 @@ describe('Supervisor Main Workflow', () => {
 
     cy.visit('/rutas');
     cy.wait('@getRutasInitial');
-    cy.contains('h4', 'Gestión de Rutas').should('be.visible');
+    cy.contains('h4', 'Gestión y Seguimiento de Rutas').should('be.visible');
 
+    // Fill the form to create a new route
     cy.get('input[name="mercaderistaId"]').type(newMercaderistaId);
     cy.contains('label', newPoint.nombre).parent().find('input[type="checkbox"]').check();
     cy.contains('button', 'Crear Ruta').click();
