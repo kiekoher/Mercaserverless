@@ -4,7 +4,6 @@
 
 Esta aplicación web está diseñada para digitalizar y optimizar el proceso de planificación de rutas para equipos de mercaderistas. La solución permite a los supervisores crear, asignar y gestionar rutas, mientras que los mercaderistas pueden visualizar sus rutas diarias y registrar sus visitas en tiempo real.
 
-Este proyecto fue desarrollado como parte de una iniciativa para Kimberly-Clark y Manpower.
 
 ## Funcionalidades Principales
 
