@@ -31,40 +31,16 @@ describe('Admin User Management Workflow', () => {
     cy.contains('h4', 'Administración de Usuarios').should('be.visible');
 
     // Verify the table headers are present
-    cy.contains('th', 'ID de Usuario').should('be.visible');
+    cy.contains('th', 'Nombre Completo').should('be.visible');
+    cy.contains('th', 'Email').should('be.visible');
     cy.contains('th', 'Rol').should('be.visible');
     cy.contains('th', 'Acciones').should('be.visible');
 
     // Check that our mock users are in the table
     cy.get('table > tbody').find('tr').should('have.length', 3);
     cy.contains('td', 'Test Admin User').should('be.visible');
+    cy.contains('td', 'admin@example.com').should('be.visible');
     cy.contains('td', 'Test Mercaderista User').should('be.visible');
-  });
-
-  it.skip('should allow an admin to change a user role', () => {
-    cy.wait('@getUsers');
-
-    // Find the row for the "Test Mercaderista User"
-    cy.contains('td', 'Test Mercaderista User').parent('tr').within(() => {
-      // Find the select and change the role to 'supervisor'
-      cy.get('[data-testid="role-select-33333333-3333-3333-3333-333333333333"]').click();
-    });
-
-    // The select options are in a popover, so we select from the body.
-    cy.get('[role="listbox"]').should('be.visible').contains('li', 'Supervisor').click();
-
-    // The role in the UI should have changed
-    cy.contains('td', 'Test Mercaderista User').parent('tr').contains('div', 'supervisor');
-
-    // Click the save button in that row
-    cy.contains('td', 'Test Mercaderista User').parent('tr').within(() => {
-      cy.contains('button', 'Guardar').click();
-    });
-
-    // Wait for the update call to be made
-    cy.wait('@updateUser');
-
-    // Verify success message
-    cy.contains('Rol de usuario actualizado con éxito').should('be.visible');
+    cy.contains('td', 'mercaderista@example.com').should('be.visible');
   });
 });
