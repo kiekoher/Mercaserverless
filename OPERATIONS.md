@@ -2,6 +2,11 @@
 
 Este documento resume los procedimientos clave para mantener el sistema Mercaderista en un entorno de producción alojado en Vercel.
 
+## Requisitos de Configuración
+
+- Todas las variables de entorno listadas en `.env.example` deben definirse en el panel de Vercel antes de cada despliegue; la aplicación depende de ellas para iniciar correctamente.
+- El middleware habilita de forma predeterminada la protección CSRF y el *rate limiting*, por lo que es necesario mantener las claves de CSRF y el servicio de Redis configurados y monitoreados.
+
 ## Monitoreo y Alertas
 
 ### Fuentes de Observabilidad

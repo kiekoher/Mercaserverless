@@ -1,4 +1,3 @@
-const { Client } = require('@googlemaps/google-maps-services-js');
 const formidable = require('formidable');
 const fs = require('fs');
 const Papa = require('papaparse');
@@ -6,11 +5,11 @@ const { z } = require('zod');
 import pLimit from 'p-limit';
 const logger = require('../../lib/logger.server');
 const { requireUser } = require('../../lib/auth');
-const { getCacheClient } = require('../../lib/redisCache');
 const geocodeConfig = require('../../lib/geocodeConfig');
 const { withLogging } = require('../../lib/api-logger');
 const { checkRateLimit } = require('../../lib/rateLimiter');
 const { sanitizeInput } = require('../../lib/sanitize');
+const { geocodeAddress } = require('../../lib/geocode');
 
 const PdvSchema = z.object({
   nombre: z.string({ required_error: "La columna 'nombre' es requerida." }).min(1),
@@ -28,9 +27,7 @@ export const config = {
   },
 };
 
-const googleMapsClient = new Client({});
-const { GEOCODE_CONCURRENCY, GEOCODE_RETRIES, GEOCODE_TIMEOUT_MS, GEOCODE_RETRY_BASE_MS } = geocodeConfig;
-const cache = getCacheClient();
+const { GEOCODE_CONCURRENCY, GEOCODE_RETRIES, GEOCODE_RETRY_BASE_MS } = geocodeConfig;
 
 async function parseForm(req) {
   return new Promise((resolve, reject) => {
@@ -143,39 +140,15 @@ async function handler(req, res) {
 }
 
 async function geocodePdv(pdv) {
-  const cacheKey = `geo:${pdv.direccion}:${pdv.ciudad}`;
-  if (cache) {
-    try {
-      const cached = await cache.get(cacheKey);
-      if (cached) {
-        const [lat, lng] = JSON.parse(cached);
-        return formatPdv(pdv, lat, lng);
-      }
-    } catch (e) {
-      logger.warn({ err: e, key: cacheKey }, 'Failed to retrieve from geocode cache');
-    }
-  }
-
   for (let i = 0; i < GEOCODE_RETRIES; i++) {
     try {
-      const response = await googleMapsClient.geocode({
-        params: { address: `${pdv.direccion}, ${pdv.ciudad}, Colombia`, key: process.env.GOOGLE_MAPS_API_KEY },
-        timeout: GEOCODE_TIMEOUT_MS,
-      });
-      if (response.data.results.length > 0) {
-        const { lat, lng } = response.data.results[0].geometry.location;
-        if (cache) {
-          try {
-            await cache.set(cacheKey, JSON.stringify([lat, lng]), { ex: 60 * 60 * 24 * 30 });
-          } catch (e) {
-            logger.warn({ err: e, key: cacheKey }, 'Failed to save to geocode cache');
-          }
-        }
-        return formatPdv(pdv, lat, lng);
+      const location = await geocodeAddress(`${pdv.direccion}, ${pdv.ciudad}, Colombia`);
+      if (location) {
+        return formatPdv(pdv, location.lat, location.lng);
       }
       break;
     } catch (error) {
-      if (error.response?.data?.status === 'OVER_QUERY_LIMIT') throw new Error('Geocoding quota exceeded');
+      if (error.message === 'Geocoding quota exceeded') throw error;
       if (i === GEOCODE_RETRIES - 1) {
         logger.error({ err: error, address: pdv.direccion }, 'Geocoding failed after all retries.');
         return null;

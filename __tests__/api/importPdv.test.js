@@ -14,10 +14,7 @@ jest.mock('formidable', () => {
 jest.mock('../../lib/auth');
 jest.mock('../../lib/logger.server');
 jest.mock('papaparse');
-jest.mock('@googlemaps/google-maps-services-js');
-jest.mock('../../lib/redisCache', () => ({
-  getCacheClient: jest.fn().mockReturnValue(null),
-}));
+jest.mock('../../lib/geocode');
 jest.mock('../../lib/rateLimiter', () => ({ checkRateLimit: jest.fn().mockResolvedValue(true) }));
 
 const mockRpc = jest.fn();
@@ -31,24 +28,13 @@ jest.mock('@supabase/supabase-js', () => ({
 const { requireUser } = require('../../lib/auth');
 const formidable = require('formidable');
 const Papa = require('papaparse');
-const { Client } = require('@googlemaps/google-maps-services-js');
+const { geocodeAddress } = require('../../lib/geocode');
 
 describe('/api/import-pdv', () => {
   beforeEach(() => {
-    // Clear mocks before each test to ensure isolation
     jest.clearAllMocks();
     mockParse.mockClear();
-    Client.mockImplementation(() => ({
-      geocode: jest
-        .fn()
-        .mockResolvedValue({
-          data: {
-            results: [
-              { geometry: { location: { lat: 1.23, lng: 4.56 } } },
-            ],
-          },
-        }),
-    }));
+    geocodeAddress.mockResolvedValue({ lat: 1.23, lng: 4.56 });
   });
 
   it('should return 403 for non-admin/supervisor roles', async () => {
