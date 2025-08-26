@@ -87,7 +87,14 @@ describe('/api/import-pdv', () => {
     });
 
     const handler = require('../../pages/api/import-pdv');
-    const { req, res } = createMocks({ method: 'POST' });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: {
+        'x-csrf-token': token,
+        'cookie': `csrf-secret=${token}`,
+      },
+    });
     await handler(req, res);
 
     expect(res._getStatusCode()).toBe(400);
@@ -134,7 +141,14 @@ describe('/api/import-pdv', () => {
     jest.spyOn(fs, 'createReadStream').mockImplementation(() => {});
 
     const handler = require('../../pages/api/import-pdv');
-    const { req, res } = createMocks({ method: 'POST' });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: {
+        'x-csrf-token': token,
+        'cookie': `csrf-secret=${token}`,
+      },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData().message).toContain('Import completed successfully');

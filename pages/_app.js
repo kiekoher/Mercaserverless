@@ -22,6 +22,7 @@ function CsrfInitializer({ children }) {
 
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS === 'true') {
+      console.log('CYPRESS_TEST_MODE: Setting static CSRF token.');
       setCsrfToken('cypress-token');
       return;
     }

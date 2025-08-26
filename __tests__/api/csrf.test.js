@@ -28,7 +28,14 @@ describe('/api/csrf', () => {
   });
 
   it('returns 405 for non-GET methods', async () => {
-    const { req, res } = createMocks({ method: 'POST' });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: {
+        'x-csrf-token': token,
+        'cookie': `csrf-secret=${token}`,
+      },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(405);
     expect(res.getHeader('Allow')).toBe('GET');

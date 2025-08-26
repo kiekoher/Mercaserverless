@@ -30,14 +30,24 @@ describe('/api/generate-insights', () => {
 
   it('returns 401 when unauthenticated', async () => {
     requireUser.mockResolvedValue({ error: { status: 401, message: 'Unauthorized' } });
-    const { req, res } = createMocks({ method: 'POST', body: { rutaId: 1 } });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
+      body: { rutaId: 1 },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(401);
   });
 
   it('returns 400 for invalid rutaId', async () => {
     requireUser.mockResolvedValue({ user: { id: '1' }, supabase: {}, error: null });
-    const { req, res } = createMocks({ method: 'POST', body: { rutaId: -1 } });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
+      body: { rutaId: -1 },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(400);
   });
@@ -50,7 +60,12 @@ describe('/api/generate-insights', () => {
     const supabase = { from: () => ({ select: () => ({ eq }) }) };
     requireUser.mockResolvedValue({ user: { id: '1' }, supabase, error: null });
 
-    const { req, res } = createMocks({ method: 'POST', body: { rutaId: 1 } });
+    const token = 'test-token';
+    const { req, res } = createMocks({
+      method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
+      body: { rutaId: 1 },
+    });
     await handler(req, res);
     expect(res._getStatusCode()).toBe(200);
     expect(res._getJSONData()).toHaveProperty('kpi');

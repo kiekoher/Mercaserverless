@@ -45,8 +45,10 @@ describe('/api/planificar-rutas', () => {
   });
 
   it('should return 400 for invalid body parameters', async () => {
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: { mercaderistaId: '123' },
     });
     await handler(req, res);
@@ -58,8 +60,10 @@ describe('/api/planificar-rutas', () => {
     mockGt.mockImplementationOnce(() => ({
         gt: jest.fn().mockResolvedValue({ data: [], error: null })
     }));
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: {
         mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         startDate: '2024-01-01',
@@ -78,8 +82,10 @@ describe('/api/planificar-rutas', () => {
     mockGt.mockImplementationOnce(() => ({
         gt: jest.fn().mockResolvedValue({ data: mockPuntos, error: null })
     }));
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: {
         mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         startDate: '2024-01-01',
@@ -102,8 +108,10 @@ describe('/api/planificar-rutas', () => {
       gt: jest.fn().mockResolvedValue({ data: mockPuntos, error: null })
     }));
     mockRpc.mockResolvedValueOnce({ error: { message: 'rpc failed' } });
+    const token = 'test-token';
     const { req, res } = createMocks({
       method: 'POST',
+      headers: { 'x-csrf-token': token, cookie: `csrf-secret=${token}` },
       body: {
         mercaderistaId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         startDate: '2024-01-01',
