@@ -32,7 +32,33 @@ Supabase ofrece backups automáticos en sus planes de pago. Si aún no está act
 2.  **Ir a Infraestructura > Backups:** (`Infrastructure` > `Backups`).
 3.  **Habilitar Backups Diarios:** Asegúrese de que los backups automáticos estén habilitados. Supabase generalmente retiene estos backups por 7 días en planes estándar. Verifique la política de retención de su plan.
 
-### 1.2. Procedimiento de Simulacro de Restauración (Acción Trimestral)
+### 1.2. Estrategia de Backup Avanzada: Point-in-Time Recovery (PITR)
+
+Para aplicaciones de alta criticidad, los backups diarios pueden no ser suficientes. Un fallo entre backups podría significar hasta 24 horas de pérdida de datos. Para mitigar este riesgo, Supabase ofrece **Point-in-Time Recovery (PITR)**.
+
+**¿Qué es PITR?**
+PITR es un sistema de backup continuo. En lugar de tomar una foto diaria, registra los cambios en la base de datos a medida que ocurren. Esto le permite restaurar la base de datos a **cualquier segundo específico** dentro de un período de retención (ej. los últimos 7 o 14 días).
+
+**Ventajas Clave:**
+- **Minimiza la Pérdida de Datos (RPO bajo):** Reduce el objetivo de punto de recuperación de 24 horas a solo unos segundos.
+- **Mayor Eficiencia:** Para bases de datos grandes (>4 GB), PITR es más eficiente en recursos que los backups diarios completos.
+
+**Consideraciones:**
+- **Es un Add-on de Pago:** PITR tiene un costo adicional en su plan de Supabase. Debe evaluar si el costo justifica el nivel de protección para su caso de uso.
+
+#### Cómo Habilitar y Usar PITR
+
+1.  **Habilitar el Add-on:**
+    - En su Dashboard de Supabase, navegue a **Infraestructura > Backups** (`Infrastructure` > `Backups`).
+    - Busque la opción de **Point-in-Time Recovery** y actívela. Deberá seleccionar un período de retención.
+
+2.  **Restaurar desde PITR:**
+    - El proceso es casi idéntico al de la restauración de un backup diario.
+    - Vaya a **Infraestructura > Backups** y seleccione la opción de restaurar.
+    - Se le presentará una opción para elegir una fecha **y una hora exacta** a la que desea revertir.
+    - **IMPORTANTE:** Al igual que con los backups diarios, la restauración se realizará en un **nuevo proyecto de Supabase** para evitar la pérdida de datos en el proyecto de producción. Puede seguir el mismo procedimiento de simulacro descrito en la siguiente sección.
+
+### 1.3. Procedimiento de Simulacro de Restauración (Acción Trimestral)
 
 Un backup no es útil si no se puede restaurar. Este simulacro debe realizarse **cada 3 meses** para garantizar que el proceso funciona y que el equipo está familiarizado con él.
 

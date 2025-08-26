@@ -1,0 +1,31 @@
+# Vercel-specific ignores
+.vercel
+
+# Ignore local environment files
+.env
+.env*.local
+.env.test
+
+# Ignore test and config files not needed in production
+__tests__/
+cypress/
+cypress.config.js
+jest.config.js
+jest.env.js
+jest.setup.js
+jest.setup-env.js
+
+# Ignore documentation
+README.md
+CONTRIBUTING.md
+AUDIT_REPORT.md
+CHECKLIST.md
+OPERATIONS.md
+VERCEL_DEPLOYMENT.md
+
+# Ignore logs
+*.log
+dev_server.log
+
+# Ignore node_modules, which Vercel handles itself
+node_modules/

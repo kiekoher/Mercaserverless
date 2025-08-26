@@ -2,7 +2,9 @@ const { defineConfig } = require('cypress');
 
 module.exports = defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:3000',
+    // Make the baseUrl configurable via environment variable for Vercel previews,
+    // but default to localhost for local development.
+    baseUrl: process.env.CYPRESS_BASE_URL || 'http://localhost:3000',
     env: {
       adminId: process.env.CYPRESS_ADMIN_ID,
       supervisorId: process.env.CYPRESS_SUPERVISOR_ID,

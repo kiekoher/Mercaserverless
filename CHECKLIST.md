@@ -1,50 +1,46 @@
-# Checklist para Lanzamiento en Producción (Beta Cerrada)
+# Checklist Final de Puesta en Producción
 
-## Estado de Preparación Técnica (Auditado por SRE)
+Este documento es una guía de verificación secuencial para el lanzamiento de la aplicación a producción. No proceda a un paso sin haber completado el anterior.
 
-- [x] **Auditoría de Código y Seguridad Completada:** Se ha realizado una auditoría exhaustiva del código, la configuración y la seguridad.
-- [x] **Pruebas Unitarias Validadas:** La suite de pruebas unitarias pasa al 100%.
-- [x] **Pruebas E2E Reparadas y Validadas:** El bloqueador principal de las pruebas E2E ha sido resuelto. Todos los flujos de usuario principales (Admin, Supervisor, Mercaderista) están cubiertos y pasan.
-- [x] **Documentación Operativa Creada:** Se ha creado el archivo `OPERATIONS.md` con guías críticas para la recuperación ante desastres y la configuración de alertas.
+## Fase 1: Preparación Final (Pre-Lanzamiento)
+
+- [ ] **Aprobar y Fusionar Cambios:** Confirmar que el Pull Request final que contiene todas las mejoras de esta auditoría ha sido revisado, aprobado y fusionado a la rama `main`.
+- [ ] **Verificar Pipeline de CI:** Confirmar que el pipeline de CI/CD en la rama `main` se ha ejecutado y ha pasado todas las pruebas (linting, tests unitarios, auditoría de seguridad) tras la fusión.
+- [ ] **Conectar Repositorio a Vercel:** Si aún no se ha hecho, seguir las instrucciones en `VERCEL_DEPLOYMENT.md` (Paso 0) para conectar este repositorio a un proyecto de Vercel.
+- [ ] **Configurar Variables de Entorno de Producción:**
+    - [ ] Navegar al dashboard del proyecto en Vercel.
+    - [ ] Ir a `Settings > Environment Variables`.
+    - [ ] Añadir **TODAS** las variables listadas en `VERCEL_DEPLOYMENT.md` para el entorno de `Production`. Prestar especial atención a los secretos (`SUPABASE_SERVICE_KEY`, `RESEND_API_KEY`, etc.).
+- [ ] **Habilitar Backups Avanzados (PITR):**
+    - [ ] Navegar al dashboard del proyecto de Supabase de **producción**.
+    - [ ] Ir a `Infrastructure > Backups`.
+    - [ ] Activar el add-on de **Point-in-Time Recovery (PITR)**. Se recomienda un periodo de retención de al menos 7 días. (Nota: Esto es un servicio de pago).
+- [ ] **Añadir Invitados Beta Iniciales:**
+    - [ ] Navegar a la página de "Gestión Beta" en la aplicación (desplegada en preview o en producción si ya está activa).
+    - [ ] Añadir los correos electrónicos del equipo interno y de los beta testers iniciales para que puedan registrarse.
+- [ ] **Configurar Dominio Personalizado:**
+    - [ ] En el dashboard de Vercel, ir a `Settings > Domains`.
+    - [ ] Añadir el dominio de producción deseado (ej. `app.suempresa.com`) y seguir las instrucciones para configurar los registros DNS.
+
+## Fase 2: Lanzamiento (Go-Live)
+
+- [ ] **Promover a Producción:**
+    - [ ] En el dashboard de Vercel, ir a la pestaña `Deployments`.
+    - [ ] Localizar el último despliegue exitoso de la rama `main`.
+    - [ ] Asegurarse de que esté promocionado a `Production`.
+- [ ] **Realizar Prueba de Humo (Smoke Test) en Producción:**
+    - [ ] Acceder a la URL de producción.
+    - [ ] **Verificar acceso denegado:** Intentar registrarse con un email que **NO** esté en la lista beta. El registro debe fallar con un error.
+    - [ ] **Verificar acceso permitido:** Registrarse con un email que **SÍ** esté en la lista beta. El registro debe ser exitoso.
+    - [ ] Iniciar sesión con el nuevo usuario.
+    - [ ] Navegar por las funcionalidades básicas (Dashboard, Rutas, etc.) para confirmar que la aplicación es funcional.
+
+## Fase 3: Post-Lanzamiento
+
+- [ ] **Monitoreo Activo:**
+    - [ ] Observar activamente la plataforma de logging (Logtail/Better Stack) durante las primeras 1-2 horas en busca de un volumen inesperado de errores.
+    - [ ] Verificar que el monitor de uptime externo (UptimeRobot, etc.) esté reportando un estado `200 OK` desde el endpoint de producción.
+- [ ] **Comunicación:** Anunciar el lanzamiento exitoso al equipo y a los beta testers.
 
 ---
-
-## Fase 1: Configuración de Infraestructura
-
-- [ ] **Proyecto en Vercel:**
-    - [ ] Crear el proyecto en Vercel y conectarlo al repositorio de GitHub.
-    - [ ] Configurar el dominio de producción.
-- [ ] **Proyecto en Supabase:**
-    - [ ] Crear el proyecto de producción en Supabase.
-    - [ ] Guardar las credenciales (`URL`, `anon_key`, `service_role_key`) de forma segura.
-    - [ ] Configurar una política de backups robusta.
-- [ ] **Variables de Entorno:**
-    - [ ] Añadir todas las variables de entorno de producción al proyecto de Vercel (Supabase, Google Maps, Gemini, Resend, Upstash).
-    - [ ] Doble verificación de que no se están usando credenciales de desarrollo.
-- [ ] **Migraciones de Base de Datos:**
-    - [ ] Ejecutar todas las migraciones en la base de datos de producción de Supabase usando la CLI.
-
-## Fase 2: Pruebas y Calidad
-
-- [ ] **Pruebas E2E:**
-    - [ ] Ejecutar la suite completa de pruebas E2E (Cypress) apuntando al entorno de staging/previsualización de Vercel.
-- [ ] **Pruebas de Carga (Opcional):**
-    - [ ] Realizar pruebas de carga básicas en los endpoints críticos (login, carga de rutas) para asegurar que soportan el número esperado de usuarios beta.
-- [ ] **Auditoría de Seguridad:**
-    - [ ] Revisar que todas las políticas de Row Level Security (RLS) en Supabase estén activadas y sean correctas.
-    - [ ] Verificar que la Content Security Policy (CSP) y la protección CSRF estén activas y configuradas para el dominio de producción.
-- [ ] **Pruebas Manuales (UAT):**
-    - [ ] Realizar una prueba completa de los flujos principales (creación de usuario, planificación de ruta, ejecución de ruta por el mercaderista) por parte del equipo.
-
-## Fase 3: Despliegue y Lanzamiento
-
-- [ ] **Migración de Datos Iniciales:**
-    - [ ] Cargar los datos de los usuarios beta (supervisores, mercaderistas) y puntos de venta a la base de datos de producción.
-- [ ] **Despliegue Final:**
-    - [ ] Hacer merge de la rama de lanzamiento a `main` para disparar el despliegue final en Vercel.
-- [ ] **Monitoreo:**
-    - [ ] Configurar el monitoreo en Vercel y Supabase para observar el rendimiento y los errores.
-    - [ ] Establecer un canal de comunicación (ej. Slack, Discord) para que los usuarios beta puedan reportar problemas.
-- [ ] **Comunicación:**
-    - [ ] Enviar las invitaciones y credenciales a los usuarios de la beta cerrada.
-    - [ ] Proporcionar una guía rápida de uso o un video tutorial.
+*Certificado para Producción y Despliegue.*
