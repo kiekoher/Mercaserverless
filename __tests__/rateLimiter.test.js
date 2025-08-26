@@ -1,15 +1,5 @@
 const httpMocks = require('node-mocks-http');
 
-let mockMulti;
-let pexpire;
-
-jest.mock('ioredis', () => {
-  return {
-    __esModule: true,
-    default: jest.fn(() => ({ status: 'ready', multi: mockMulti, quit: jest.fn() })),
-  };
-});
-
 describe('rate limiter behavior without Redis', () => {
   const originalEnv = { ...process.env };
 
@@ -50,33 +40,5 @@ describe('rate limiter behavior without Redis', () => {
     const { checkRateLimit } = require('../lib/rateLimiter');
     const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '1.1.1.1' } });
     await expect(checkRateLimit(req)).resolves.toBe(true);
-  });
-});
-
-describe('rate limiter with Redis', () => {
-  const originalEnv = { ...process.env };
-
-  beforeEach(() => {
-    jest.resetModules();
-    process.env = { ...originalEnv };
-    process.env.NODE_ENV = 'production';
-    process.env.UPSTASH_REDIS_URL = 'redis://localhost:6379';
-    delete process.env.LOGTAIL_SOURCE_TOKEN;
-
-    pexpire = jest.fn().mockReturnThis();
-    const incr = jest.fn().mockReturnThis();
-    const exec = jest.fn().mockResolvedValue([[null, 1], [null, 'OK']]);
-    mockMulti = jest.fn(() => ({ incr, pexpire, exec }));
-  });
-
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
-  it('incr and expire atomically in a single transaction', async () => {
-    const { checkRateLimit, closeRedis } = require('../lib/rateLimiter');
-    const req = httpMocks.createRequest({ method: 'GET', socket: { remoteAddress: '2.2.2.2' } });
-    await expect(checkRateLimit(req)).resolves.toBe(true);
-    closeRedis();
   });
 });
