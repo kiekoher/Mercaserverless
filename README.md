@@ -131,33 +131,11 @@ npm run lint
 ```
 Este comando utiliza variables de entorno de `.env.test`.
 
-## Despliegue y Arquitectura Serverless
+## Despliegue en Producción
 
-Este proyecto está diseñado para una arquitectura 100% serverless utilizando **Vercel** para el despliegue y servicios gestionados en la nube.
+Aunque este proyecto fue diseñado inicialmente para una arquitectura serverless, la configuración recomendada para producción se ha consolidado en un despliegue autocontenido y robusto utilizando **Docker y Docker Compose**.
 
-### Despliegue en Vercel
+Este enfoque proporciona un control total sobre la infraestructura y está diseñado para ser desplegado en cualquier proveedor de máquinas virtuales (como DigitalOcean, AWS EC2, etc.).
 
-La aplicación se despliega automáticamente en Vercel con cada `push` a la rama `main`. Vercel se encarga de la compilación, el despliegue y la escalabilidad de la aplicación Next.js.
-
-### Gestión de Variables de Entorno en Producción
-
-Todas las variables de entorno requeridas por la aplicación (ver `.env.example`) **son obligatorias** y deben configurarse directamente en el **panel de control de Vercel** para el proyecto correspondiente. La aplicación no arrancará correctamente si falta alguna de ellas. Esto incluye:
-- Credenciales de Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`).
-- Claves de API para servicios externos (`GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`).
-- URL del servicio de Redis. Se soporta la conexión REST de Upstash mediante `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` o el URL clásico `UPSTASH_REDIS_URL`.
-- Token del servicio de logging (`LOGTAIL_SOURCE_TOKEN`).
-- Tiempo máximo de espera para la API de IA (`AI_TIMEOUT_MS`).
-- Control de *fail-open* para el rate limiter (`RATE_LIMIT_FAIL_OPEN`, por defecto `false`; establecer en `true` si desea que las solicitudes continúen cuando Redis no esté disponible). El `middleware` comparte este comportamiento y omite el bloqueo cuando la variable está activada.
-- Bypass de autenticación para pruebas (`NEXT_PUBLIC_BYPASS_AUTH_FOR_TESTS`, mantener en `false` en producción).
-
-No se debe utilizar el archivo `.env` en el entorno de producción.
-
-### Servicios en la Nube
-
-- **Rate Limiting:** Se utiliza un servicio de Redis serverless como [Upstash](https://upstash.com/) para gestionar el límite de peticiones a la API. Si no se configura Redis, las solicitudes no se limitan y el servicio se degrada de forma controlada.
-- **Logging:** Los logs de la aplicación son enviados a un servicio de logging externo como [Logtail](https://logtail.com/) para su centralización y análisis.
-
-### Seguridad y sanitización
-
-Los campos de texto enviados por los usuarios se procesan con la función `sanitizeInput` para eliminar etiquetas HTML y saltos de línea antes de almacenarlos. Esta mitigación reduce riesgos de inyección, pero se recomienda combinarla con validaciones adicionales según el contexto de uso.
+Para obtener una guía detallada paso a paso sobre cómo desplegar la aplicación en un servidor de producción, incluyendo la configuración de Nginx, SSL, y los procedimientos de mantenimiento como backups y migraciones, consulte la **[Guía de Despliegue (DEPLOYMENT.md)](./DEPLOYMENT.md)**.
 

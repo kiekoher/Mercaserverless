@@ -1,54 +1,88 @@
-# Checklist de Puesta en Producción
+# Guía de Despliegue en Servidor Dedicado con Docker
 
-Esta es la lista de verificación secuencial con todos los pasos a seguir para el despliegue de la aplicación en un entorno de producción para el beta cerrado.
+Esta guía describe el proceso para desplegar, mantener y actualizar la aplicación en una máquina virtual (ej. un Droplet de DigitalOcean) utilizando la configuración de Docker Compose para producción.
 
-## Fase 1: Verificaciones Finales del Código
+## Advertencia: Pruebas E2E
+**Nota Crítica:** El checklist de despliegue anterior (`Checklist de Puesta en Producción`) indicaba que las pruebas End-to-End (`npm run cy:run`) fallan de forma persistente. Antes de cualquier despliegue a producción, es **altamente recomendable** ejecutar una verificación manual de los flujos de usuario más importantes (login, creación de rutas, etc.) en un entorno de pre-producción.
 
-Estos pasos ya han sido completados por el equipo de SRE/desarrollo.
+## 1. Requisitos Previos
 
-- [X] **Implementar cabecera de `Content-Security-Policy`**: Verificado, implementado en `middleware.js`.
-- [X] **Implementar protección anti-CSRF en toda la API**: **Completado.** Se ha añadido una validación de token CSRF (Double Submit Cookie) en todos los endpoints que modifican datos.
-- [X] **Refactorizar funciones de base de datos para minimizar `SECURITY DEFINER`**: Completado.
-- [X] **Consolidar/Verificar políticas de RLS**: Verificado, las políticas actuales son seguras y no requieren cambios.
-- [X] **Actualizar dependencias `npm`**: Completado, sin vulnerabilidades conocidas.
-- [X] **Instrumentar el código para logging de alertas**: **Completado.** El código ahora emite todos los logs necesarios para las alertas de seguridad y rendimiento.
-- [X] **Verificar suite de pruebas unitarias (`npm test`)**: **Completado.** El 100% de las 101 pruebas unitarias pasan con éxito.
+Antes de comenzar, asegúrese de tener lo siguiente en su servidor de producción:
+- **Docker y Docker Compose** instalados.
+- **Git** instalado para clonar el repositorio.
+- Un **nombre de dominio** apuntando a la dirección IP de su servidor.
+- Un archivo `.env.prod` creado en la raíz del proyecto, con todas las variables de entorno configuradas según el `.env.prod.example`.
 
-## Fase 2: Pruebas y Acciones Manuales Críticas
+## 2. Despliegue Inicial
 
-Estos pasos deben ser ejecutados por el equipo antes del despliegue.
+Siga estos pasos la primera vez que despliegue la aplicación.
 
-1.  [ ] **Ejecutar Pruebas E2E (`npm run cy:run`)**:
-    *   **Acción:** Realizar una pasada final de las pruebas End-to-End.
-    *   **¡ADVERTENCIA!** Las pruebas E2E han estado fallando de forma persistente en el entorno de CI debido a un problema con la inicialización de la aplicación en Cypress. **Se recomienda encarecidamente realizar una verificación manual de los flujos de usuario principales** (login, ver ruta, crear PDV) en un entorno de pre-producción antes de continuar.
+### Paso 2.1: Iniciar los Servicios
+Clone el repositorio en su servidor y, desde la raíz del proyecto, ejecute el siguiente comando para construir las imágenes e iniciar todos los servicios en segundo plano:
 
-2.  [ ] **Realizar Simulacro de Restauración de Backup**:
-    *   **Acción:** Seguir la guía en `OPERATIONS.md` para realizar el primer simulacro de restauración de la base de datos de Supabase.
-    *   **Objetivo:** Validar la integridad de los backups y medir el Tiempo de Recuperación (RTO).
-    *   **Criticidad:** **Alta.** No desplegar si este paso falla.
+```bash
+docker-compose -f docker-compose.prod.yml up -d --build
+```
 
-3.  [ ] **Configurar Alertas de Monitorización**:
-    *   **Acción:** Utilizando la plataforma de logging (Logtail/Better Stack), configurar las alertas P1 y P2 detalladas en la sección "Monitoreo y Alertas" de `OPERATIONS.md`.
-    *   **Objetivo:** Asegurar que el equipo reciba notificaciones inmediatas de fallos críticos o degradación del servicio.
-    *   **Criticidad:** **Alta.**
+### Paso 2.2: Configurar SSL (Let's Encrypt)
+La configuración de Nginx está preparada para usar certificados SSL de Let's Encrypt. Para generar el certificado inicial y configurar la renovación automática, es necesario añadir un servicio `certbot` a su `docker-compose.prod.yml`:
 
-## Fase 3: Proceso de Despliegue
+```yaml
+# En docker-compose.prod.yml, añada este servicio:
+  certbot:
+    image: certbot/certbot
+    container_name: kimberly-certbot-prod
+    restart: unless-stopped
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew -q; sleep 12h & wait $${!}; done;'"
+```
 
-Estos son los pasos para el día del lanzamiento.
+Una vez añadido el servicio, ejecute el siguiente comando para generar el certificado inicial. Reemplace los datos de ejemplo:
+```bash
+docker-compose -f docker-compose.prod.yml run --rm certbot certonly --webroot --webroot-path /var/www/certbot --email your-email@example.com -d your.domain.com --agree-tos --no-eff-email --force-renewal
+```
 
-4.  [ ] **Pausar los Despliegues Automáticos**:
-    *   **Acción:** En el dashboard de Vercel, ir a `Project Settings > Git` y pausar los despliegues para evitar que commits accidentales interfieran con el lanzamiento.
+Finalmente, reinicie Nginx para que cargue los certificados:
+```bash
+docker-compose -f docker-compose.prod.yml restart nginx
+```
+El servicio de Certbot se encargará de renovar los certificados automáticamente.
 
-5.  [ ] **Desplegar la Versión Estable a Producción**:
-    *   **Acción:** Promocionar el último commit verificado de la rama `main` al dominio de producción.
+## 3. Mantenimiento y Actualizaciones
 
-6.  [ ] **Reanudar los Despliegues Automáticos**:
-    *   **Acción:** Una vez que el despliegue se ha confirmado como exitoso, volver a habilitar los despliegues automáticos en Vercel.
+### 3.1. Actualizar la Aplicación
+Para desplegar una nueva versión del código:
+1.  Obtenga los últimos cambios del repositorio: `git pull`
+2.  Reconstruya e inicie la aplicación:
+    ```bash
+    docker-compose -f docker-compose.prod.yml up -d --build app
+    ```
 
-## Fase 4: Monitoreo Post-Lanzamiento
+### 3.2. Aplicar Migraciones de Base de Datos (Procedimiento Seguro)
 
-7.  [ ] **Monitorear Activamente**:
-    *   **Acción:** Durante las primeras horas después del despliegue, monitorear de cerca los logs en Logtail, el dashboard de Vercel y el de Supabase para detectar cualquier comportamiento anómalo.
-    *   **Objetivo:** Identificar y responder rápidamente a cualquier incidente post-despliegue.
+Las migraciones modifican el esquema de la base de datos y deben aplicarse con cuidado. **Nunca** las aplique automáticamente durante el despliegue.
 
-¡Felicidades por el lanzamiento!
+**Paso 1: (Opcional pero Recomendado) Realizar un Backup Manual**
+El sistema realiza backups automáticos diarios. Sin embargo, antes de una migración importante, es prudente realizar uno manualmente:
+```bash
+docker-compose -f docker-compose.prod.yml exec postgres-backup backup
+```
+Esto creará un nuevo archivo de backup en el volumen `postgres_backups`.
+
+**Paso 2: Ejecutar la Migración**
+Utilice el siguiente comando para ejecutar un contenedor de un solo uso que aplicará las migraciones y luego se eliminará. Este es el método más seguro ya que utiliza el entorno exacto de la aplicación.
+
+```bash
+docker-compose -f docker-compose.prod.yml run --rm --entrypoint="npm run db:push" app
+```
+
+El flag `--rm` asegura que el contenedor se elimine después de completar la tarea. La opción `--entrypoint` anula el comando por defecto del contenedor (`node graceful-server.js`) y ejecuta únicamente el script de migración. Revise la salida del comando para asegurarse de que todas las migraciones se aplicaron correctamente.
+
+### 3.3. Restaurar un Backup de Base de Datos
+Para restaurar el último backup, puede ejecutar el siguiente comando. **ADVERTENCIA:** Esto sobreescribirá los datos actuales de la base de datos.
+```bash
+docker-compose -f docker-compose.prod.yml exec postgres-backup restore <backup-file-name.sql.gz>
+```
+Puede encontrar los nombres de los archivos de backup en el volumen `postgres_backups`.

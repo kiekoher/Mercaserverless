@@ -1,18 +1,18 @@
-# Guía Operacional para Despliegues en Vercel
+# Guía Operacional
 
-Este documento resume los procedimientos clave para mantener el sistema Mercaderista en un entorno de producción alojado en Vercel.
+Este documento resume los procedimientos clave para mantener el sistema Mercaderista en un entorno de producción.
 
 ## Requisitos de Configuración
 
-- Todas las variables de entorno listadas en `.env.example` deben definirse en el panel de Vercel antes de cada despliegue; la aplicación depende de ellas para iniciar correctamente.
-- El middleware habilita de forma predeterminada la protección CSRF y el *rate limiting*, por lo que es necesario mantener las claves de CSRF y el servicio de Redis configurados y monitoreados.
+- Todas las variables de entorno listadas en `.env.prod.example` deben definirse en el archivo `.env.prod` antes de cada despliegue. La aplicación depende de ellas para iniciar correctamente.
+- El middleware habilita de forma predeterminada la protección CSRF y el *rate limiting*, por lo que es necesario mantener el servicio de Redis configurado y monitoreado.
 
 ## Monitoreo y Alertas
 
 ### Fuentes de Observabilidad
-- **Logs**: La integración con Logtail (Better Stack) centraliza todos los logs de la aplicación. Es la fuente principal para alertas basadas en eventos.
-- **Métricas y APM**: Vercel Analytics y la integración con un servicio de APM (Datadog, Better Stack, etc.) son clave para monitorear el rendimiento (Core Web Vitals, latencia de API) y el estado general de las funciones serverless.
-- **Servicios de Terceros**: Los dashboards de Supabase y Upstash deben ser monitoreados para la salud específica de la base de datos y la caché/rate-limiter.
+- **Logs**: La integración con Logtail (Better Stack) centraliza todos los logs de la aplicación. Es la fuente principal para alertas basadas en eventos. Se recomienda configurar un agente en el servidor host para reenviar los logs de los contenedores Docker a este servicio.
+- **Métricas y APM**: La integración con un servicio de APM (Datadog, Better Stack, etc.) es clave para monitorear el rendimiento (latencia de API, uso de CPU/memoria de los contenedores).
+- **Servicios de Terceros**: Los dashboards de Supabase (si se usa para Auth) y los proveedores de API (Google) deben ser monitoreados para su estado de salud.
 
 ### Configuración de Alertas Recomendadas (en Logtail/Better Stack)
 
@@ -38,38 +38,31 @@ Es fundamental configurar alertas específicas y priorizadas para una respuesta 
   - **Razón:** Podría indicar un intento de ataque XSS o un error en el frontend que está bloqueando recursos legítimos.
 
 ## Rotación de Secretos
-- **Fuente de Verdad**: Vercel es la única fuente de verdad para todas las variables de entorno de producción.
-- **Procedimiento**: Programe rotaciones trimestrales de todas las claves y tokens sensibles, incluyendo `SUPABASE_SERVICE_KEY`, `LOGTAIL_SOURCE_TOKEN`, y las credenciales de Upstash Redis.
-- **Health Check Token**: Mantenga en secreto el `HEALTHCHECK_TOKEN` utilizado para el endpoint de salud interno (`/api/health`) y cámbielo si se sospecha de filtración. Este endpoint puede ser usado por servicios de monitoreo externos para verificar la disponibilidad de la API.
+- **Fuente de Verdad**: El archivo `.env.prod` en el servidor de producción es la única fuente de verdad para todas las variables de entorno. Este archivo **NUNCA** debe ser versionado en Git.
+- **Procedimiento**: Programe rotaciones trimestrales de todas las claves y tokens sensibles, incluyendo `SUPABASE_SERVICE_KEY`, `LOGTAIL_SOURCE_TOKEN`, y las credenciales de la base de datos y servicios externos.
+- **Health Check Token**: Mantenga en secreto el `HEALTHCHECK_TOKEN` utilizado para el endpoint de salud interno (`/api/health`) y cámbielo si se sospecha de filtración.
 - **Auditoría**: Documente cada rotación de secretos y revoque las credenciales antiguas inmediatamente después de confirmar que el nuevo secreto está funcionando correctamente.
 
 ## Respaldo y Recuperación
 
-### Base de Datos (Supabase)
+### Base de Datos (PostgreSQL en Docker)
 
-- **Activación de Backups**: Asegúrese de que los respaldos automáticos diarios (`Automated backups`) estén habilitados en el dashboard de Supabase (`Project Settings` > `Backups`). Para aplicaciones críticas, considere activar la recuperación de punto en el tiempo (`Point-in-Time Recovery`), que permite restaurar a cualquier minuto de las últimas horas o días (según el plan).
+- **Estrategia de Backups**: El servicio `postgres-backup` en `docker-compose.prod.yml` realiza backups automáticos diarios.
+- **Procedimiento de Restauración**: El procedimiento detallado para restaurar la base de datos desde un backup se encuentra en la **[Guía de Despliegue (DEPLOYMENT.md)](./DEPLOYMENT.md)**.
+- **Simulacro de Restauración (Trimestral)**: Es **crítico** realizar pruebas de restauración trimestrales para validar la integridad de los backups y el procedimiento documentado. El objetivo es medir y asegurar un Tiempo de Recuperación (RTO) aceptable.
 
-- **Procedimiento de Prueba de Restauración (Simulacro Trimestral)**: Realizar pruebas de restauración es **crítico** para validar la integridad de los backups y el plan de recuperación ante desastres.
-  1.  **Acceso y Selección**: Navegue al dashboard de Supabase del proyecto de producción, vaya a `Project Settings` > `Backups`. En la lista de `Automated backups`, elija un backup reciente para la prueba.
-  2.  **Restauración Aislada**: Inicie el proceso de restauración. **Es fundamental restaurar siempre en un NUEVO PROYECTO para no afectar la producción**. La interfaz de Supabase le guiará para crear una nueva instancia durante el proceso de restauración.
-  3.  **Medición del Tiempo**: Anote el tiempo total que tarda el proceso, desde el inicio de la restauración hasta que la nueva instancia está completamente operativa. Este es su Tiempo de Recuperación (RTO) estimado.
-  4.  **Validación de Datos**: Una vez que el proyecto temporal esté activo, realice comprobaciones básicas para verificar la integridad de los datos:
-      - Conéctese a la nueva base de datos.
-      - Ejecute consultas `SELECT COUNT(*)` en tablas clave como `profiles`, `rutas`, `puntos_de_venta`. Compare los resultados con los valores esperados.
-      - Verifique el contenido de una o dos filas recientes para confirmar que los datos son correctos.
-  5.  **Documentación y Limpieza**: Documente los resultados del simulacro: éxito/fallo, tiempo de restauración, y cualquier problema encontrado. Una vez completada la validación, **elimine inmediatamente el proyecto temporal** para evitar costes inesperados.
-
-### Configuración de Vercel
-- Antes de realizar cambios significativos en la configuración del proyecto en Vercel, tome una captura de pantalla o anote las configuraciones de variables de entorno y dominios.
+### Base de Datos (Supabase - Referencia)
+La siguiente sección se mantiene como referencia del diseño original. Si se utiliza Supabase como proveedor de base de datos en la nube, estos pasos aplican.
+- **Activación de Backups**: Asegúrese de que los respaldos automáticos diarios (`Automated backups`) estén habilitados en el dashboard de Supabase.
+- **Procedimiento de Prueba de Restauración**: Siga la guía de Supabase para restaurar un backup en un nuevo proyecto de prueba para validar la integridad de los datos.
 
 ## Manejo de Incidentes
-1.  **Contención**: Ante una falla crítica, pause inmediatamente los despliegues automáticos en el dashboard de Vercel (`Project Settings > Git > Pause Deployments`) para evitar que un nuevo commit empeore la situación.
-2.  **Diagnóstico**: Revise los logs en tiempo real en Logtail y el estado de los servicios en los dashboards de Vercel, Supabase y Upstash para identificar la causa raíz.
+1.  **Contención**: Ante una falla crítica, considere detener el despliegie de nuevas versiones (ej. congelando la rama `main`) para evitar que un nuevo commit empeore la situación.
+2.  **Diagnóstico**: Revise los logs en tiempo real en Logtail y el estado de los servicios (`docker-compose ps -a`) para identificar la causa raíz.
 3.  **Comunicación**: Informe a las partes interesadas sobre el incidente y el progreso de la resolución.
 4.  **Resolución y Post-mortem**: Una vez resuelto el incidente, documente la causa raíz, la solución aplicada y las lecciones aprendidas en un sistema de seguimiento de incidencias para prevenir futuras recurrencias.
 
 ## Contacto de Soporte
-- **Vercel**: https://vercel.com/support
 - **Supabase**: https://supabase.com/support
 - **Upstash**: https://upstash.com/support
 - **Logtail (Better Stack)**: https://betterstack.com/docs/logs/
