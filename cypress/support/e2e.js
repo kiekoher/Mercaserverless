@@ -27,6 +27,9 @@ before(() => {
 // require('./commands')
 
 Cypress.on('window:before:load', (win) => {
+  // Inject the CSRF token into the window so the app can pick it up
+  win.__CSRF_TOKEN__ = Cypress.env('csrfToken');
+
   const origFetch = win.fetch.bind(win);
   cy.stub(win, 'fetch')
     .callsFake((...args) => {
