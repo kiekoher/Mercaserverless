@@ -27,8 +27,8 @@ export async function middleware(req) {
 
   // 4. Apply Rate Limiting to all API requests to prevent abuse
   if (req.nextUrl.pathname.startsWith('/api/')) {
-    const rateLimitError = await checkRateLimit(req, { userId: session?.user?.id });
-    if (rateLimitError) {
+    const allowed = await checkRateLimit(req, { userId: session?.user?.id });
+    if (!allowed) {
       logger.warn({ ip: req.ip, userId: session?.user?.id, pathname: req.nextUrl.pathname }, 'Rate limit exceeded');
       return new NextResponse(JSON.stringify({ error: 'Too many requests' }), { status: 429, headers: { 'Content-Type': 'application/json' } });
     }

@@ -1,6 +1,6 @@
-const { randomBytes } = require('crypto');
-const { withLogging } = require('../../lib/api-logger');
-const { checkRateLimit } = require('../../lib/rateLimiter');
+import { randomBytes } from 'crypto';
+import { withLogging } from '../../lib/api-logger';
+import { checkRateLimit } from '../../lib/rateLimiter';
 
 async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -31,4 +31,4 @@ async function handler(req, res) {
   res.status(200).json({ csrfToken: token });
 }
 
-module.exports = withLogging(handler);;
+export default withLogging(handler);
