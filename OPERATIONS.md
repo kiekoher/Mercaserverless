@@ -32,19 +32,19 @@ Supabase ofrece backups automáticos en sus planes de pago. Si aún no está act
 2.  **Ir a Infraestructura > Backups:** (`Infrastructure` > `Backups`).
 3.  **Habilitar Backups Diarios:** Asegúrese de que los backups automáticos estén habilitados. Supabase generalmente retiene estos backups por 7 días en planes estándar. Verifique la política de retención de su plan.
 
-### 1.2. Estrategia de Backup Avanzada: Point-in-Time Recovery (PITR)
+### 1.2. Estrategia de Backup Certificada para Producción: Point-in-Time Recovery (PITR)
 
-Para aplicaciones de alta criticidad, los backups diarios pueden no ser suficientes. Un fallo entre backups podría significar hasta 24 horas de pérdida de datos. Para mitigar este riesgo, Supabase ofrece **Point-in-Time Recovery (PITR)**.
+**Recomendación Crítica de SRE:** Para cualquier despliegue en producción de esta aplicación, se **recomienda encarecidamente** la activación de Point-in-Time Recovery (PITR). Los backups diarios no son suficientes para una aplicación con datos transaccionales valiosos. La activación de PITR es un requisito para cumplir con el sello "Certified for Production".
 
 **¿Qué es PITR?**
 PITR es un sistema de backup continuo. En lugar de tomar una foto diaria, registra los cambios en la base de datos a medida que ocurren. Esto le permite restaurar la base de datos a **cualquier segundo específico** dentro de un período de retención (ej. los últimos 7 o 14 días).
 
-**Ventajas Clave:**
-- **Minimiza la Pérdida de Datos (RPO bajo):** Reduce el objetivo de punto de recuperación de 24 horas a solo unos segundos.
+**Ventajas Clave para este Proyecto:**
+- **Minimiza la Pérdida de Datos (RPO bajo):** Reduce el objetivo de punto de recuperación de 24 horas a solo unos segundos, protegiendo los datos de visitas y rutas.
 - **Mayor Eficiencia:** Para bases de datos grandes (>4 GB), PITR es más eficiente en recursos que los backups diarios completos.
 
 **Consideraciones:**
-- **Es un Add-on de Pago:** PITR tiene un costo adicional en su plan de Supabase. Debe evaluar si el costo justifica el nivel de protección para su caso de uso.
+- **Es un Add-on de Pago:** PITR tiene un costo adicional en su plan de Supabase. Este costo debe ser considerado como parte del costo operativo de mantener una aplicación robusta en producción.
 
 #### Cómo Habilitar y Usar PITR
 

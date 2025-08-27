@@ -49,21 +49,62 @@ async function handler(req, res) {
   }
   const { rutaId } = parsed.data;
 
-  // 1. Fetch all visits for the given route
-  const { data: visitas, error: visitasError } = await supabase
-    .from('visitas')
-    .select('*, puntos_de_venta(nombre)')
-    .eq('ruta_id', rutaId);
+  // 1. Fetch route details, including assigned rep, all PDVs, and all visits.
+  let routeQuery = supabase
+    .from('rutas')
+    .select(`
+      fecha,
+      profiles (full_name),
+      ruta_pdv (
+        pdv_id,
+        puntos_de_venta (nombre, direccion)
+      ),
+      visitas (
+        punto_de_venta_id,
+        estado,
+        check_in_at,
+        check_out_at,
+        observaciones
+      )
+    `)
+    .eq('id', rutaId)
+    .single();
 
-  if (visitasError) throw visitasError;
-  if (!visitas || visitas.length === 0) {
-    return res.status(404).json({ error: 'No se encontraron visitas para esta ruta.' });
+  const { data: routeData, error: routeError } = await routeQuery;
+
+  if (routeError) {
+    logger.error({ err: routeError, rutaId }, 'Error fetching route data for insights');
+    throw routeError;
+  }
+  if (!routeData) {
+    return res.status(404).json({ error: 'No se encontró la ruta especificada.' });
   }
 
+  const { profiles: rep, ruta_pdv: allPdvs, visitas, fecha } = routeData;
+
   // 2. Format the data for the AI prompt
-  const promptData = visitas.map(v =>
-    `- Punto: ${sanitizeInput(v.puntos_de_venta.nombre)}, Estado: ${sanitizeInput(v.estado)}, Check-in: ${sanitizeInput(v.check_in_at)}, Check-out: ${sanitizeInput(v.check_out_at)}, Observaciones: ${sanitizeInput(v.observaciones || 'N/A')}`
+  const visitedPdvIds = new Set(visitas.map(v => v.punto_de_venta_id));
+  const unvisitedPdvs = allPdvs.filter(pdv => !visitedPdvIds.has(pdv.pdv_id));
+
+  const visitedPdvsStr = visitas.map(v => {
+    const pdv = allPdvs.find(p => p.pdv_id === v.punto_de_venta_id);
+    return `- VISITADO: ${sanitizeInput(pdv?.puntos_de_venta?.nombre || 'PDV Desconocido')}, Estado: ${sanitizeInput(v.estado)}, Observaciones: ${sanitizeInput(v.observaciones || 'N/A')}`;
+  }).join('\n');
+
+  const unvisitedPdvsStr = unvisitedPdvs.map(pdv =>
+    `- NO VISITADO: ${sanitizeInput(pdv.puntos_de_venta.nombre)}`
   ).join('\n');
+
+  const promptData = `
+Fecha de la Ruta: ${fecha}
+Mercaderista: ${sanitizeInput(rep.full_name)}
+
+Visitas Realizadas:
+${visitedPdvsStr.length > 0 ? visitedPdvsStr : 'Ninguna'}
+
+Puntos de Venta No Visitados:
+${unvisitedPdvsStr.length > 0 ? unvisitedPdvsStr : 'Ninguno'}
+  `.trim();
 
   if (UNSAFE_PROMPT_PATTERN.test(promptData)) {
     logger.warn({ userId: user.id, rutaId }, 'Prompt contains unsafe content');
@@ -146,4 +187,6 @@ async function handler(req, res) {
   res.status(200).json(parsedOutput);
 }
 
-module.exports = withLogging(handler);;
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler;
+module.exports = mainHandler;

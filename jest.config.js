@@ -25,7 +25,7 @@ module.exports = {
     ],
   },
   transformIgnorePatterns: [
-    '/node_modules/(?!(@supabase|isows|@supabase/realtime-js|p-limit|yocto-queue)/)',
+    "/node_modules/(?!(p-retry|is-network-error|@supabase/ssr|@supabase/realtime-js|isows|p-limit|yocto-queue)/)",
     '^.+\\.module\\.(css|sass|scss)$',
   ],
 };
