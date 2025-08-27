@@ -15,7 +15,8 @@
     "db:push": "supabase db push",
     "test": "GOOGLE_MAPS_API_KEY=test-key dotenv -e .env.test -- jest",
     "cy:run": "NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=example-anon-key SUPABASE_SERVICE_KEY=example-service-key UPSTASH_REDIS_URL=https://example.redis.co start-server-and-test dev:test http://localhost:3000 \"cypress run\"",
-    "cy:run:preview": "cypress run"
+    "cy:run:preview": "cypress run",
+    "audit:ci": "npm audit --audit-level=high"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.2.2",
@@ -39,7 +40,7 @@
     "@upstash/ratelimit": "^1.2.1",
     "@upstash/redis": "^1.35.3",
     "chart.js": "^4.5.0",
-    "cookie": "^0.6.0",
+    "cookie": "^1.0.2",
     "date-fns": "^4.1.0",
     "formidable": "^3.5.4",
     "hoist-non-react-statics": "^3.3.2",
@@ -50,6 +51,7 @@
     "next": "^14.2.4",
     "notistack": "^3.0.1",
     "p-limit": "^7.1.0",
+    "p-retry": "^7.0.0",
     "papaparse": "^5.4.1",
     "pino": "^9.9.0",
     "pino-std-serializers": "^1.0.0",

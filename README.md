@@ -50,8 +50,10 @@ Para una guía detallada sobre cómo configurar las variables de entorno para ca
 La aplicación ha sido robustecida con las siguientes medidas de seguridad:
 - **Cabeceras de Seguridad:** Se implementa una Política de Seguridad de Contenidos (CSP) estricta y otras cabeceras de seguridad (`X-Content-Type-Options`, `Referrer-Policy`, etc.) a través de middleware para mitigar ataques XSS y otros vectores.
 - **Endpoint de Health Check Securizado:** El endpoint `/api/health` requiere un token de autorización para evitar su abuso.
-- **CI/CD Seguro:** El pipeline de integración continua incluye auditoría de dependencias y análisis estático de código (SAST) con Semgrep.
+- **CI/CD Seguro:** El pipeline de integración continua ahora está preparado para incluir auditoría de dependencias automatizada.
 
 ### Operaciones y Monitorización
 
 Para instrucciones sobre recuperación ante desastres, monitorización y configuración de alertas, consulta la **[Guía de Operaciones](./OPERATIONS.md)**.
+
+**Nota sobre Backups en Producción:** La configuración certificada para producción de este proyecto requiere la activación de **Point-in-Time Recovery (PITR)** en Supabase para minimizar la pérdida de datos. Consulta la guía de operaciones para más detalles.

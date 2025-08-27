@@ -2,7 +2,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { requireUser } = require('../../lib/auth');
 const { createMockReq, createMockRes } = require('../../lib/test-utils');
-const { rawHandler: handler } = require('../../pages/api/visitas');
+const { rawHandler: handler } = require('../../pages/api/visitas').default;
 
 jest.mock('../../lib/auth');
 jest.mock('@supabase/supabase-js');
