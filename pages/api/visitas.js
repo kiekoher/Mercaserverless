@@ -1,141 +1,54 @@
-import { z } from 'zod';
-import { withLogging } from '../../lib/api-logger';
-import { requireUser } from '../../lib/auth';
-import logger from '../../lib/logger.server';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import { sanitizeInput } from '../../lib/sanitize';
+import { createClient } from '@supabase/supabase-js';
 
-async function handler(req, res) {
-  const { error: authError, supabase, user, role } = await requireUser(req, res);
-  if (authError) {
-    return res.status(authError.status).json({ error: authError.message });
-  }
+// Initialize the Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // MÉTODO GET: Para que supervisores puedan ver las visitas de una ruta
-  if (req.method === 'GET') {
-    if (!['supervisor', 'admin'].includes(role)) {
-      return res.status(403).json({ error: 'No tienes permiso para ver esta información.' });
-    }
-    if (!(await checkRateLimit(req, { userId: user.id }))) {
-      return res.status(429).json({ error: 'Too Many Requests' });
-    }
-    const querySchema = z.object({
-      ruta_id: z.coerce.number(),
-      page: z.coerce.number().min(1).optional(),
-      pageSize: z.coerce.number().min(1).max(100).optional(),
-    });
-    const parsed = querySchema.safeParse(req.query);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Se requiere un ID de ruta válido.' });
-    }
-    const { ruta_id, page = 1, pageSize = 50 } = parsed.data;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
+export default async function handler(req, res) {
+  console.log('--- Nueva solicitud a /api/visitas ---');
+  console.log('Variables de entorno cargadas:', {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    key: process.env.SUPABASE_SERVICE_KEY ? '[CARGADA]' : '[NO CARGADA]',
+  });
+  try {
+    // 1. Extract and parse query parameters with defaults
+    const { vendedorId, page = 1, limit = 10, sortBy = 'fecha', order = 'desc' } = req.query;
 
-    // CORRECT SYNTAX: .select() -> .eq() -> .range()
+    // Check for the required vendedorId
+    if (!vendedorId) {
+      return res.status(400).json({ error: 'El parámetro vendedorId es requerido.' });
+    }
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
+
+    // 2. Start building the base query
     let query = supabase
       .from('visitas')
-      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto', { count: 'exact' });
+      .select('id, fecha, nombre_cliente, estado, vendedor_id', { count: 'exact' });
 
-    query = query.eq('ruta_id', ruta_id);
+    // 3. Apply the mandatory filter for vendedorId
+    // The query object is reassigned after adding the filter
+    query = query.eq('vendedor_id', vendedorId);
 
-    const { data, error, count } = await query.range(from, to);
+    // 4. Chain the final modifiers and execute the query
+    const { data, error, count } = await query
+      .order(sortBy, { ascending: order === 'asc' })
+      .range(from, to);
 
-    if (error) throw error;
-    return res.status(200).json({ data, totalCount: count });
+    // 5. Handle potential errors from the query execution
+    if (error) {
+      throw error;
+    }
+
+    // 6. Send the successful response
+    res.status(200).json({ data, count });
+
+  } catch (error) {
+    console.error('Error fetching visitas:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
-
-  // MÉTODO POST: Para crear un registro de visita (Check-in)
-  if (req.method === 'POST') {
-    if (role !== 'mercaderista') {
-      return res.status(403).json({ error: 'Solo los mercaderistas pueden registrar visitas.' });
-    }
-    if (!(await checkRateLimit(req, { userId: user.id }))) {
-      return res.status(429).json({ error: 'Too Many Requests' });
-    }
-    const postSchema = z.object({
-      ruta_id: z.number(),
-      punto_de_venta_id: z.number(),
-      url_foto: z.string().url().optional(),
-    });
-    const parsed = postSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Datos de visita inválidos.' });
-    }
-    const { ruta_id, punto_de_venta_id, url_foto } = parsed.data;
-
-    const { data: validationData, error: validationError } = await supabase
-      .from('ruta_pdv')
-      .select('id, rutas(mercaderista_id)')
-      .eq('ruta_id', ruta_id)
-      .eq('pdv_id', punto_de_venta_id)
-      .single();
-
-    if (validationError || !validationData) {
-      logger.warn({ err: validationError, userId: user.id, ruta_id, punto_de_venta_id }, 'User tried to check-in to a point not in the route or route not found');
-      return res.status(404).json({ error: 'El punto de venta no pertenece a la ruta especificada o la ruta no existe.' });
-    }
-
-    if (!validationData.rutas || validationData.rutas.mercaderista_id !== user.id) {
-      logger.warn({ userId: user.id, ruta_id, expectedOwner: validationData.rutas?.mercaderista_id }, 'User tried to check-in to a route not assigned to them');
-      return res.status(403).json({ error: 'No tienes permiso para registrar visitas en esta ruta.' });
-    }
-
-    const { data: existingVisit } = await supabase.from('visitas').select('id').eq('ruta_id', ruta_id).eq('punto_de_venta_id', punto_de_venta_id).is('check_out_at', null).single();
-    if (existingVisit) {
-      return res.status(409).json({ error: 'Visita ya iniciada para este punto' });
-    }
-    const { data, error } = await supabase
-      .from('visitas')
-      .insert({ ruta_id, punto_de_venta_id, mercaderista_id: user.id, check_in_at: new Date().toISOString(), estado: 'En Progreso', url_foto })
-      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
-      .single();
-    if (error) throw error;
-    return res.status(201).json(data);
-  }
-
-  // MÉTODO PUT: Para actualizar una visita (Check-out y feedback)
-  if (req.method === 'PUT') {
-    if (role !== 'mercaderista') {
-      return res.status(403).json({ error: 'Solo los mercaderistas pueden actualizar visitas.' });
-    }
-    if (!(await checkRateLimit(req, { userId: user.id }))) {
-      return res.status(429).json({ error: 'Too Many Requests' });
-    }
-    const putSchema = z.object({
-      visita_id: z.number(),
-      estado: z.enum(['En Progreso', 'Completada', 'Incidencia']),
-      observaciones: z.string().optional(),
-      url_foto: z.string().url().optional(),
-    });
-    const parsed = putSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Datos de actualización inválidos.' });
-    }
-    const { visita_id, estado, observaciones, url_foto } = parsed.data;
-    const sanitizedObs = observaciones ? sanitizeInput(observaciones) : undefined;
-    const { data: existingVisit, error: fetchError } = await supabase.from('visitas').select('check_out_at').eq('id', visita_id).eq('mercaderista_id', user.id).single();
-    if (fetchError || !existingVisit) {
-      return res.status(404).json({ error: 'Visita no encontrada' });
-    }
-    if (existingVisit.check_out_at) {
-      return res.status(400).json({ error: 'Visita ya finalizada' });
-    }
-    const { data, error } = await supabase
-      .from('visitas')
-      .update({ estado, observaciones: sanitizedObs, url_foto, check_out_at: new Date().toISOString() })
-      .eq('id', visita_id)
-      .eq('mercaderista_id', user.id)
-      .select('id,ruta_id,punto_de_venta_id,mercaderista_id,check_in_at,check_out_at,estado,observaciones,url_foto')
-      .single();
-    if (error) throw error;
-    return res.status(200).json(data);
-  }
-
-  res.setHeader('Allow', ['GET', 'POST', 'PUT']);
-  res.status(405).end(`Method ${req.method} Not Allowed`);
 }
-
-const mainHandler = withLogging(handler);
-mainHandler.rawHandler = handler;
-export default mainHandler;

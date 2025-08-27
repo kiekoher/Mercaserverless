@@ -1,57 +1,52 @@
-import { z } from 'zod';
-import { withLogging } from '../../lib/api-logger';
-import { requireUser } from '../../lib/auth';
-import { checkRateLimit } from '../../lib/rateLimiter';
-import { sanitizeInput } from '../../lib/sanitize';
+import { createClient } from '@supabase/supabase-js';
 
-async function handler(req, res) {
-  const { error: authError, supabase, user } = await requireUser(req, res, ['admin', 'supervisor']);
-  if (authError) {
-    return res.status(authError.status).json({ error: authError.message });
-  }
+// Initialize the Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-  if (!(await checkRateLimit(req, { userId: user.id }))) {
-    return res.status(429).json({ error: 'Too many requests' });
-  }
+export default async function handler(req, res) {
+  console.log('--- Nueva solicitud a /api/users ---');
+  console.log('Variables de entorno cargadas:', {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    key: process.env.SUPABASE_SERVICE_KEY ? '[CARGADA]' : '[NO CARGADA]',
+  });
+  try {
+    // 1. Extract and parse query parameters with defaults
+    const { searchTerm = '', page = 1, limit = 10, sortBy = 'created_at', order = 'desc' } = req.query;
 
-  if (req.method === 'GET') {
-    const schema = z.object({
-      page: z.coerce.number().int().positive().default(1),
-      pageSize: z.coerce.number().int().min(10).max(100).default(20),
-      search: z.string().optional().default(''),
-    });
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const from = (pageNum - 1) * limitNum;
+    const to = from + limitNum - 1;
 
-    const parsed = schema.safeParse(req.query);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Parámetros de consulta inválidos.', details: parsed.error.format() });
-    }
-
-    const { page, pageSize, search } = parsed.data;
-    const safeSearch = sanitizeInput(search).slice(0, 50);
-
-    const { from, to } = { from: (page - 1) * pageSize, to: page * pageSize - 1 };
-
+    // 2. Start building the base query
     let query = supabase
-      .from('profiles')
-      .select('id, full_name, role', { count: 'exact' });
+      .from('users')
+      .select('id, name, email, role, created_at', { count: 'exact' });
 
-    if (safeSearch) {
-      query = query.ilike('full_name', `%${safeSearch}%`);
+    // 3. Conditionally apply the search filter
+    if (searchTerm) {
+      // Reassign the query object after adding the filter
+      query = query.ilike('name', `%${searchTerm}%`);
     }
 
-    const { data, error, count } = await query.range(from, to).order('id');
+    // 4. Chain the final modifiers and execute the query
+    const { data, error, count } = await query
+      .order(sortBy, { ascending: order === 'asc' })
+      .range(from, to);
 
+    // 5. Handle potential errors from the query execution
     if (error) {
       throw error;
     }
 
-    return res.status(200).json({ data, totalCount: count });
+    // 6. Send the successful response
+    res.status(200).json({ data, count });
+
+  } catch (error) {
+    // Log the detailed error for debugging
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
-
-  res.setHeader('Allow', ['GET']);
-  res.status(405).end('Method Not Allowed');
 }
-
-const mainHandler = withLogging(handler);
-mainHandler.rawHandler = handler;
-export default mainHandler;
