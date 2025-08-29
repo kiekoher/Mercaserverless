@@ -124,7 +124,7 @@ describe('visitas API', () => {
     supabase.select.mockReturnValueOnce(supabase);
     supabase.eq.mockReturnValueOnce(supabase);
     supabase.eq.mockReturnValueOnce(supabase);
-    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: null }, error: null });
+    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: null, mercaderista_id: 'u1' }, error: null });
 
     supabase.from.mockReturnValueOnce(supabase);
     supabase.update.mockReturnValueOnce(supabase);
@@ -149,7 +149,7 @@ describe('visitas API', () => {
     supabase.select.mockReturnValueOnce(supabase);
     supabase.eq.mockReturnValueOnce(supabase);
     supabase.eq.mockReturnValueOnce(supabase);
-    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: '2024-01-01T12:00:00Z' }, error: null });
+    supabase.single.mockResolvedValueOnce({ data: { id: 1, check_out_at: '2024-01-01T12:00:00Z', mercaderista_id: 'u1' }, error: null });
 
     const req = createMockReq('PUT', { visita_id: 1, estado: 'Completada' });
     const res = createMockRes();

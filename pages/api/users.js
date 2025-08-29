@@ -1,52 +1,51 @@
-import { createClient } from '@supabase/supabase-js';
+import { withLogging } from '../../lib/api-logger';
+import { requireUser } from '../../lib/auth';
+import { z } from 'zod';
 
-// Initialize the Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const schema = z.object({
+  page: z.preprocess(Number, z.number().int().min(1).default(1)),
+  pageSize: z.preprocess(Number, z.number().int().min(1).max(100).default(20)),
+  search: z.string().optional(),
+});
 
-export default async function handler(req, res) {
-  console.log('--- Nueva solicitud a /api/users ---');
-  console.log('Variables de entorno cargadas:', {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    key: process.env.SUPABASE_SERVICE_KEY ? '[CARGADA]' : '[NO CARGADA]',
-  });
-  try {
-    // 1. Extract and parse query parameters with defaults
-    const { searchTerm = '', page = 1, limit = 10, sortBy = 'created_at', order = 'desc' } = req.query;
-
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const from = (pageNum - 1) * limitNum;
-    const to = from + limitNum - 1;
-
-    // 2. Start building the base query
-    let query = supabase
-      .from('users')
-      .select('id, name, email, role, created_at', { count: 'exact' });
-
-    // 3. Conditionally apply the search filter
-    if (searchTerm) {
-      // Reassign the query object after adding the filter
-      query = query.ilike('name', `%${searchTerm}%`);
-    }
-
-    // 4. Chain the final modifiers and execute the query
-    const { data, error, count } = await query
-      .order(sortBy, { ascending: order === 'asc' })
-      .range(from, to);
-
-    // 5. Handle potential errors from the query execution
-    if (error) {
-      throw error;
-    }
-
-    // 6. Send the successful response
-    res.status(200).json({ data, count });
-
-  } catch (error) {
-    // Log the detailed error for debugging
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Server error: ' + error.message });
+async function handler(req, res) {
+  const { error: authError, supabase, role } = await requireUser(req, res, ['admin', 'supervisor']);
+  if (authError) {
+    return res.status(authError.status).json({ error: authError.message });
   }
+
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  const parsedQuery = schema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    return res.status(400).json({ error: 'Parámetros de consulta inválidos', details: parsedQuery.error.format() });
+  }
+  const { page, pageSize, search } = parsedQuery.data;
+  const offset = (page - 1) * pageSize;
+
+  let query = supabase
+    .from('profiles')
+    .select('id, full_name, email, role, created_at', { count: 'exact' });
+
+  if (search) {
+    query = query.ilike('full_name', `%${search}%`);
+  }
+
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(offset, offset + pageSize - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return res.status(200).json({ data, totalCount: count });
 }
+
+const mainHandler = withLogging(handler);
+mainHandler.rawHandler = handler; // Attaching the raw handler for testing
+
+export default mainHandler;

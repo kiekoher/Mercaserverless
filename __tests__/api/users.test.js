@@ -19,7 +19,7 @@ describe('users API', () => {
       eq: jest.fn().mockReturnThis(),
       single: jest.fn(),
       range: jest.fn().mockReturnThis(),
-      order: jest.fn(),
+      order: jest.fn().mockReturnThis(),
     };
     createClient.mockReturnValue(supabase);
   });
@@ -34,9 +34,9 @@ describe('users API', () => {
 
   it('returns a list of users for admin', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'admin', supabase });
-    supabase.order.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
+    supabase.range.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
 
-    const req = createMockReq('GET');
+    const req = createMockReq('GET', undefined, { page: '1', pageSize: '10' });
     const res = createMockRes();
     await handler(req, res);
 
@@ -48,9 +48,9 @@ describe('users API', () => {
 
   it('returns a list of users for supervisor', async () => {
     requireUser.mockResolvedValue({ user: { id: 'u1' }, role: 'supervisor', supabase });
-    supabase.order.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
+    supabase.range.mockResolvedValue({ data: [{ id: 'u2', full_name: 'Test User', role: 'mercaderista' }], count: 1, error: null });
 
-    const req = createMockReq('GET');
+    const req = createMockReq('GET', undefined, { page: '1', pageSize: '10' });
     const res = createMockRes();
     await handler(req, res);
 
