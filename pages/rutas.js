@@ -12,6 +12,7 @@ import { useSnackbar } from 'notistack';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MapIcon from '@mui/icons-material/Map';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 import dynamic from 'next/dynamic';
 import { useAuthorization } from '../hooks/useAuthorization';
 import { useCsrfFetcher } from '../lib/fetchWithCsrf';
@@ -52,6 +53,12 @@ export default function RutasPage() {
   const [loadingVisitas, setLoadingVisitas] = useState(false);
   const [summaryContent, setSummaryContent] = useState('');
   const [loadingSummary, setLoadingSummary] = useState(false);
+
+  // State for the new AI Analysis feature
+  const [analysisModalOpen, setAnalysisModalOpen] = useState(false);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [analysisContent, setAnalysisContent] = useState(null);
+  const [selectedRutaForAnalysis, setSelectedRutaForAnalysis] = useState(null);
 
   // Estado del formulario
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
@@ -193,6 +200,28 @@ export default function RutasPage() {
       enqueueSnackbar(err.message, { variant: 'error' });
     } finally {
       setLoadingSummary(false);
+    }
+  };
+
+  const handleGenerateInsights = async (ruta) => {
+    setLoadingAnalysis(true);
+    setSelectedRutaForAnalysis(ruta);
+    setAnalysisContent(null);
+    try {
+      const res = await fetchWithCsrf('/api/generate-insights', {
+        method: 'POST',
+        body: JSON.stringify({ rutaId: ruta.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo generar el análisis.');
+      }
+      setAnalysisContent(data);
+      setAnalysisModalOpen(true);
+    } catch (err) {
+      enqueueSnackbar(err.message, { variant: 'error' });
+    } finally {
+      setLoadingAnalysis(false);
     }
   };
 
@@ -397,6 +426,16 @@ export default function RutasPage() {
                             </IconButton>
                           </span>
                         </Tooltip>
+                        <Tooltip title="Generar Análisis IA">
+                          <span>
+                            <IconButton
+                              onClick={() => handleGenerateInsights(ruta)}
+                              disabled={loadingAnalysis && selectedRutaForAnalysis?.id === ruta.id}
+                            >
+                              {loadingAnalysis && selectedRutaForAnalysis?.id === ruta.id ? <CircularProgress size={24} /> : <AnalyticsIcon />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                         <Button size="small" onClick={() => openEditRutaDialog(ruta)}>Editar</Button>
                         <Button size="small" color="error" onClick={() => openDeleteRutaDialog(ruta)}>Eliminar</Button>
                       </TableCell>
@@ -591,6 +630,51 @@ export default function RutasPage() {
              <Button onClick={() => setPlanModalOpen(false)} sx={{ mt: 2 }}>
                 Cerrar
             </Button>
+        </Box>
+      </Modal>
+
+      <Modal open={analysisModalOpen} onClose={() => setAnalysisModalOpen(false)}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" gutterBottom>
+            Análisis de Ruta por IA
+          </Typography>
+          {loadingAnalysis ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : analysisContent ? (
+            <Box>
+              <Card variant="outlined" sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>KPI Clave</Typography>
+                  <Typography variant="h5" component="div">{analysisContent.kpi}</Typography>
+                </CardContent>
+              </Card>
+              <Card variant="outlined" sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>Observación</Typography>
+                  <Typography variant="body2">{analysisContent.observation}</Typography>
+                </CardContent>
+              </Card>
+              <Card variant="outlined" sx={{ mb: 2 }}>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>Insight</Typography>
+                  <Typography variant="body2">{analysisContent.insight}</Typography>
+                </CardContent>
+              </Card>
+              <Card variant="outlined" sx={{ backgroundColor: '#e3f2fd' }}>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>Recomendación</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{analysisContent.recommendation}</Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          ) : (
+            <Typography sx={{ p: 2 }}>No hay datos de análisis para mostrar.</Typography>
+          )}
+          <Button onClick={() => setAnalysisModalOpen(false)} sx={{ mt: 2 }}>
+            Cerrar
+          </Button>
         </Box>
       </Modal>
 
